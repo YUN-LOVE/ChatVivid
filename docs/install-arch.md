@@ -102,21 +102,56 @@ mv commandlinetools/cmdline-tools "$ANDROID_HOME/cmdline-tools/latest"
 
 如果上面的版本号 404，去官方页面复制最新的 `commandlinetools-linux-*_latest.zip` 链接替换。
 
-把环境变量写进 shell 配置（zsh 示例，bash 改 `~/.bashrc`）：
+把环境变量写进 shell 配置。**关键是让 Java 17 和 `$ANDROID_HOME/cmdline-tools/latest/bin` 排在
+系统旧 `/opt/android-sdk/tools/bin` 前面**，否则会用到旧 `sdkmanager` + Java 25，报
+`NoClassDefFoundError: javax/xml/bind/annotation/XmlSchema`。
+
+### zsh / bash
 
 ```bash
-cat >> ~/.zshrc <<'EOF'
 export ANDROID_HOME="$HOME/Android/Sdk"
 export ANDROID_SDK_ROOT="$ANDROID_HOME"
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk
-export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
-EOF
-source ~/.zshrc
+export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+```
+
+写进 `~/.zshrc` / `~/.bashrc` 时用同样内容。
+
+### fish（你的 shell）
+
+```fish
+set -Ux ANDROID_HOME $HOME/Android/Sdk
+set -Ux ANDROID_SDK_ROOT $HOME/Android/Sdk
+set -Ux JAVA_HOME /usr/lib/jvm/java-17-openjdk
+fish_add_path --prepend $ANDROID_HOME/cmdline-tools/latest/bin
+fish_add_path --prepend /usr/lib/jvm/java-17-openjdk/bin
+```
+
+`set -Ux` 和 `fish_add_path` 会持久化，不需要改 `~/.zshrc`。检查：
+
+```fish
+type -a sdkmanager
+# 期望第一行：/home/YOU/Android/Sdk/cmdline-tools/latest/bin/sdkmanager
+# 如果第一行是 /opt/android-sdk/tools/bin/sdkmanager，说明旧路径还在前面
+
+which java
+java -version   # 必须是 17，不是 25
+```
+
+如果 `sdkmanager` 仍指向 `/opt/android-sdk/tools/bin`，把该旧路径从 PATH 移除，或直接用绝对路径：
+
+```fish
+env JAVA_HOME=/usr/lib/jvm/java-17-openjdk \
+  PATH=/usr/lib/jvm/java-17-openjdk/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH \
+  $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
 ```
 
 ### 3.3 接受许可 + 安装 SDK 组件
 
 ```bash
+type -a sdkmanager
+java -version
+
 yes | sdkmanager --licenses
 
 sdkmanager --install \
@@ -241,5 +276,6 @@ flutter build apk --debug
 | `flutter build apk` 卡在 Gradle | 首次下载依赖；检查网络/代理 |
 | `flutter_live2d` 编译失败 | 确认 NDK + CMake 已装，`sdkmanager --list_installed` 有 `ndk`/`cmake` |
 | 桌面没有 Live2D | `flutter_live2d` 只覆盖 Android/iOS；桌面 v1 静态，后续补 adapter |
+| `NoClassDefFoundError: javax/xml/bind/annotation/XmlSchema` | PATH 里旧 `/opt/android-sdk/tools/bin/sdkmanager` 或 `java` 是 25；让 Java 17 + `$ANDROID_HOME/cmdline-tools/latest/bin` 排前面，或绝对路径调用 |
 | CMake 找不到 SQLite/CURL | 装 `sqlite curl openssl pkgconf`，清空 `build/` 重配 |
 | AUR Flutter 与 dart 冲突 | 移除独立 `dart`，或用官方 tarball |
