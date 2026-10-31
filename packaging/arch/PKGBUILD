@@ -1,0 +1,34 @@
+# Maintainer: YOUR NAME <you@example.com>
+# Template: replace OWNER, license, and sha256sums before publishing to AUR.
+pkgname=chatvv-server
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Personal AI memory server (C++ core)"
+arch=('x86_64' 'aarch64')
+url="https://github.com/OWNER/chatvv"
+license=('custom') # TODO: add the project LICENSE and set SPDX id
+depends=('sqlite' 'curl' 'openssl')
+makedepends=('clang' 'cmake' 'ninja' 'pkgconf')
+source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP') # TODO: replace with the real hash for AUR
+
+build() {
+  cd "$srcdir/chatvv-$pkgver"
+  cmake -S . -B build -G Ninja \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_INSTALL_PREFIX=/usr
+  cmake --build build
+}
+
+check() {
+  cd "$srcdir/chatvv-$pkgver"
+  ctest --test-dir build --output-on-failure
+}
+
+package() {
+  cd "$srcdir/chatvv-$pkgver"
+  DESTDIR="$pkgdir" cmake --install build
+  install -Dm644 README.md "$pkgdir/usr/share/doc/chatvv/README.md"
+  install -Dm644 config/config.example.toml "$pkgdir/etc/chatvv/config.toml"
+}
