@@ -28,7 +28,13 @@ class _ChatScreenState extends State<ChatScreen> {
     super.initState();
     _chat = ChatController();
     _chat.addListener(_onChatChanged);
-    _chat.initialize();
+    _chat.initialize().then((_) {
+      if (!mounted) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      });
+    });
   }
 
   void _onChatChanged() {
