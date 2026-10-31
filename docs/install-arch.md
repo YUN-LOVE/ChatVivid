@@ -38,7 +38,7 @@ ctest --preset dev
 ### 方案 A：AUR（推荐，省事）
 
 ```bash
-paru -S --needed flutter android-studio android-udev
+paru -S --needed flutter android-studio
 ```
 
 当前 AUR 版本参考：`flutter 3.41.2-3`、`android-studio 2026.2.2.8-1`。
@@ -67,11 +67,15 @@ flutter doctor -v
 Android Studio 的 SDK Manager 最稳；也可以用 AUR 的 `android-sdk` + `sdkmanager`。
 
 ```bash
-# 官方 adb/fastboot + JDK
-sudo pacman -S --needed android-tools jdk17-openjdk
+# 官方 adb/fastboot + udev 规则 + JDK
+sudo pacman -S --needed android-tools android-udev jdk17-openjdk
 
 # 如果使用 AUR 的 command line tools
 paru -S --needed android-sdk android-sdk-platform-tools android-sdk-build-tools
+
+# 如果 sdkmanager 不在 PATH：AUR android-sdk 通常在 /opt/android-sdk
+export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
+export PATH="$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools"
 
 # 安装平台、构建工具、NDK、CMake（flutter_live2d 需要 NDK/CMake）
 sdkmanager --install \
@@ -89,7 +93,7 @@ flutter doctor -v
   Android 36 或更高 build-tools；按 `flutter doctor` 的提示装对应版本即可。
 - `flutter_live2d` 通过 NDK + CMake 编译 native GL 插件；Android 最低 API 24。
 - `flutter build apk` 第一次会下载 Gradle 依赖，比较慢。
-- 真机权限：装 AUR 的 `android-udev`，重新插拔设备；`adb devices` 应能看到。
+- 真机权限：装官方的 `android-udev`，重新插拔设备；`adb devices` 应能看到。
 
 ## 4. Linux 桌面 Flutter
 
