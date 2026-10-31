@@ -143,7 +143,7 @@ class ChatController extends ChangeNotifier {
       ChatMessage(
         id: 'intro',
         role: 'assistant',
-        content: '……你来了。\n今天，想从哪里开始？',
+        content: 'zako！',
         createdAt: DateTime.now(),
       ),
     );

@@ -36,7 +36,7 @@ class AppSettings {
       clientBaseUrl: 'http://127.0.0.1:8080',
       clientToken: '',
       provider: 'deepseek',
-      model: 'deepseek-chat',
+      model: 'deepseek-flash',
       fullBaseUrl: 'https://api.deepseek.com',
       fullEndpoint: '/responses',
       apiKey: '',

@@ -298,7 +298,7 @@ class _TopBar extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '水仙女',
+                        '大肥鱼',
                         style: TextStyle(
                           color: AppColors.text,
                           fontSize: 15,
@@ -500,7 +500,7 @@ class _MessageTile extends StatelessWidget {
                 Row(
                   children: [
                     const Text(
-                      '水仙女',
+                      '大肥鱼',
                       style: TextStyle(
                         color: AppColors.text,
                         fontSize: 12,

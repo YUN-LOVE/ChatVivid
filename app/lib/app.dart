@@ -9,7 +9,7 @@ class ChatvvApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'chatvv',
+      title: 'ChatVivid',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark(),
       darkTheme: AppTheme.dark(),

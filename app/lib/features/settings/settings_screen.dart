@@ -275,7 +275,7 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '水仙女',
+                  '大肥鱼',
                   style: TextStyle(
                     color: AppColors.text,
                     fontSize: 15,
@@ -467,7 +467,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
     return _settings.copyWith(
       apiKey: _apiKey.text.trim(),
       provider: _provider,
-      model: _model.text.trim().isEmpty ? 'deepseek-chat' : _model.text.trim(),
+      model: _model.text.trim().isEmpty ? 'deepseek-flash' : _model.text.trim(),
       fullBaseUrl: _fullBase.text.trim().isEmpty
           ? 'https://api.deepseek.com'
           : _fullBase.text.trim(),
