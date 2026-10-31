@@ -1,7 +1,8 @@
 # chatvv app (Flutter)
 
-> 状态：**首版 Client 模式 UI 已 scaffold**（Flutter 3.44.2）。
+> 状态：**首版 Client 模式 UI 已在 Pixel 8 Pro (Android 12) 安装跑通**（Flutter 3.44.2）。
 > 已实现：顶部静态大肥鱼舞台、渐变过渡、聊天列表、SSE 发送/停止、连接设置 sheet。
+> Live2D 插件实验在 `feature/live2d-stage` 分支，当前 `main` 仍使用静态舞台。
 > 未实现：Live2D runtime、Full/FFI、记忆库、助手管理、TTS。
 > 当前环境 Flutter 3.44.2 / Dart 3.12.2；Android SDK 36。
 
@@ -35,7 +36,7 @@ flutter run -d <device-id> --dart-define=CHATVV_API=http://127.0.0.1:8080
 或构建安装：
 
 ```bash
-flutter build apk --debug
+flutter build apk --debug --target-platform android-arm64
 adb install -r build/app/outputs/flutter-apk/app-debug.apk
 ```
 
