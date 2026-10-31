@@ -10,7 +10,10 @@ import 'remote_chat_api.dart';
 
 Future<ChatBackend> createChatBackend(AppSettings settings) async {
   if (settings.mode == BackendMode.client) {
-    return RemoteChatApi(baseUrl: settings.clientBaseUrl);
+    return RemoteChatApi(
+      baseUrl: settings.clientBaseUrl,
+      apiKey: settings.clientToken,
+    );
   }
 
   final support = await appSupportDirectory();
