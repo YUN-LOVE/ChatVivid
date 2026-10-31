@@ -63,6 +63,10 @@ DialogService::StartResult DialogService::start(
     if (last.contains("content")) rendered = last["content"].dump();
   }
   db_.append_message("user", text, rendered, id);
+  // Register before the worker can publish. SSE clients may connect as soon
+  // as start() returns; an unknown hub id would otherwise race into
+  // stream_lost.
+  hub_.open(id);
 
   auto cancel = std::make_shared<std::atomic<bool>>(false);
   {
