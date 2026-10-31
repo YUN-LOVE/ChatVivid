@@ -241,7 +241,7 @@ RikkaHub 的助手卡片可借鉴：大圆角卡、温度 chip、Prompt 预览�
 | 字体 | 只打包用到的字重/子集 |
 | 列表 | `ListView.builder` + `RepaintBoundary`；不整页重建 |
 
-测量：`flutter build apk --analyze-size`、DevTools memory、Android Studio profiler；每个里程碑记录。
+测量：`flutter build apk --analyze-size`、DevTools memory、`simpleperf`/Perfetto；每个里程碑记录。
 
 ## 9. 资产与许可
 
