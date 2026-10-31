@@ -101,7 +101,7 @@ flutter devices
 
 - `gtk3`：Linux embedder。
 - `libsecret`：`flutter_secure_storage` 的 Linux 后端。
-- 桌面版**没有** `flutter_live2d` 支持；Live2D 只在 Android/iOS。桌面先用静态头像。
+- 桌面版**没有** `flutter_live2d` 支持；v1 先用静态头像。用户接受多套代码，后续可补 `DesktopLive2D`（Cubism Native/FFI 或 WebView）。
 
 ## 5. macOS / iOS
 
@@ -154,6 +154,6 @@ adb devices
 | `adb` 看不到设备 | 装 `android-udev`，开 USB 调试，换线/端口 |
 | `flutter build apk` 卡在 Gradle | 首次下载依赖；检查网络/代理 |
 | `flutter_live2d` 编译失败 | 确认 NDK + CMake 已装，`flutter doctor -v` 看 Android toolchain |
-| 桌面没有 Live2D | `flutter_live2d` 只支持 Android/iOS；桌面用静态头像 |
+| 桌面没有 Live2D | `flutter_live2d` 只覆盖 Android/iOS；桌面 v1 静态，后续补独立 adapter |
 | CMake 找不到 SQLite/CURL | 装 `sqlite curl openssl pkgconf`，清空 `build/` 重配 |
 | AUR Flutter 与 dart 冲突 | 移除独立 `dart`，或用官方 tarball |

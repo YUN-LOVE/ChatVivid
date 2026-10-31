@@ -25,7 +25,8 @@
 - 仓库：https://github.com/linh18nd/flutter_live2d
 - 版本：1.0.2（2026-05 发布；2026-09 仍在更新）
 - 许可：BSD-3-Clause（插件）；内置 **Live2D Cubism Core** 为 Live2D Inc. 专有许可
-- 平台：Android API 24+ / iOS 13+（**不支持桌面**）
+- 平台：Android API 24+ / iOS 13+（**插件本身不支持桌面**）
+- 全平台策略：`CharacterRuntime` 接口不变，桌面后续单独实现 `DesktopLive2D`（Cubism Native + FFI/Texture，或 WebView 兜底）；v1 桌面先静态头像
 - 能力：透明背景、`setParameter`、`setExpression`、`startMotion`、触控跟随、暂停/恢复
 - 支持 `.moc3` 3.0–5.3；这个模型是 Cubism 4，兼容
 
@@ -113,7 +114,8 @@ await ctrl.setParameter('ParamMouthOpenY', mouth);
 - 模型 4.3 MB；native Cubism Core + GL 会增加 APK；Android/iOS 分包。
 - 低端设备可关闭 Live2D，回退到静态头像（`MascotAvatar`）。
 - 不在列表滚动时同时跑高帧率；GL 层与 Flutter 列表分离。
-- 桌面没有 `flutter_live2d` 支持：桌面版用静态头像/预渲染 WebP，或后续找桌面方案。
+- 桌面：`flutter_live2d` 不覆盖；v1 静态头像/预渲染 WebP，后续按“多套代码”思路补 `DesktopLive2D`。
+- Android/iOS 与桌面共用 `CharacterAsset` / `CharacterRuntime`，只是 adapter 不同。
 
 ## 许可清单
 
