@@ -64,9 +64,16 @@ curl -fsS -N -X POST "$base/v1/turns" \
   -H 'Content-Type: application/json' \
   -d '{"message":"smoke test"}' \
   --max-time 30 -o "$DATA_DIR/turn.sse"
-grep -q '^event: response.created' "$DATA_DIR/turn.sse"
-grep -q '^event: response.output_text.delta' "$DATA_DIR/turn.sse"
-grep -q '^event: response.completed' "$DATA_DIR/turn.sse"
+for expected in response.created response.output_text.delta response.completed; do
+  if ! grep -q "^event: $expected" "$DATA_DIR/turn.sse"; then
+    echo "smoke: missing SSE event: $expected" >&2
+    echo "--- turn.sse ---" >&2
+    cat "$DATA_DIR/turn.sse" >&2
+    echo "--- server.log ---" >&2
+    cat "$LOG" >&2
+    exit 1
+  fi
+done
 
 echo "smoke: history"
 curl -fsS "$base/v1/messages?limit=50" -o "$DATA_DIR/messages.json"
