@@ -85,7 +85,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       mode: _mode,
       apiKey: _apiKey.text.trim(),
       provider: _provider,
-      model: _model.text.trim().isEmpty ? 'deepseek-chat' : _model.text.trim(),
+      model: _model.text.trim().isEmpty ? 'deepseek-flash' : _model.text.trim(),
       fullBaseUrl: _fullBase.text.trim().isEmpty
           ? 'https://api.deepseek.com'
           : _fullBase.text.trim(),
