@@ -74,7 +74,10 @@ add_subdirectory(third_party/llama.cpp EXCLUDE_FROM_ALL)
 foreach(_llama_target llama ggml ggml-base ggml-cpu)
   if(TARGET ${_llama_target})
     set_target_properties(${_llama_target} PROPERTIES
-      INTERPROCEDURAL_OPTIMIZATION OFF)
+      INTERPROCEDURAL_OPTIMIZATION OFF
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED ON
+      CXX_EXTENSIONS OFF)
   endif()
 endforeach()
 
