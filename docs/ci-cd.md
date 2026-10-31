@@ -49,14 +49,14 @@ git push origin v0.1.0
 Release job 的规则：
 
 - 四个后端的 job 都成功才发 Release。
-- app job 可以是 `success` 或 `skipped`（还没 scaffold 时跳过）。
+- app job 可以是 `success` 或 `skipped`（例如未 scaffold 的分支）。
 - tag 含 `-`（如 `v0.1.0-rc.1`）自动标为 prerelease。
 - 自动生成 release notes。
 
 ## App 构建/签名
 
-- 当前 app 尚未 scaffold；CI 的 app job 会跳过，release 只发 server 包。
-- scaffold 后，release 默认用 Flutter 的 debug signing（只适合内测）。
+- app 已 scaffold；CI 会跑 `flutter analyze/test` + debug APK；Live2D 尚未接入。
+- app 已 scaffold；release 默认用 Flutter 的 debug signing（只适合内测）。
 - 正式 Android 签名后续加 secrets：
   - `ANDROID_KEYSTORE_BASE64`
   - `ANDROID_KEYSTORE_PASSWORD`
@@ -83,7 +83,7 @@ Release job 的规则：
 
 - `main` / `dev`：Require a pull request；Require status checks；
   Dismiss stale approvals；禁止 force push/删除。
-- 必选 checks：四个 backend job；app scaffold 后加 `app / analyze & build`。
+- 必选 checks：四个 backend job；再加 `app / analyze & build`。
 - Tag `v*` 仅 maintainer 可创建。
 - Release 使用 `GITHUB_TOKEN`（`contents: write`），不需要 PAT。
 

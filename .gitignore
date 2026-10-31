@@ -45,3 +45,11 @@ archive/web-gal-game/.pnpm-store/
 archive/web-gal-game/.npm-cache/
 archive/web-gal-game/.chromium*/
 .tmp-tools/
+.android-sdk/
+.flutter/
+.gradle/
+.home/
+.pub-cache/
+.tmp-scaffold/
+.tmp-repo.xml
+app/android/local.properties

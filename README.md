@@ -6,7 +6,7 @@
 
 
 > **方向变更（2026-10-31）**：Web GalGame 前端已归档，改为 **Flutter 原生 app + 可嵌入 C++ 核心**。
-> 当前状态：C++ 后端 M0 可运行；Flutter app 已完成设计与工作区整理，**尚未开始编码**；C++ core/FFI 拆分仍是计划。
+> 当前状态：C++ 后端 M0 可运行；Flutter app 已 scaffold，首版 **Client 模式 UI**（顶部静态舞台 + 聊天 + SSE）跑通构建；Live2D/Full 模式/FFI 后续。
 
 ## 新架构：两种模式，一套核心
 
@@ -30,7 +30,7 @@ Flutter app
 ## 仓库结构
 
 ```
-app/                    Flutter app（设计/目录已建，未 scaffold）
+app/                    Flutter app（scaffold + 首版 Client UI）
   design/DESIGN.md      Material 3 Expressive + 毛玻璃 + 大肥鱼
   assets/               头像 / Live2D / 字体计划
 docs/
@@ -104,9 +104,9 @@ export DEEPSEEK_API_KEY=sk-...
 ## 下一步
 
 1. 安装 Flutter stable，`flutter doctor`。
-2. 先做 **client 模式** UI：Chat + SSE + 设置 + 大肥鱼/玻璃主题。
-3. `flutter_live2d` 真机 spike：加载鲸鱼娘、idle、口型、透明叠加。
-4. 再加 **full 模式**：拆 `chatvv_core` / C ABI / FFI。
+2. **Client UI 首版已完成**：静态舞台 + Chat + SSE + 连接 sheet。
+3. 接 `flutter_live2d`：Android/iOS 舞台、idle、口型、暂停/兜底。
+4. 加 **full 模式**：拆 `chatvv_core` / C ABI / FFI。
 5. Android Full → iOS/桌面 → 打磨。
 
 旧 Web 版仅作历史参考，不再维护。
