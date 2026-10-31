@@ -17,6 +17,7 @@ struct Config {
     std::string base_url = "https://api.deepseek.com";
     std::string endpoint = "/responses";
     std::string api_key;
+    std::string ca_bundle;
     std::string api_key_env = "DEEPSEEK_API_KEY";
     std::string model = "deepseek-flash";
     std::string reasoning_effort = "none";
@@ -38,6 +39,7 @@ struct Config {
   } prompt;
 
   static Config load(const std::string& path);
+  static std::string default_system_prompt();
 
   std::string db_path() const;
 };

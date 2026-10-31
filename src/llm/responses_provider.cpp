@@ -178,6 +178,9 @@ LlmResult ResponsesProvider::complete(const LlmRequest& req,
   curl_easy_setopt(curl.handle, CURLOPT_HTTPHEADER, headers.list);
   curl_easy_setopt(curl.handle, CURLOPT_WRITEFUNCTION, on_write);
   curl_easy_setopt(curl.handle, CURLOPT_WRITEDATA, &st);
+  if (!req.ca_bundle.empty()) {
+    curl_easy_setopt(curl.handle, CURLOPT_CAINFO, req.ca_bundle.c_str());
+  }
   curl_easy_setopt(curl.handle, CURLOPT_NOSIGNAL, 1L);
   curl_easy_setopt(curl.handle, CURLOPT_CONNECTTIMEOUT_MS, 10000L);
   curl_easy_setopt(curl.handle, CURLOPT_TIMEOUT_MS,

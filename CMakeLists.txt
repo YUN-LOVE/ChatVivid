@@ -66,14 +66,32 @@ add_library(chatvv_core STATIC
   src/llm/mock_provider.cpp
   src/llm/responses_provider.cpp
   src/dialog/response_hub.cpp
-  src/dialog/dialog_service.cpp
-  src/http/server.cpp)
+  src/dialog/dialog_service.cpp)
 target_include_directories(chatvv_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(chatvv_core PUBLIC chatvv_deps)
+set_target_properties(chatvv_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 chatvv_warnings(chatvv_core)
 
+# HTTP/SSE is a server adapter, not part of the embedded core.
+add_library(chatvv_server STATIC src/http/server.cpp)
+target_include_directories(chatvv_server PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(chatvv_server PUBLIC chatvv_core)
+chatvv_warnings(chatvv_server)
+
+# Stable C ABI for Dart/FFI. The core never binds a socket in this path.
+add_library(chatvv_ffi SHARED src/ffi/chatvv_ffi.cpp)
+target_include_directories(chatvv_ffi
+  PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(chatvv_ffi PRIVATE chatvv_core)
+target_compile_definitions(chatvv_ffi PRIVATE CHATVV_FFI_BUILD)
+set_target_properties(chatvv_ffi PROPERTIES
+  CXX_VISIBILITY_PRESET hidden
+  VISIBILITY_INLINES_HIDDEN ON)
+chatvv_warnings(chatvv_ffi)
+
 add_executable(chatvvd src/main.cpp)
-target_link_libraries(chatvvd PRIVATE chatvv_core)
+target_link_libraries(chatvvd PRIVATE chatvv_server)
 chatvv_warnings(chatvvd)
 
 enable_testing()
@@ -82,11 +100,22 @@ target_link_libraries(chatvv_tests PRIVATE chatvv_core)
 chatvv_warnings(chatvv_tests)
 add_test(NAME core COMMAND chatvv_tests)
 
+add_executable(chatvv_ffi_tests tests/test_ffi.cpp)
+target_include_directories(chatvv_ffi_tests
+  PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(chatvv_ffi_tests PRIVATE chatvv_ffi)
+chatvv_warnings(chatvv_ffi_tests)
+add_test(NAME ffi COMMAND chatvv_ffi_tests)
+
 # The smoke test is a bash script; Windows only runs the core test.
 if(UNIX)
   add_test(NAME smoke COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/smoke.sh)
   set_tests_properties(smoke PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 
-install(TARGETS chatvvd RUNTIME DESTINATION bin)
+install(TARGETS chatvvd chatvv_ffi
+  RUNTIME DESTINATION bin
+  LIBRARY DESTINATION lib
+  ARCHIVE DESTINATION lib)
+install(FILES include/chatvv/chatvv.h DESTINATION include/chatvv)
 install(FILES config/config.example.toml DESTINATION share/chatvv)
