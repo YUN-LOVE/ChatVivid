@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../data/app_settings.dart';
 import '../../theme/app_theme.dart';
-import '../../theme/glass.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({
@@ -250,8 +249,7 @@ class _WelcomePage extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         Text(
-          'chatvv 是一个单对话的私人 AI 记忆体。\n'
-          '你的对话、上下文和长期记忆默认只存在本机。',
+          '单对话、长期记忆，默认只在本机。',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.85),
@@ -259,82 +257,7 @@ class _WelcomePage extends StatelessWidget {
             height: 1.6,
           ),
         ),
-        const SizedBox(height: 26),
-        _Point(
-          icon: Icons.memory_rounded,
-          title: 'Full / 内嵌模式',
-          body: 'Dart FFI 直接调用 C++ core，不启动本地服务器。',
-        ),
-        const SizedBox(height: 10),
-        _Point(
-          icon: Icons.cloud_outlined,
-          title: 'Only client',
-          body: '连接你自己的 chatvvd，远程使用同一个记忆库。',
-        ),
-        const SizedBox(height: 10),
-        _Point(
-          icon: Icons.lock_outline_rounded,
-          title: 'API Key 只在本机',
-          body: '用于直连模型；不会上传到第三方中转。',
-        ),
-        const SizedBox(height: 18),
-        Text(
-          '当前选择：${mode.label}',
-          textAlign: TextAlign.center,
-          style: const TextStyle(color: AppColors.muted, fontSize: 10),
-        ),
       ],
-    );
-  }
-}
-
-class _Point extends StatelessWidget {
-  const _Point({required this.icon, required this.title, required this.body});
-
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceHigh.withValues(alpha: 0.45),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: AppColors.primary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  body,
-                  style: TextStyle(
-                    color: AppColors.muted.withValues(alpha: 0.8),
-                    fontSize: 11,
-                    height: 1.45,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -360,7 +283,7 @@ class _ModePage extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(
-          '之后可以在设置里切换；两种模式共用同一套聊天界面。',
+          '可随时切换，共用同一套聊天界面。',
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.8),
             fontSize: 12,
@@ -373,8 +296,7 @@ class _ModePage extends StatelessWidget {
           icon: Icons.memory_rounded,
           title: 'Full · 内嵌 C++',
           subtitle: '推荐',
-          body: 'libchatvv_ffi.so + SQLite + provider 全部在 App 进程内。\n'
-              '不监听端口，不经过 127.0.0.1。',
+          body: 'C++ core 在 App 内，无端口、无回环。',
           onTap: () => onChanged(BackendMode.full),
         ),
         const SizedBox(height: 12),
@@ -383,8 +305,7 @@ class _ModePage extends StatelessWidget {
           icon: Icons.cloud_outlined,
           title: 'Only client',
           subtitle: '远程',
-          body: 'Flutter 通过 HTTPS/SSE 连接你的 chatvvd；\n'
-              '适合多设备共享一台常开服务器。',
+          body: '连接你自己的 chatvvd。',
           onTap: () => onChanged(BackendMode.client),
         ),
       ],
@@ -522,17 +443,7 @@ class _ConnectionPage extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          mode == BackendMode.full
-              ? 'Full 模式直接由 C++ core 请求模型；Key 只保存在本机。'
-              : 'Only client 连接你自己的 chatvvd，使用它的 HTTPS/SSE。',
-          style: TextStyle(
-            color: AppColors.muted.withValues(alpha: 0.8),
-            fontSize: 12,
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 18),
         if (mode == BackendMode.full) ...[
           SegmentedButton<String>(
             segments: const [
@@ -571,15 +482,6 @@ class _ConnectionPage extends StatelessWidget {
             obscure: true,
           ),
         ],
-        const SizedBox(height: 18),
-        Text(
-          'API Key 目前以本机 JSON 存储；后续会迁移到平台安全存储。',
-          style: TextStyle(
-            color: AppColors.muted.withValues(alpha: 0.5),
-            fontSize: 10,
-            height: 1.5,
-          ),
-        ),
       ],
     );
   }
@@ -668,35 +570,6 @@ class _ReadyPage extends StatelessWidget {
             color: AppColors.muted.withValues(alpha: 0.8),
             fontSize: 12,
             height: 1.6,
-          ),
-        ),
-        const SizedBox(height: 28),
-        GlassPanel(
-          radius: 22,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '接下来',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '· 在设置里可以随时切换 Full / Only client\n'
-                '· 角色舞台目前为静态；Live2D adapter 在单独分支\n'
-                '· 对话与记忆默认只写本机 SQLite',
-                style: TextStyle(
-                  color: AppColors.muted.withValues(alpha: 0.8),
-                  fontSize: 11,
-                  height: 1.6,
-                ),
-              ),
-            ],
           ),
         ),
       ],
