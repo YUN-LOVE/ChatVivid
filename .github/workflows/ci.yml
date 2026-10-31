@@ -108,10 +108,8 @@ jobs:
         run: |
           cmake --preset windows-x64 2>&1 | Tee-Object -FilePath configure.log
           if ($LASTEXITCODE -ne 0) {
-            Add-Content $env:GITHUB_STEP_SUMMARY "### Windows configure"
-            Add-Content $env:GITHUB_STEP_SUMMARY '```'
-            Get-Content configure.log | Add-Content $env:GITHUB_STEP_SUMMARY
-            Add-Content $env:GITHUB_STEP_SUMMARY '```'
+            $msg = (Get-Content configure.log -Raw) -replace "`n", "%0A"
+            Write-Output "::error::$msg"
             exit 1
           }
       - name: Build
