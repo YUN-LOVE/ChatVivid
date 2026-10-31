@@ -11,6 +11,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
 import '../character/character_stage.dart';
 import 'chat_attachment.dart';
+import 'markdown_message.dart';
 import 'file_upload_service.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
@@ -573,25 +574,9 @@ class _MessageTile extends StatelessWidget {
                 if (body.isEmpty && message.streaming)
                   const _ThinkingLine()
                 else
-                  SelectableText.rich(
-                    TextSpan(
-                      text: body,
-                      children: [
-                        if (message.streaming)
-                          const TextSpan(
-                            text: '  ▍',
-                            style: TextStyle(
-                              color: AppColors.primary,
-                              fontSize: 13,
-                            ),
-                          ),
-                      ],
-                    ),
-                    style: const TextStyle(
-                      color: AppColors.text,
-                      fontSize: 15,
-                      height: 1.58,
-                    ),
+                  MarkdownMessage(
+                    data: body,
+                    streaming: message.streaming,
                   ),
               ],
             ),
