@@ -59,6 +59,12 @@ jobs:
         run: cmake --build --preset linux-arm64
       - name: Test
         run: ctest --preset linux-arm64
+      - name: Test details
+        if: failure()
+        shell: bash
+        run: |
+          LOG=$(find build -name LastTest.log | head -1)
+          { echo '### ctest LastTest.log'; echo '```'; cat "$LOG" 2>/dev/null || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   backend-macos-arm64:
     name: backend / macos arm64
@@ -74,6 +80,12 @@ jobs:
         run: cmake --build --preset macos-arm64
       - name: Test
         run: ctest --preset macos-arm64
+      - name: Test details
+        if: failure()
+        shell: bash
+        run: |
+          LOG=$(find build -name LastTest.log | head -1)
+          { echo '### ctest LastTest.log'; echo '```'; cat "$LOG" 2>/dev/null || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   backend-windows-x64:
     name: backend / windows x64
@@ -92,7 +104,16 @@ jobs:
           C:\vcpkg\bootstrap-vcpkg.bat
           C:\vcpkg\vcpkg.exe install --classic --triplet x64-windows curl sqlite3
       - name: Configure
-        run: cmake --preset windows-x64
+        shell: pwsh
+        run: |
+          cmake --preset windows-x64 2>&1 | Tee-Object -FilePath configure.log
+          if ($LASTEXITCODE -ne 0) {
+            Add-Content $env:GITHUB_STEP_SUMMARY "### Windows configure"
+            Add-Content $env:GITHUB_STEP_SUMMARY '```'
+            Get-Content configure.log | Add-Content $env:GITHUB_STEP_SUMMARY
+            Add-Content $env:GITHUB_STEP_SUMMARY '```'
+            exit 1
+          }
       - name: Build
         run: cmake --build --preset windows-x64
       - name: Test
