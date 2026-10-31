@@ -79,6 +79,8 @@ jobs:
 
   backend-macos-arm64:
     name: package / macos arm64
+    # Temporarily disabled to avoid macOS runner overage.
+    if: false
     runs-on: macos-14
     timeout-minutes: 60
     steps:
@@ -213,10 +215,9 @@ jobs:
     needs:
       - backend-linux-x64
       - backend-linux-arm64
-      - backend-macos-arm64
       - backend-windows-x64
       - app-release
-    if: ${{ always() && needs.backend-linux-x64.result == 'success' && needs.backend-linux-arm64.result == 'success' && needs.backend-macos-arm64.result == 'success' && needs.backend-windows-x64.result == 'success' && (needs.app-release.result == 'success' || needs.app-release.result == 'skipped') }}
+    if: ${{ always() && needs.backend-linux-x64.result == 'success' && needs.backend-linux-arm64.result == 'success' && needs.backend-windows-x64.result == 'success' && (needs.app-release.result == 'success' || needs.app-release.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
