@@ -123,13 +123,18 @@ export PATH="$JAVA_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME
 set -Ux ANDROID_HOME $HOME/Android/Sdk
 set -Ux ANDROID_SDK_ROOT $HOME/Android/Sdk
 set -Ux JAVA_HOME /usr/lib/jvm/java-17-openjdk
-fish_add_path --prepend $ANDROID_HOME/cmdline-tools/latest/bin
+# 注意：不要依赖 $ANDROID_HOME；有些环境会把它设成 /opt/android-sdk
+fish_add_path --prepend $HOME/Android/Sdk/cmdline-tools/latest/bin
+fish_add_path --prepend $HOME/Android/Sdk/platform-tools
 fish_add_path --prepend /usr/lib/jvm/java-17-openjdk/bin
 ```
 
 `set -Ux` 和 `fish_add_path` 会持久化，不需要改 `~/.zshrc`。检查：
 
 ```fish
+echo $ANDROID_HOME
+# 如果输出 /opt/android-sdk，不要用它；用绝对路径 $HOME/Android/Sdk
+
 type -a sdkmanager
 # 期望第一行：/home/YOU/Android/Sdk/cmdline-tools/latest/bin/sdkmanager
 # 如果第一行是 /opt/android-sdk/tools/bin/sdkmanager，说明旧路径还在前面
@@ -142,8 +147,8 @@ java -version   # 必须是 17，不是 25
 
 ```fish
 env JAVA_HOME=/usr/lib/jvm/java-17-openjdk \
-  PATH=/usr/lib/jvm/java-17-openjdk/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH \
-  $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
+  PATH=/usr/lib/jvm/java-17-openjdk/bin:$HOME/Android/Sdk/cmdline-tools/latest/bin:$PATH \
+  $HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
 ```
 
 ### 3.3 接受许可 + 安装 SDK 组件
@@ -276,6 +281,8 @@ flutter build apk --debug
 | `flutter build apk` 卡在 Gradle | 首次下载依赖；检查网络/代理 |
 | `flutter_live2d` 编译失败 | 确认 NDK + CMake 已装，`sdkmanager --list_installed` 有 `ndk`/`cmake` |
 | 桌面没有 Live2D | `flutter_live2d` 只覆盖 Android/iOS；桌面 v1 静态，后续补 adapter |
-| `NoClassDefFoundError: javax/xml/bind/annotation/XmlSchema` | PATH 里旧 `/opt/android-sdk/tools/bin/sdkmanager` 或 `java` 是 25；让 Java 17 + `$ANDROID_HOME/cmdline-tools/latest/bin` 排前面，或绝对路径调用 |
+| `NoClassDefFoundError: javax/xml/bind/annotation/XmlSchema` | PATH 里旧 `/opt/android-sdk/tools/bin/sdkmanager` 或 `java` 是 25；让 Java 17 + `$HOME/Android/Sdk/cmdline-tools/latest/bin` 排前面，或绝对路径调用 |
+| `fish_add_path: Skipping non-existent path: /opt/android-sdk/...` | `$ANDROID_HOME` 被设成 `/opt/android-sdk`；改用绝对 `$HOME/Android/Sdk` |
+| `env: "/opt/android-sdk/.../sdkmanager": 没有那个文件` | 同上；`$ANDROID_HOME` 是错的，使用绝对路径 `$HOME/Android/Sdk/cmdline-tools/latest/bin/sdkmanager` |
 | CMake 找不到 SQLite/CURL | 装 `sqlite curl openssl pkgconf`，清空 `build/` 重配 |
 | AUR Flutter 与 dart 冲突 | 移除独立 `dart`，或用官方 tarball |
