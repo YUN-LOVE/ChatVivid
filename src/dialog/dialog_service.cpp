@@ -82,7 +82,6 @@ DialogService::StartResult DialogService::start(
 void DialogService::run(std::string id, BuiltContext ctx, std::string model,
                         std::shared_ptr<std::atomic<bool>> cancel) {
   int64_t seq = 0;
-  bool saw_terminal = false;
 
   auto emit = [&](const std::string& type, nlohmann::json data) {
     ++seq;
@@ -127,7 +126,10 @@ void DialogService::run(std::string id, BuiltContext ctx, std::string model,
 
   auto sink = [&](const std::string& type, const nlohmann::json& data) {
     if (type == "response.created") return;
-    if (is_terminal(type)) saw_terminal = true;
+    // The provider's terminal event can arrive before the assistant message is
+    // persisted. Suppress it here; the final event below is emitted only after
+    // the DB write, so history is consistent when the callback observes it.
+    if (is_terminal(type)) return;
     emit(type, data);
   };
 
@@ -136,27 +138,23 @@ void DialogService::run(std::string id, BuiltContext ctx, std::string model,
 
   if (cancelled) {
     db_.update_response(id, "cancelled", "", "", "cancelled", now_ms());
-    if (!saw_terminal) {
-      emit("response.incomplete",
-           {{"type", "response.incomplete"},
-            {"response",
-             {{"id", id},
-              {"status", "incomplete"},
-              {"incomplete_details", {{"reason", "cancelled"}}}}}});
-    }
+    emit("response.incomplete",
+         {{"type", "response.incomplete"},
+          {"response",
+           {{"id", id},
+            {"status", "incomplete"},
+            {"incomplete_details", {{"reason", "cancelled"}}}}}});
     log_info("turn.cancelled", {{"response_id", id}});
   } else if (!result.ok) {
     db_.update_response(id, "failed", result.output.dump(),
                         result.usage.dump(), result.error, now_ms());
-    if (!saw_terminal) {
-      emit("response.failed",
-           {{"type", "response.failed"},
-            {"response",
-             {{"id", id},
-              {"status", "failed"},
-              {"error",
-               {{"code", "upstream_error"}, {"message", result.error}}}}}});
-    }
+    emit("response.failed",
+         {{"type", "response.failed"},
+          {"response",
+           {{"id", id},
+            {"status", "failed"},
+            {"error",
+             {{"code", "upstream_error"}, {"message", result.error}}}}}});
     log_error("turn.failed", {{"response_id", id}, {"error", result.error}});
   } else {
     const std::string text = extract_text(result.output);
@@ -167,17 +165,15 @@ void DialogService::run(std::string id, BuiltContext ctx, std::string model,
         result.status == "incomplete" ? "incomplete" : "completed";
     db_.update_response(id, status, result.output.dump(), result.usage.dump(),
                         "", now_ms());
-    if (!saw_terminal) {
-      emit("response.completed",
-           {{"type", "response.completed"},
-            {"response",
-             {{"id", id},
-              {"object", "response"},
-              {"status", status},
-              {"model", model},
-              {"output", result.output},
-              {"usage", result.usage}}}});
-    }
+    emit("response.completed",
+         {{"type", "response.completed"},
+          {"response",
+           {{"id", id},
+            {"object", "response"},
+            {"status", status},
+            {"model", model},
+            {"output", result.output},
+            {"usage", result.usage}}}});
     log_info("turn.completed",
              {{"response_id", id}, {"chars", text.size()}, {"status", status}});
   }

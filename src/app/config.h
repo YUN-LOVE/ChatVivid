@@ -38,6 +38,7 @@ struct Config {
   } prompt;
 
   static Config load(const std::string& path);
+  static std::string default_system_prompt();
 
   std::string db_path() const;
 };

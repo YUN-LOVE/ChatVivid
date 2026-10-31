@@ -44,6 +44,8 @@ std::string read_file(const std::string& path) {
 
 }  // namespace
 
+std::string Config::default_system_prompt() { return kDefaultSystem; }
+
 std::string Config::db_path() const {
   const auto path = std::filesystem::path(storage.data_dir) / "chatvv.db";
   const auto utf8 = path.u8string();
