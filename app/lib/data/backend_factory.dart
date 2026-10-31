@@ -37,6 +37,17 @@ Future<ChatBackend> createChatBackend(AppSettings settings) async {
   final injectionsDir = Directory('${support.path}/injections');
   await syncInjectionFiles(injectionsDir, settings.injections);
 
+  final modelFile = File(
+    '${support.path}/models/bge-small-zh-v1.5-q8_0.gguf',
+  );
+  if (!await modelFile.exists()) {
+    await modelFile.parent.create(recursive: true);
+    final data = await rootBundle.load(
+      'assets/models/bge-small-zh-v1.5-q8_0.gguf',
+    );
+    await modelFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
+  }
+
   final caFile = File('${support.path}/cacert.pem');
   if (!await caFile.exists()) {
     final data = await rootBundle.load('assets/cacert.pem');
@@ -60,6 +71,8 @@ Future<ChatBackend> createChatBackend(AppSettings settings) async {
       'model': settings.model,
       'ca_bundle': caFile.path,
       'system_prompt': settings.systemPrompt,
+      'embedding_model': modelFile.path,
+      'embedding_threads': 2,
     },
   );
 }

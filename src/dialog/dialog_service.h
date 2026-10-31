@@ -13,6 +13,7 @@
 namespace chatvv {
 
 class Db;
+class EmbeddingEngine;
 class InjectionStore;
 class Provider;
 class ResponseHub;
@@ -21,7 +22,8 @@ struct Config;
 class DialogService {
  public:
   DialogService(const Config& cfg, Db& db, InjectionStore& slots,
-                ResponseHub& hub, Provider& provider);
+                ResponseHub& hub, Provider& provider,
+                EmbeddingEngine* embedding = nullptr);
   ~DialogService();
 
   struct StartResult {
@@ -45,6 +47,7 @@ class DialogService {
   InjectionStore& slots_;
   ResponseHub& hub_;
   Provider& provider_;
+  EmbeddingEngine* embedding_ = nullptr;
 
   std::mutex mu_;
   std::unordered_map<std::string, std::shared_ptr<std::atomic<bool>>> cancels_;

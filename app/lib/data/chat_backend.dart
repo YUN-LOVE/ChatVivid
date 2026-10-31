@@ -24,5 +24,9 @@ abstract interface class ChatBackend {
 
   Future<void> deleteMemory(String id);
 
+  Future<MemoryArchiveResult> saveContext();
+
+  Future<void> clearContext();
+
   Future<void> dispose();
 }

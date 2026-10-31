@@ -5,6 +5,7 @@
 #include "app/config.h"
 #include "context/context_builder.h"
 #include "context/injections.h"
+#include "memory/embedding.h"
 #include "store/db.h"
 #include "util/ulid.h"
 #include "util/util.h"
@@ -139,8 +140,28 @@ int main() {
   const auto ctx_after = build_context(db, store, cfg, "after archive");
   CHECK(ctx_after.instructions.find("长期记忆") != std::string::npos);
   CHECK(ctx_after.input.size() == 5);  // 3 recent + at_depth + current
+  db.clear_context();
+  CHECK(db.max_seq() == 0);
+  CHECK(db.list_memories(10, "archive message").size() == 1);
   CHECK(db.delete_memory(archived.memory.id));
   CHECK(db.list_memories(10, "").empty());
+
+  // Local GGUF embedding/RAG model loaded through llama.cpp.
+  EmbeddingEngine embedding;
+  std::string embedding_error;
+  if (!embedding.load(CHATVV_TEST_MODEL, 2, &embedding_error)) {
+    std::cerr << "embedding load error: " << embedding_error << "\n";
+  }
+  CHECK(embedding.ready());
+  CHECK(embedding.dim() == 512);
+  const auto vector = embedding.embed("记忆归档测试", &embedding_error);
+  CHECK(vector.size() == 512);
+  const auto rag_memory = db.append_memory("鲸鱼娘喜欢米饭", 0.8);
+  db.set_memory_embedding(rag_memory.id, vector);
+  const auto rag_hits = db.search_memories(vector, 1);
+  CHECK(rag_hits.size() == 1);
+  CHECK(rag_hits.front().id == rag_memory.id);
+  db.delete_memory(rag_memory.id);
 
   fs::remove_all(dir);
 

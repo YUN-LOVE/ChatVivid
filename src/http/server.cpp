@@ -1,5 +1,7 @@
 #include "http/server.h"
 
+#include "memory/embedding.h"
+
 #include <httplib.h>
 
 #include <chrono>
@@ -89,8 +91,14 @@ std::string etag_for(int64_t server_seq, size_t count) {
 }  // namespace
 
 HttpServer::HttpServer(const Config& cfg, Db& db, InjectionStore& slots,
-                       ResponseHub& hub, DialogService& dialog)
-    : cfg_(cfg), db_(db), slots_(slots), hub_(hub), dialog_(dialog) {
+                       ResponseHub& hub, DialogService& dialog,
+                       EmbeddingEngine* embedding)
+    : cfg_(cfg),
+      db_(db),
+      slots_(slots),
+      hub_(hub),
+      dialog_(dialog),
+      embedding_(embedding) {
   setup_routes();
 }
 
@@ -356,7 +364,14 @@ void HttpServer::setup_routes() {
                } catch (...) {
                }
                try {
-                 const auto archived = db_.archive_messages(keep_recent);
+                 auto archived = db_.archive_messages(keep_recent);
+                 if (archived.archived_messages > 0 && embedding_ &&
+                     embedding_->ready()) {
+                   const auto values = embedding_->embed(archived.memory.text);
+                   if (!values.empty()) {
+                     db_.set_memory_embedding(archived.memory.id, values);
+                   }
+                 }
                  nlohmann::json payload{
                      {"archived_messages", archived.archived_messages},
                      {"cutoff_seq", archived.cutoff_seq},
@@ -367,6 +382,42 @@ void HttpServer::setup_routes() {
                  json_response(res, payload);
                } catch (const std::exception& e) {
                  error_response(res, 500, "archive_failed", e.what());
+               }
+             });
+
+  svr_->Post("/v1/context/save",
+             [this](const httplib::Request& req, httplib::Response& res) {
+               if (!authorized(req, res)) return;
+               try {
+                 auto archived = db_.archive_messages(0);
+                 if (archived.archived_messages > 0 && embedding_ &&
+                     embedding_->ready()) {
+                   const auto values = embedding_->embed(archived.memory.text);
+                   if (!values.empty()) {
+                     db_.set_memory_embedding(archived.memory.id, values);
+                   }
+                 }
+                 db_.clear_context();
+                 nlohmann::json payload{
+                     {"archived_messages", archived.archived_messages},
+                     {"memory", nullptr}};
+                 if (archived.archived_messages > 0) {
+                   payload["memory"] = memory_json(archived.memory);
+                 }
+                 json_response(res, payload);
+               } catch (const std::exception& e) {
+                 error_response(res, 500, "save_context_failed", e.what());
+               }
+             });
+
+  svr_->Post("/v1/context/clear",
+             [this](const httplib::Request& req, httplib::Response& res) {
+               if (!authorized(req, res)) return;
+               try {
+                 db_.clear_context();
+                 json_response(res, {{"ok", true}});
+               } catch (const std::exception& e) {
+                 error_response(res, 500, "clear_context_failed", e.what());
                }
              });
 
@@ -478,7 +529,7 @@ void HttpServer::setup_routes() {
                }
                const auto extra = parse_injections(
                    body.value("injections", nlohmann::json::array()));
-               auto ctx = build_context(db_, slots_, cfg_, text, extra);
+               auto ctx = build_context(db_, slots_, cfg_, text, extra, embedding_);
                json_response(res, {{"instructions", ctx.instructions},
                                    {"input", ctx.input},
                                    {"tools", ctx.tools},

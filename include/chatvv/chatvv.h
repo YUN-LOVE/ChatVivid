@@ -88,6 +88,9 @@ CHATVV_API char* chatvv_archive(chatvv_engine* engine, int32_t keep_recent,
                                 char** error_json);
 CHATVV_API int32_t chatvv_delete_memory(chatvv_engine* engine,
                                         const char* memory_id);
+CHATVV_API char* chatvv_save_context(chatvv_engine* engine, char** error_json);
+CHATVV_API int32_t chatvv_clear_context(chatvv_engine* engine,
+                                        char** error_json);
 
 CHATVV_API void chatvv_free(char* value);
 

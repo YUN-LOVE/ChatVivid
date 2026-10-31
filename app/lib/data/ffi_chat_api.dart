@@ -68,6 +68,24 @@ typedef _ArchiveDart = Pointer<Utf8> Function(
   Pointer<Pointer<Utf8>> errorJson,
 );
 
+typedef _SaveContextNative = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+typedef _SaveContextDart = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+
+typedef _ClearContextNative = Int32 Function(
+  Pointer<Void> engine,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+typedef _ClearContextDart = int Function(
+  Pointer<Void> engine,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+
 typedef _DeleteMemoryNative = Int32 Function(
   Pointer<Void> engine,
   Pointer<Utf8> memoryId,
@@ -145,6 +163,10 @@ class FfiChatApi implements ChatBackend {
     );
     _deleteMemory = _library.lookupFunction<
         _DeleteMemoryNative, _DeleteMemoryDart>('chatvv_delete_memory');
+    _saveContext = _library.lookupFunction<
+        _SaveContextNative, _SaveContextDart>('chatvv_save_context');
+    _clearContext = _library.lookupFunction<
+        _ClearContextNative, _ClearContextDart>('chatvv_clear_context');
     _free = _library.lookupFunction<_FreeNative, _FreeDart>('chatvv_free');
 
     _callable = NativeCallable<_EventCallbackNative>.listener(_onNativeEvent);
@@ -173,6 +195,8 @@ class FfiChatApi implements ChatBackend {
   late final _MemoriesDart _memories;
   late final _ArchiveDart _archive;
   late final _DeleteMemoryDart _deleteMemory;
+  late final _SaveContextDart _saveContext;
+  late final _ClearContextDart _clearContext;
   late final _FreeDart _free;
   late final NativeCallable<_EventCallbackNative> _callable;
 
@@ -448,6 +472,41 @@ class FfiChatApi implements ChatBackend {
     final idPtr = id.toNativeUtf8();
     _deleteMemory(_engine, idPtr);
     calloc.free(idPtr);
+  }
+
+  @override
+  Future<MemoryArchiveResult> saveContext() async {
+    if (_disposed) {
+      throw const ChatApiException('FFI engine 已释放');
+    }
+    final errorPtr = calloc<Pointer<Utf8>>();
+    final resultPtr = _saveContext(_engine, errorPtr);
+    if (resultPtr.address == 0) {
+      final message = _takeError(errorPtr);
+      calloc.free(errorPtr);
+      throw ChatApiException(message);
+    }
+    final raw = resultPtr.toDartString();
+    _free(resultPtr);
+    calloc.free(errorPtr);
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw const ChatApiException('保存上下文响应格式错误');
+    }
+    return MemoryArchiveResult.fromJson(Map<String, dynamic>.from(decoded));
+  }
+
+  @override
+  Future<void> clearContext() async {
+    if (_disposed) return;
+    final errorPtr = calloc<Pointer<Utf8>>();
+    final ok = _clearContext(_engine, errorPtr);
+    if (ok == 0) {
+      final message = _takeError(errorPtr);
+      calloc.free(errorPtr);
+      throw ChatApiException(message);
+    }
+    calloc.free(errorPtr);
   }
 
   @override

@@ -16,6 +16,7 @@
       "displayName": "Linux/macOS dev (Debug, clang)",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++"
       }
     },
@@ -25,6 +26,7 @@
       "displayName": "Linux/macOS release (LTO)",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_INTERPROCEDURAL_OPTIMIZATION": "ON"
       }
@@ -35,6 +37,7 @@
       "displayName": "Linux aarch64 (native build)",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++"
       }
     },
@@ -44,6 +47,7 @@
       "displayName": "macOS arm64 (AppleClang)",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "CMAKE_C_COMPILER": "clang",
         "CMAKE_CXX_COMPILER": "clang++",
         "CMAKE_OSX_ARCHITECTURES": "arm64"
       }
