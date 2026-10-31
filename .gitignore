@@ -53,3 +53,7 @@ archive/web-gal-game/.chromium*/
 .tmp-scaffold/
 .tmp-repo.xml
 app/android/local.properties
+
+app/android/.kotlin/
+
+.android-user/
