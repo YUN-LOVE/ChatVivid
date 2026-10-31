@@ -3,7 +3,7 @@
 > 状态：**Full / Only client 双模式已接入**，Android 真机已验证 FFI（无后端、无 adb reverse）。
 > 已实现：启动门、4 步引导、Full/Client 设置、顶部静态舞台、聊天、SSE/FFI。
 > Live2D 插件实验在 `feature/live2d-stage` 分支，主分支仍使用静态舞台。
-> 未实现：Live2D runtime、Full/FFI、记忆库、助手管理、TTS。
+> 未实现：Live2D runtime、TTS、Windows 完整包、真实 DeepSeek 回归、平台安全存储。
 > 当前环境 Flutter 3.44.2 / Dart 3.12.2；Android SDK 36。
 
 ## 运行

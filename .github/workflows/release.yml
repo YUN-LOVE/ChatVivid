@@ -185,12 +185,17 @@ jobs:
           yes | "$SDKMGR" --licenses >/dev/null || true
           "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" \
             "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Build Android embedded core
+        shell: bash
+        env:
+          ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        run: ./scripts/build-android-ffi.sh
       - name: Build APK
         working-directory: app
-        run: flutter build apk --release
+        run: flutter build apk --release --target-platform android-arm64
       - name: Build AAB
         working-directory: app
-        run: flutter build appbundle --release
+        run: flutter build appbundle --release --target-platform android-arm64
       - name: Stage artifacts
         run: |
           mkdir -p artifacts
