@@ -121,6 +121,7 @@ void DialogService::run(std::string id, BuiltContext ctx, std::string model,
   req.base_url = cfg_.llm.base_url;
   req.endpoint = cfg_.llm.endpoint;
   req.api_key = cfg_.llm.api_key;
+  req.ca_bundle = cfg_.llm.ca_bundle;
   req.timeout_ms = cfg_.llm.timeout_ms;
   req.cancel = cancel.get();
 

@@ -1,6 +1,6 @@
 # build / runtime
 build/
-data/
+/data/
 .env
 *.db
 *.db-wal
@@ -57,3 +57,10 @@ app/android/local.properties
 app/android/.kotlin/
 
 .android-user/
+
+.vcpkg/
+.vcpkg_installed/
+
+app/android/app/src/main/jniLibs/
+
+.vcpkg-cache/

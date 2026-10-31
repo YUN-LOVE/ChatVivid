@@ -28,9 +28,14 @@ typedef enum chatvv_event_type {
   CHATVV_EVENT_CONTEXT = 6
 } chatvv_event_type;
 
-/* event_json is UTF-8 JSON and is only valid for the duration of the call. */
+/*
+ * event_json is UTF-8 JSON allocated by the library. The callback must copy
+ * what it needs and then call chatvv_free(event_json). This ownership transfer
+ * is required because NativeCallable.listener delivers callbacks
+ * asynchronously; a pointer valid only for the native call would dangle.
+ */
 typedef void (*chatvv_event_cb)(void* user_data, int32_t event_type,
-                                const char* event_json);
+                                char* event_json);
 
 /*
  * config_json is a UTF-8 JSON object. Recognized keys:

@@ -29,7 +29,7 @@ std::string escape_json(const std::string& value) {
   return out;
 }
 
-void on_event(void* user_data, int32_t type, const char* event_json) {
+void on_event(void* user_data, int32_t type, char* event_json) {
   auto* state = static_cast<CallbackState*>(user_data);
   {
     std::lock_guard lock(state->mu);
@@ -43,6 +43,7 @@ void on_event(void* user_data, int32_t type, const char* event_json) {
       state->error = event_json ? event_json : "";
     }
   }
+  chatvv_free(event_json);
   state->cv.notify_all();
 }
 

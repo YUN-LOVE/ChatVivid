@@ -88,6 +88,7 @@ bool parse_config(const json& input, chatvv::Config& cfg, std::string& error) {
   string_field("base_url", cfg.llm.base_url);
   string_field("endpoint", cfg.llm.endpoint);
   string_field("api_key", cfg.llm.api_key);
+  string_field("ca_bundle", cfg.llm.ca_bundle);
   string_field("model", cfg.llm.model);
   string_field("reasoning_effort", cfg.llm.reasoning_effort);
   string_field("system_prompt", cfg.prompt.system_text);
@@ -156,10 +157,13 @@ void chatvv_sub::run() {
       if (!callback) continue;
       const int32_t type = event_type_for(event.type);
       if (type == 0) continue;
+      char* event_copy = dup_string(event.data);
+      if (!event_copy) continue;
       try {
-        callback(user_data, type, event.data.c_str());
+        callback(user_data, type, event_copy);
       } catch (...) {
-        // A callback exception must never unwind through the worker thread.
+        // Ownership transferred to the callback only when it returns normally.
+        std::free(event_copy);
       }
     }
     if (result.done) break;
