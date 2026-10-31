@@ -44,3 +44,4 @@ archive/web-gal-game/.store/
 archive/web-gal-game/.pnpm-store/
 archive/web-gal-game/.npm-cache/
 archive/web-gal-game/.chromium*/
+.tmp-tools/

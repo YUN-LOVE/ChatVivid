@@ -84,6 +84,14 @@ export DEEPSEEK_API_KEY=sk-...
 - [Live2D 接入](reference/avatar-tech/LIVE2D.md)：鲸鱼娘模型、`flutter_live2d`、口型/动作/性能。
 - [3D VRM 评估](reference/avatar-tech/VRM-3D.md)：BlueFatFish、为什么暂不进 v1。
 
+
+## 开发 / CI
+
+- **Arch Linux 环境**：见 [docs/install-arch.md](docs/install-arch.md)（clang/CMake/Flutter/Android SDK/NDK/Live2D 依赖）。
+- **分支规范**：`main` 稳定、`dev` 集成、feature 从 `dev` 开；见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+- **CI/CD**：push/PR 跑四平台后端 + Flutter（app 有 `pubspec.yaml` 后启用）；tag `v*` 自动发 Release；见 [docs/ci-cd.md](docs/ci-cd.md)。
+- **Arch 包模板**：[packaging/arch/PKGBUILD](packaging/arch/PKGBUILD)。
+
 ## 参考与许可
 
 - 大肥鱼/鲸鱼娘设定图：**CC BY-NC-SA 4.0，非商业**；署名链见 [ATTRIBUTION.md](reference/deepseek-mascot/ATTRIBUTION.md)。
