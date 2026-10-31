@@ -22,6 +22,7 @@
 #include "dialog/dialog_service.h"
 #include "dialog/response_hub.h"
 #include "llm/provider.h"
+#include "memory/embedding.h"
 #include "store/db.h"
 #include "util/log.h"
 
@@ -92,7 +93,9 @@ bool parse_config(const json& input, chatvv::Config& cfg, std::string& error) {
   string_field("model", cfg.llm.model);
   string_field("reasoning_effort", cfg.llm.reasoning_effort);
   string_field("system_prompt", cfg.prompt.system_text);
+  string_field("embedding_model", cfg.embedding.model);
   int_field("max_output_tokens", cfg.llm.max_output_tokens);
+  int_field("embedding_threads", cfg.embedding.threads);
   int_field("timeout_ms", cfg.llm.timeout_ms);
 
   if (cfg.storage.data_dir.empty()) {
@@ -182,6 +185,7 @@ struct chatvv_engine {
   chatvv::InjectionStore injections;
   chatvv::ResponseHub hub;
   std::unique_ptr<chatvv::Provider> provider;
+  std::unique_ptr<chatvv::EmbeddingEngine> embedding;
   std::unique_ptr<chatvv::DialogService> dialog;
   std::mutex subs_mu;
   std::vector<std::unique_ptr<chatvv_sub>> subs;
@@ -288,9 +292,21 @@ chatvv_engine* chatvv_create(const char* config_json, char** error_json) {
     engine->db->migrate();
     engine->injections.load_dir(engine->cfg.injections.dir);
     engine->provider = chatvv::make_provider(engine->cfg);
+    if (engine->cfg.embedding.enabled &&
+        !engine->cfg.embedding.model.empty()) {
+      engine->embedding = std::make_unique<chatvv::EmbeddingEngine>();
+      std::string embedding_error;
+      if (!engine->embedding->load(engine->cfg.embedding.model,
+                                   engine->cfg.embedding.threads,
+                                   &embedding_error)) {
+        chatvv::log_warn("embedding.load_failed",
+                         {{"error", embedding_error}});
+        engine->embedding.reset();
+      }
+    }
     engine->dialog = std::make_unique<chatvv::DialogService>(
         engine->cfg, *engine->db, engine->injections, engine->hub,
-        *engine->provider);
+        *engine->provider, engine->embedding.get());
     return engine.release();
   } catch (const std::exception& e) {
     set_error(error_json, "create_failed", e.what());
@@ -432,6 +448,12 @@ char* chatvv_archive(chatvv_engine* engine, int32_t keep_recent,
                  {"cutoff_seq", archived.cutoff_seq},
                  {"memory", nullptr}};
     if (archived.archived_messages > 0) {
+      if (engine->embedding && engine->embedding->ready()) {
+        const auto values = engine->embedding->embed(archived.memory.text);
+        if (!values.empty()) {
+          engine->db->set_memory_embedding(archived.memory.id, values);
+        }
+      }
       payload["memory"] = memory_json(archived.memory);
     }
     return dup_string(payload.dump());
@@ -446,6 +468,46 @@ int32_t chatvv_delete_memory(chatvv_engine* engine, const char* memory_id) {
   try {
     return engine->db->delete_memory(memory_id) ? 1 : 0;
   } catch (...) {
+    return 0;
+  }
+}
+
+char* chatvv_save_context(chatvv_engine* engine, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!engine) {
+    set_error(error_json, "invalid_argument", "engine is null");
+    return nullptr;
+  }
+  try {
+    auto archived = engine->db->archive_messages(0);
+    if (archived.archived_messages > 0 && engine->embedding &&
+        engine->embedding->ready()) {
+      const auto values = engine->embedding->embed(archived.memory.text);
+      if (!values.empty()) {
+        engine->db->set_memory_embedding(archived.memory.id, values);
+      }
+    }
+    engine->db->clear_context();
+    json payload{{"archived_messages", archived.archived_messages},
+                 {"memory", nullptr}};
+    if (archived.archived_messages > 0) {
+      payload["memory"] = memory_json(archived.memory);
+    }
+    return dup_string(payload.dump());
+  } catch (const std::exception& e) {
+    set_error(error_json, "save_context_failed", e.what());
+    return nullptr;
+  }
+}
+
+int32_t chatvv_clear_context(chatvv_engine* engine, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!engine) return 0;
+  try {
+    engine->db->clear_context();
+    return 1;
+  } catch (const std::exception& e) {
+    set_error(error_json, "clear_context_failed", e.what());
     return 0;
   }
 }

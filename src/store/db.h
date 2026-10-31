@@ -77,7 +77,12 @@ class Db {
   std::vector<Memory> list_memories(int limit, const std::string& query);
   bool delete_memory(const std::string& id);
   void mark_memory_used(const std::string& id);
+  void set_memory_embedding(const std::string& id,
+                            const std::vector<float>& embedding);
+  std::vector<Memory> search_memories(const std::vector<float>& query,
+                                      int limit);
   int64_t archive_cutoff();
+  void clear_context();
   ArchiveResult archive_messages(int keep_recent, int max_chars = 6000);
 
   void create_response(const ResponseRow& row);

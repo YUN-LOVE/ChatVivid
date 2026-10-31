@@ -91,6 +91,13 @@ Config Config::load(const std::string& path) {
           (*sec)["max_output_tokens"].value_or(cfg.llm.max_output_tokens);
       cfg.llm.timeout_ms = (*sec)["timeout_ms"].value_or(cfg.llm.timeout_ms);
     }
+    if (const auto* sec = tbl["embedding"].as_table()) {
+      cfg.embedding.model = (*sec)["model"].value_or(cfg.embedding.model);
+      cfg.embedding.threads =
+          (*sec)["threads"].value_or(cfg.embedding.threads);
+      cfg.embedding.enabled =
+          (*sec)["enabled"].value_or(cfg.embedding.enabled);
+    }
     if (const auto* sec = tbl["storage"].as_table()) {
       cfg.storage.data_dir = (*sec)["data_dir"].value_or(cfg.storage.data_dir);
     }
@@ -114,6 +121,10 @@ Config Config::load(const std::string& path) {
   cfg.llm.ca_bundle = env_or("CHATVV_LLM_CA_BUNDLE", cfg.llm.ca_bundle);
   cfg.storage.data_dir = env_or("CHATVV_DATA_DIR", cfg.storage.data_dir);
   cfg.injections.dir = env_or("CHATVV_INJECTIONS_DIR", cfg.injections.dir);
+  cfg.embedding.model =
+      env_or("CHATVV_EMBEDDING_MODEL", cfg.embedding.model);
+  cfg.embedding.threads =
+      env_int_or("CHATVV_EMBEDDING_THREADS", cfg.embedding.threads);
 
   if (cfg.llm.api_key.empty()) {
     cfg.llm.api_key = env_or(cfg.llm.api_key_env.c_str(), "");

@@ -167,6 +167,7 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
     );
     if (!mounted || updated == null) return;
+    await chat.initialize();
     if (updated.cacheKey != widget.settings.cacheKey) {
       await widget.onSettingsChanged(updated);
     }

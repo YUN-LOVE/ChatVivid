@@ -3,6 +3,7 @@
 #include <csignal>
 #include <filesystem>
 #include <iostream>
+#include <memory>
 #include <string>
 
 #include "app/config.h"
@@ -11,6 +12,7 @@
 #include "dialog/response_hub.h"
 #include "http/server.h"
 #include "llm/provider.h"
+#include "memory/embedding.h"
 #include "store/db.h"
 #include "util/log.h"
 
@@ -52,8 +54,19 @@ int main(int argc, char** argv) {
 
     auto provider = chatvv::make_provider(cfg);
     chatvv::ResponseHub hub;
-    chatvv::DialogService dialog(cfg, db, slots, hub, *provider);
-    chatvv::HttpServer server(cfg, db, slots, hub, dialog);
+    std::unique_ptr<chatvv::EmbeddingEngine> embedding;
+    if (cfg.embedding.enabled && !cfg.embedding.model.empty()) {
+      embedding = std::make_unique<chatvv::EmbeddingEngine>();
+      std::string embedding_error;
+      if (!embedding->load(cfg.embedding.model, cfg.embedding.threads,
+                           &embedding_error)) {
+        chatvv::log_warn("embedding.load_failed", {{"error", embedding_error}});
+        embedding.reset();
+      }
+    }
+    chatvv::DialogService dialog(cfg, db, slots, hub, *provider,
+                                 embedding.get());
+    chatvv::HttpServer server(cfg, db, slots, hub, dialog, embedding.get());
 
     g_server = &server;
     std::signal(SIGINT, on_signal);

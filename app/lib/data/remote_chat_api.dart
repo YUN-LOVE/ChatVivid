@@ -188,6 +188,29 @@ class RemoteChatApi implements ChatBackend {
   }
 
   @override
+  Future<MemoryArchiveResult> saveContext() async {
+    try {
+      final response = await _dio.post<dynamic>('/v1/context/save');
+      final data = response.data;
+      if (data is! Map) {
+        throw const ChatApiException('保存上下文响应格式错误');
+      }
+      return MemoryArchiveResult.fromJson(Map<String, dynamic>.from(data));
+    } on DioException catch (error) {
+      throw ChatApiException(_friendlyError(error));
+    }
+  }
+
+  @override
+  Future<void> clearContext() async {
+    try {
+      await _dio.post<dynamic>('/v1/context/clear');
+    } on DioException catch (error) {
+      throw ChatApiException(_friendlyError(error));
+    }
+  }
+
+  @override
   Future<void> dispose() async => _dio.close(force: true);
 
   static String? _responseId(Map<String, dynamic> payload) {

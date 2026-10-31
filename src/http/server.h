@@ -18,6 +18,7 @@ class Response;
 namespace chatvv {
 
 class Db;
+class EmbeddingEngine;
 class ResponseHub;
 class DialogService;
 struct Config;
@@ -25,7 +26,8 @@ struct Config;
 class HttpServer {
  public:
   HttpServer(const Config& cfg, Db& db, InjectionStore& slots,
-             ResponseHub& hub, DialogService& dialog);
+             ResponseHub& hub, DialogService& dialog,
+             EmbeddingEngine* embedding = nullptr);
   ~HttpServer();
 
   bool listen();
@@ -49,6 +51,7 @@ class HttpServer {
   InjectionStore& slots_;
   ResponseHub& hub_;
   DialogService& dialog_;
+  EmbeddingEngine* embedding_ = nullptr;
   std::unique_ptr<httplib::Server> svr_;
 };
 
