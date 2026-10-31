@@ -106,9 +106,14 @@ jobs:
       - name: Configure
         shell: pwsh
         run: |
-          cmake --preset windows-x64 2>&1 | Tee-Object -FilePath configure.log
+          cmake --preset windows-x64 *>&1 | Tee-Object -FilePath configure.log
           if ($LASTEXITCODE -ne 0) {
-            $msg = (Get-Content configure.log -Raw) -replace "`n", "%0A"
+            $lines = Get-Content configure.log
+            $idx = ($lines | Select-String -Pattern "CMake Error|error:|Error" | Select-Object -First 1).LineNumber
+            if ($idx -eq $null) { $idx = 1 }
+            $start = [Math]::Max(0, $idx - 2)
+            $end = [Math]::Min($lines.Count - 1, $idx + 18)
+            $msg = ($lines[$start..$end] -join "%0A")
             Write-Output "::error::$msg"
             exit 1
           }
