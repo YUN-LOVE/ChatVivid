@@ -64,3 +64,5 @@ app/android/.kotlin/
 app/android/app/src/main/jniLibs/
 
 .vcpkg-cache/
+
+artifacts/
