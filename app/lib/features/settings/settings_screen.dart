@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 
 import '../../data/app_paths.dart';
 import '../../data/app_settings.dart';
+import '../../data/chat_backend.dart';
 import '../../data/prompt_injection.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
 import 'injection_editor.dart';
+import 'memory_archive_pane.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key, required this.settings});
+  const SettingsScreen({
+    super.key,
+    required this.settings,
+    required this.backend,
+  });
 
   final AppSettings settings;
+  final ChatBackend backend;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -38,6 +45,11 @@ const _categories = [
     title: '提示词与注入',
     description: '系统提示词、上下文注入',
     icon: Icons.auto_awesome_rounded,
+  ),
+  SettingsCategory(
+    title: '记忆归档',
+    description: '长期记忆、旧对话归档',
+    icon: Icons.memory_rounded,
   ),
   SettingsCategory(
     title: '角色与舞台',
@@ -114,6 +126,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   child: SettingsDetail(
                                     category: _categories[_selected],
                                     settings: _settings,
+                                    backend: widget.backend,
                                     onChanged: _apply,
                                   ),
                                 ),
@@ -128,6 +141,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                     builder: (_) => SettingsDetailPage(
                                       category: _categories[index],
                                       settings: _settings,
+                                      backend: widget.backend,
                                     ),
                                   ),
                                 );
@@ -368,10 +382,12 @@ class SettingsDetailPage extends StatefulWidget {
     super.key,
     required this.category,
     required this.settings,
+    required this.backend,
   });
 
   final SettingsCategory category;
   final AppSettings settings;
+  final ChatBackend backend;
 
   @override
   State<SettingsDetailPage> createState() => _SettingsDetailPageState();
@@ -400,6 +416,7 @@ class _SettingsDetailPageState extends State<SettingsDetailPage> {
         body: SettingsDetail(
           category: widget.category,
           settings: widget.settings,
+          backend: widget.backend,
           onChanged: (next) => setState(() => _draft = next),
         ),
       ),
@@ -412,11 +429,13 @@ class SettingsDetail extends StatefulWidget {
     super.key,
     required this.category,
     required this.settings,
+    required this.backend,
     required this.onChanged,
   });
 
   final SettingsCategory category;
   final AppSettings settings;
+  final ChatBackend backend;
   final ValueChanged<AppSettings> onChanged;
 
   @override
@@ -502,6 +521,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         const SizedBox(height: 18),
         if (widget.category.title == '连接与后端') _connection(),
         if (widget.category.title == '提示词与注入') _prompts(),
+        if (widget.category.title == '记忆归档') _memory(),
         if (widget.category.title == '角色与舞台') _character(),
         if (widget.category.title == '外观') _appearance(),
         if (widget.category.title == '数据与存储') _data(),
@@ -697,6 +717,10 @@ class _SettingsDetailState extends State<SettingsDetail> {
     final next = [..._settings.injections]..removeAt(index);
     setState(() => _settings = _settings.copyWith(injections: next));
     _emit();
+  }
+
+  Widget _memory() {
+    return MemoryArchivePane(backend: widget.backend);
   }
 
   Widget _character() {

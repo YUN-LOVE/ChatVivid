@@ -123,6 +123,25 @@ int main() {
                      "", now_ms());
   CHECK(db.response_status(row.id) == "completed");
 
+  // Memory archive: old messages become a memory and are excluded from the
+  // next context by the archive cutoff.
+  for (int i = 0; i < 8; ++i) {
+    db.append_message(i % 2 == 0 ? "user" : "assistant",
+                      "archive message " + std::to_string(i), "", "");
+  }
+  const auto archived = db.archive_messages(3);
+  CHECK(archived.archived_messages == 7);
+  CHECK(archived.cutoff_seq == 7);
+  CHECK(db.archive_cutoff() == 7);
+  CHECK(!archived.memory.text.empty());
+  const auto memories = db.list_memories(10, "archive message");
+  CHECK(memories.size() == 1);
+  const auto ctx_after = build_context(db, store, cfg, "after archive");
+  CHECK(ctx_after.instructions.find("长期记忆") != std::string::npos);
+  CHECK(ctx_after.input.size() == 5);  // 3 recent + at_depth + current
+  CHECK(db.delete_memory(archived.memory.id));
+  CHECK(db.list_memories(10, "").empty());
+
   fs::remove_all(dir);
 
   if (g_failures) {

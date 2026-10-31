@@ -156,9 +156,14 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _openSettings() async {
+    final chat = _chat;
+    if (chat == null) return;
     final updated = await Navigator.of(context).push<AppSettings>(
       MaterialPageRoute(
-        builder: (_) => SettingsScreen(settings: widget.settings),
+        builder: (_) => SettingsScreen(
+          settings: widget.settings,
+          backend: chat.api,
+        ),
       ),
     );
     if (!mounted || updated == null) return;
