@@ -115,6 +115,7 @@ class AppSettings {
         model,
         fullBaseUrl,
         fullEndpoint,
-        apiKey.isEmpty ? 'no-key' : 'key',
+        apiKey,
+        clientToken,
       ].join('|');
 }
