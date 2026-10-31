@@ -33,6 +33,23 @@ struct ResponseRow {
   int64_t completed_at = 0;
 };
 
+struct Memory {
+  std::string id;
+  std::string text;
+  int64_t created_at = 0;
+  int64_t last_used_at = 0;
+  int use_count = 0;
+  double importance = 0.5;
+  int durability = 3;
+  std::string status = "active";
+};
+
+struct ArchiveResult {
+  Memory memory;
+  int archived_messages = 0;
+  int64_t cutoff_seq = 0;
+};
+
 struct StoredEvent {
   int64_t seq = 0;
   std::string type;
@@ -54,6 +71,14 @@ class Db {
   std::vector<Message> list_messages(int limit, int64_t before_seq,
                                      int64_t after_seq, bool* has_more);
   int64_t max_seq();
+
+  Memory append_memory(const std::string& text, double importance = 0.5,
+                       int durability = 3);
+  std::vector<Memory> list_memories(int limit, const std::string& query);
+  bool delete_memory(const std::string& id);
+  void mark_memory_used(const std::string& id);
+  int64_t archive_cutoff();
+  ArchiveResult archive_messages(int keep_recent, int max_chars = 6000);
 
   void create_response(const ResponseRow& row);
   void update_response(const std::string& id, const std::string& status,

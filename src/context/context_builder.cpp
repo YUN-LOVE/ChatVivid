@@ -103,8 +103,24 @@ BuiltContext build_context(Db& db, const InjectionStore& slots,
   add_block(join_bodies(after_system));
   add_block(kSafety);
 
+  const int64_t archive_cutoff = db.archive_cutoff();
   bool history_truncated = false;
-  std::vector<Message> history = db.list_messages(500, 0, 0, &history_truncated);
+  std::vector<Message> history =
+      db.list_messages(500, 0, archive_cutoff, &history_truncated);
+
+  nlohmann::json used_memories = nlohmann::json::array();
+  std::string memory_block;
+  for (const auto& memory : db.list_memories(12, "")) {
+    if (memory_block.size() + memory.text.size() > 6000) break;
+    if (!memory_block.empty()) memory_block += "\n";
+    memory_block += "- " + memory.text;
+    used_memories.push_back({{"id", memory.id},
+                             {"tokens", estimate_tokens(memory.text)}});
+    db.mark_memory_used(memory.id);
+  }
+  if (!memory_block.empty()) {
+    add_block("[长期记忆]\n" + memory_block);
+  }
 
   std::vector<nlohmann::json> head;
   for (const auto& slot : chat_start) {
@@ -174,6 +190,8 @@ BuiltContext build_context(Db& db, const InjectionStore& slots,
   ctx.manifest = {{"injections", used},
                   {"history_messages", history.size()},
                   {"history_truncated", history_truncated},
+                  {"archive_cutoff_seq", archive_cutoff},
+                  {"memories", used_memories},
                   {"instructions_tokens", estimate_tokens(instructions)},
                   {"input_tokens_estimate", estimate_tokens(ctx.input.dump())},
                   {"position_counts",
