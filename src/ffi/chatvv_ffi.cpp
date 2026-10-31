@@ -114,6 +114,41 @@ bool parse_config(const json& input, chatvv::Config& cfg, std::string& error) {
   return true;
 }
 
+std::vector<chatvv::Injection> parse_injections(const char* injections_json,
+                                                 std::string& error) {
+  std::vector<chatvv::Injection> out;
+  if (!injections_json || !*injections_json) return out;
+  try {
+    const json input = json::parse(injections_json);
+    if (!input.is_array()) {
+      error = "injections_json must be an array";
+      return out;
+    }
+    int index = 0;
+    for (const auto& item : input) {
+      if (!item.is_object()) continue;
+      chatvv::Injection inj;
+      inj.name = item.value("name", "injection-" + std::to_string(index++));
+      inj.position = item.value("position", std::string("before_latest"));
+      inj.mode = item.value("mode", std::string("append"));
+      inj.trust = item.value("trust", std::string("data"));
+      inj.description = item.value("description", std::string());
+      inj.body = item.value("content", std::string());
+      inj.depth = item.value("depth", 0);
+      inj.priority = item.value("priority", 100);
+      inj.enabled = item.value("enabled", true) && !inj.body.empty();
+      if (!inj.enabled) continue;
+      if (inj.position == "at_depth" && (inj.depth < 1 || inj.depth > 64)) {
+        continue;
+      }
+      out.push_back(std::move(inj));
+    }
+  } catch (const std::exception& e) {
+    error = e.what();
+  }
+  return out;
+}
+
 }  // namespace
 
 struct chatvv_engine;
@@ -169,6 +204,50 @@ void chatvv_sub::run() {
     if (result.done) break;
   }
 }
+
+namespace {
+
+char* start_turn(chatvv_engine* engine, const char* text,
+                 std::vector<chatvv::Injection> extra,
+                 chatvv_event_cb callback, void* user_data,
+                 char** error_json) {
+  if (!engine) {
+    set_error(error_json, "invalid_argument", "engine is null");
+    return nullptr;
+  }
+  if (!text || !*text) {
+    set_error(error_json, "invalid_argument", "text must not be empty");
+    return nullptr;
+  }
+  if (engine->stopping.load()) {
+    set_error(error_json, "engine_stopped", "engine is shutting down");
+    return nullptr;
+  }
+
+  try {
+    const auto started = engine->dialog->start(text, std::move(extra));
+    auto sub = std::make_unique<chatvv_sub>();
+    sub->engine = engine;
+    sub->id = started.id;
+    sub->callback = callback;
+    sub->user_data = user_data;
+    chatvv_sub* raw = sub.get();
+    {
+      std::lock_guard lock(engine->subs_mu);
+      engine->subs.push_back(std::move(sub));
+    }
+    raw->thread = std::thread([raw] { raw->run(); });
+    return dup_string(started.id);
+  } catch (const std::exception& e) {
+    set_error(error_json, "send_failed", e.what());
+    return nullptr;
+  } catch (...) {
+    set_error(error_json, "send_failed", "unknown error");
+    return nullptr;
+  }
+}
+
+}  // namespace
 
 extern "C" {
 
@@ -236,40 +315,21 @@ char* chatvv_send(chatvv_engine* engine, const char* text,
                   chatvv_event_cb callback, void* user_data,
                   char** error_json) {
   if (error_json) *error_json = nullptr;
-  if (!engine) {
-    set_error(error_json, "invalid_argument", "engine is null");
-    return nullptr;
-  }
-  if (!text || !*text) {
-    set_error(error_json, "invalid_argument", "text must not be empty");
-    return nullptr;
-  }
-  if (engine->stopping.load()) {
-    set_error(error_json, "engine_stopped", "engine is shutting down");
-    return nullptr;
-  }
+  return start_turn(engine, text, {}, callback, user_data, error_json);
+}
 
-  try {
-    const auto started = engine->dialog->start(text);
-    auto sub = std::make_unique<chatvv_sub>();
-    sub->engine = engine;
-    sub->id = started.id;
-    sub->callback = callback;
-    sub->user_data = user_data;
-    chatvv_sub* raw = sub.get();
-    {
-      std::lock_guard lock(engine->subs_mu);
-      engine->subs.push_back(std::move(sub));
-    }
-    raw->thread = std::thread([raw] { raw->run(); });
-    return dup_string(started.id);
-  } catch (const std::exception& e) {
-    set_error(error_json, "send_failed", e.what());
-    return nullptr;
-  } catch (...) {
-    set_error(error_json, "send_failed", "unknown error");
+char* chatvv_send_ex(chatvv_engine* engine, const char* text,
+                     const char* injections_json, chatvv_event_cb callback,
+                     void* user_data, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  std::string parse_error;
+  auto extra = parse_injections(injections_json, parse_error);
+  if (!parse_error.empty()) {
+    set_error(error_json, "invalid_injections", parse_error);
     return nullptr;
   }
+  return start_turn(engine, text, std::move(extra), callback, user_data,
+                    error_json);
 }
 
 void chatvv_cancel(chatvv_engine* engine, const char* response_id) {

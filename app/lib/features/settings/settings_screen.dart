@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../data/app_paths.dart';
 import '../../data/app_settings.dart';
+import '../../data/prompt_injection.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
+import 'injection_editor.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, required this.settings});
@@ -428,6 +430,8 @@ class _SettingsDetailState extends State<SettingsDetail> {
       TextEditingController(text: _settings.clientBaseUrl);
   late final TextEditingController _clientToken =
       TextEditingController(text: _settings.clientToken);
+  late final TextEditingController _systemPrompt =
+      TextEditingController(text: _settings.systemPrompt);
   late String _provider =
       _settings.provider == 'mock' ? 'mock' : 'deepseek';
 
@@ -437,6 +441,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         _fullBase,
         _clientBase,
         _clientToken,
+        _systemPrompt,
       ];
 
   @override
@@ -475,6 +480,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           ? 'http://127.0.0.1:8080'
           : _clientBase.text.trim(),
       clientToken: _clientToken.text.trim(),
+      systemPrompt: _systemPrompt.text.trim(),
     );
   }
 
@@ -490,6 +496,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         _Header(category: widget.category),
         const SizedBox(height: 18),
         if (widget.category.title == '连接与后端') _connection(),
+        if (widget.category.title == '提示词与注入') _prompts(),
         if (widget.category.title == '角色与舞台') _character(),
         if (widget.category.title == '外观') _appearance(),
         if (widget.category.title == '数据与存储') _data(),
@@ -583,6 +590,108 @@ class _SettingsDetailState extends State<SettingsDetail> {
         ),
       ],
     );
+  }
+
+  Widget _prompts() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: _systemPrompt,
+          minLines: 5,
+          maxLines: 10,
+          style: const TextStyle(color: AppColors.text, fontSize: 13),
+          decoration: InputDecoration(
+            labelText: '系统提示词',
+            hintText: '留空使用默认人格',
+            alignLabelWithHint: true,
+            labelStyle: const TextStyle(color: AppColors.muted, fontSize: 11),
+            hintStyle: TextStyle(
+              color: AppColors.muted.withValues(alpha: 0.45),
+              fontSize: 12,
+            ),
+            filled: true,
+            fillColor: AppColors.surfaceHigh.withValues(alpha: 0.4),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: BorderSide.none,
+            ),
+            contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Row(
+          children: [
+            const Text(
+              '上下文注入',
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _editInjection,
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('新建'),
+            ),
+          ],
+        ),
+        if (_settings.injections.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Text(
+              '暂无注入。文件附件也会以注入形式进入上下文。',
+              style: TextStyle(
+                color: AppColors.muted.withValues(alpha: 0.65),
+                fontSize: 11,
+              ),
+            ),
+          )
+        else
+          for (var i = 0; i < _settings.injections.length; i++) ...[
+            _InjectionTile(
+              injection: _settings.injections[i],
+              onEdit: () => _editInjection(_settings.injections[i]),
+              onDelete: () => _removeInjection(i),
+              onToggle: (enabled) {
+                final next = [..._settings.injections];
+                next[i] = next[i].copyWith(enabled: enabled);
+                setState(
+                  () => _settings = _settings.copyWith(injections: next),
+                );
+                _emit();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+      ],
+    );
+  }
+
+  Future<void> _editInjection([PromptInjection? initial]) async {
+    final result = await Navigator.of(context).push<PromptInjection>(
+      MaterialPageRoute(
+        builder: (_) => InjectionEditorPage(initial: initial),
+      ),
+    );
+    if (!mounted || result == null) return;
+    final next = [..._settings.injections];
+    final index = next.indexWhere((item) => item.id == result.id);
+    if (index >= 0) {
+      next[index] = result;
+    } else {
+      next.add(result);
+    }
+    setState(() => _settings = _settings.copyWith(injections: next));
+    _emit();
+  }
+
+  void _removeInjection(int index) {
+    final next = [..._settings.injections]..removeAt(index);
+    setState(() => _settings = _settings.copyWith(injections: next));
+    _emit();
   }
 
   Widget _character() {
@@ -717,6 +826,70 @@ class _SettingsDetailState extends State<SettingsDetail> {
           onTap: null,
         ),
       ],
+    );
+  }
+}
+
+class _InjectionTile extends StatelessWidget {
+  const _InjectionTile({
+    required this.injection,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onToggle,
+  });
+
+  final PromptInjection injection;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final ValueChanged<bool> onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceHigh.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Switch(
+            value: injection.enabled,
+            onChanged: onToggle,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  injection.name,
+                  style: const TextStyle(
+                    color: AppColors.text,
+                    fontSize: 12,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${injection.position} · ${injection.mode} · ${injection.trust}',
+                  style: TextStyle(
+                    color: AppColors.muted.withValues(alpha: 0.65),
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onEdit,
+            icon: const Icon(Icons.edit_outlined, size: 18),
+          ),
+          IconButton(
+            onPressed: onDelete,
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+          ),
+        ],
+      ),
     );
   }
 }
