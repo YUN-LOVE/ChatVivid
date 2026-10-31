@@ -15,6 +15,7 @@ class MemoryArchivePane extends StatefulWidget {
 
 class _MemoryArchivePaneState extends State<MemoryArchivePane> {
   final TextEditingController _query = TextEditingController();
+  final TextEditingController _keepRecent = TextEditingController(text: '20');
   List<MemoryEntry> _memories = const [];
   bool _loading = true;
   bool _busy = false;
@@ -29,6 +30,7 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
   @override
   void dispose() {
     _query.dispose();
+    _keepRecent.dispose();
     super.dispose();
   }
 
@@ -60,7 +62,8 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final result = await widget.backend.archive(keepRecent: 20);
+      final keep = int.tryParse(_keepRecent.text) ?? 20;
+      final result = await widget.backend.archive(keepRecent: keep);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -162,6 +165,30 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
         const SizedBox(height: 12),
         Row(
           children: [
+            SizedBox(
+              width: 82,
+              child: TextField(
+                controller: _keepRecent,
+                keyboardType: TextInputType.number,
+                style: const TextStyle(color: AppColors.text, fontSize: 12),
+                decoration: InputDecoration(
+                  labelText: '保留',
+                  labelStyle: const TextStyle(
+                    color: AppColors.muted,
+                    fontSize: 10,
+                  ),
+                  isDense: true,
+                  filled: true,
+                  fillColor: AppColors.surfaceHigh.withValues(alpha: 0.4),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
             Text(
               '${_memories.length} 条记忆',
               style: const TextStyle(color: AppColors.muted, fontSize: 11),
@@ -170,7 +197,7 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
             FilledButton.tonalIcon(
               onPressed: _busy ? null : _archive,
               icon: const Icon(Icons.archive_outlined, size: 18),
-              label: Text(_busy ? '归档中…' : '归档旧对话'),
+              label: Text(_busy ? '归档中…' : '归档'),
             ),
           ],
         ),
