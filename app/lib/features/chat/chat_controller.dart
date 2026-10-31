@@ -22,6 +22,8 @@ class ChatController extends ChangeNotifier {
 
   String get apiBase => api.endpointLabel;
 
+  String get backendLabel => '${api.modeLabel} · ${api.endpointLabel}';
+
   Future<void> initialize() async {
     try {
       final history = await api.history();

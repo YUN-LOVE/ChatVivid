@@ -308,7 +308,7 @@ class _TopBar extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'deepseek-chat · 记忆体',
+                        chat.backendLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
