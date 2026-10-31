@@ -43,7 +43,7 @@ ctest --preset dev
 paru -S --needed flutter
 ```
 
-当前 AUR 参考版本：`flutter 3.41.2-3`。
+当前 AUR 参考版本：以 AUR 实际为准；本机实测 Flutter **3.44.2**。
 如果 AUR 的 Flutter 与系统 Dart 冲突，先移除独立 `dart`，或改用方案 B。
 不要安装 `android-studio`；下面手动装 SDK。
 
@@ -121,16 +121,16 @@ yes | sdkmanager --licenses
 
 sdkmanager --install \
   "platform-tools" \
-  "platforms;android-35" \
-  "build-tools;35.0.0" \
+  "platforms;android-36" \
+  "build-tools;36.0.0" \
   "ndk;27.2.12479018" \
   "cmake;3.22.1"
 
 sdkmanager --list_installed
 ```
 
-- `platforms;android-35` / `build-tools;35.0.0` 是参考值；Flutter 3.41 可能提示 Android 36，
-  按 `flutter doctor` 提示装对应版本。
+- `platforms;android-36` / `build-tools;36.0.0` 是 Flutter 3.44 的要求；如果 `flutter doctor`
+  提示 36.1/37 或更高，按提示装对应版本。
 - `flutter_live2d` 需要 **NDK + CMake**，版本按插件/Flutter 要求调整。
 - `platform-tools` 必须在 PATH 里；否则 `adb` 用系统的 `android-tools` 版本。
 
@@ -164,8 +164,8 @@ adb devices
 sudo gpasswd -a "$USER" kvm   # 重新登录生效
 ls -l /dev/kvm
 
-sdkmanager --install "emulator" "system-images;android-35;google_apis;x86_64"
-avdmanager create avd -n chatvv -k "system-images;android-35;google_apis;x86_64" -d pixel_7
+sdkmanager --install "emulator" "system-images;android-36;google_apis;x86_64"
+avdmanager create avd -n chatvv -k "system-images;android-36;google_apis;x86_64" -d pixel_7
 flutter emulators
 ```
 
