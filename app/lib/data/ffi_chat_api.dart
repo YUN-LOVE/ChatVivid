@@ -147,6 +147,18 @@ class FfiChatApi implements ChatBackend {
         const String.fromEnvironment('CHATVV_FFI_LIB', defaultValue: '');
     if (configured.isNotEmpty) return DynamicLibrary.open(configured);
     if (Platform.isAndroid) return DynamicLibrary.open('libchatvv_ffi.so');
+
+    final executable = File(Platform.resolvedExecutable);
+    final bundled = switch (Platform.operatingSystem) {
+      'linux' => '${executable.parent.path}/lib/libchatvv_ffi.so',
+      'macos' =>
+        '${executable.parent.parent.path}/Frameworks/libchatvv_ffi.dylib',
+      'windows' => '${executable.parent.path}/chatvv_ffi.dll',
+      _ => null,
+    };
+    if (bundled != null && File(bundled).existsSync()) {
+      return DynamicLibrary.open(bundled);
+    }
     if (Platform.isLinux) return DynamicLibrary.open('libchatvv_ffi.so');
     if (Platform.isMacOS) return DynamicLibrary.open('libchatvv_ffi.dylib');
     if (Platform.isWindows) return DynamicLibrary.open('chatvv_ffi.dll');

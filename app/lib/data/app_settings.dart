@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'prompt_injection.dart';
 
 enum BackendMode {
@@ -36,7 +34,7 @@ class AppSettings {
 
   factory AppSettings.defaults() {
     return AppSettings(
-      mode: Platform.isAndroid ? BackendMode.full : BackendMode.client,
+      mode: BackendMode.full,
       clientBaseUrl: 'http://127.0.0.1:8080',
       clientToken: '',
       provider: 'deepseek',
