@@ -1,81 +1,95 @@
 # chatvv app (Flutter)
 
-> 状态：**目录与设计已建，尚未 scaffold，未写业务代码**。
-> 当前环境未安装 Flutter SDK；本轮先完成归档、参考、设计，再开始编码。
+> 状态：**首版 Client 模式 UI 已 scaffold**（Flutter 3.44.2）。
+> 已实现：顶部静态大肥鱼舞台、渐变过渡、聊天列表、SSE 发送/停止、连接设置 sheet。
+> 未实现：Live2D runtime、Full/FFI、记忆库、助手管理、TTS。
+> 当前环境 Flutter 3.44.2 / Dart 3.12.2；Android SDK 36。
 
-## 目标
+## 运行
 
-- Flutter 原生 UI，2D/2.5D、低占用，无 WebView；Live2D 角色层用原生 GL，不做完整 3D。
-- 两种模式：
-  - `full`：通过 FFI 内嵌 `libchatvv_core`，本地 SQLite，直连 LLM。
-  - `client`：只连远端 `chatvv-server`（HTTP/SSE），本地只做缓存。
-- 视觉：Material You 3 Expressive + Apple 毛玻璃 + DeepSeek 大肥鱼。
-- 一个持续对话，不做会话列表。
-- Live2D 角色舞台：v1 Android/iOS 用 `flutter_live2d`；桌面后续独立 adapter，先静态兜底；3D 走同一 `CharacterRuntime`，授权到位再接。
+### 后端
 
-## 设计文档
+```bash
+cd ..
+./build/dev/chatvvd --config config/config.toml
+```
 
-- [整体架构与 IA](../docs/flutter-app-design.md)
-- [C++ 编译成库 / FFI](../docs/native-core-embedding.md)
-- [视觉与交互 DESIGN](design/DESIGN.md)
-- [角色舞台接口 / 外部模型](design/CHARACTER_STAGE.md)
-- [参考素材](../reference/README.md)
+默认 mock provider，监听 `127.0.0.1:8080`。
 
-## 计划中的目录
+### Linux 桌面
+
+```bash
+cd app
+flutter pub get
+flutter run -d linux --dart-define=CHATVV_API=http://127.0.0.1:8080
+```
+
+### Android 真机
+
+```bash
+adb reverse tcp:8080 tcp:8080
+cd app
+flutter run -d <device-id> --dart-define=CHATVV_API=http://127.0.0.1:8080
+```
+
+或构建安装：
+
+```bash
+flutter build apk --debug
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+```
+
+> Android 9+ 已允许本地明文 HTTP（`usesCleartextTraffic=true`）；生产应改 HTTPS。
+> 设备必须在 ADB 模式，不是 MIDI/仅充电。
+
+## 当前结构
 
 ```
 lib/
 ├── main.dart
-├── app/                 # bootstrap、router、mode
-├── core/                # theme、glass、motion、tokens
+├── app.dart
+├── theme/
+│   ├── app_theme.dart      # Deep Sea 色板、Material 3
+│   └── glass.dart          # BackdropFilter 玻璃面板
 ├── data/
-│   ├── backend/         # ChatBackend 接口
-│   ├── embedded/        # FFI
-│   ├── remote/          # HTTP/SSE
-│   └── cache/           # Drift
+│   └── remote_chat_api.dart # /v1/messages + /v1/turns SSE
 └── features/
-    ├── chat/
-    ├── memory/
-    ├── assistants/
-    ├── settings/
-    └── onboarding/
+    ├── character/
+    │   └── character_stage.dart # 顶部静态舞台（Live2D 占位）
+    └── chat/
+        ├── chat_screen.dart
+        ├── chat_controller.dart
+        └── chat_models.dart
 assets/
-├── mascot/              # 大肥鱼 WebP（头像/空状态）
-├── live2d/whale-girl/   # Live2D 鲸鱼娘（已放入，4.3 MB）
-├── fonts/               # Noto 子集
-└── icons/               # Material Symbols 子集
+├── mascot/                 # 大肥鱼头像/全身（CC BY-NC-SA）
+└── live2d/whale-girl/      # Live2D 模型（已放入，adapter 下一步）
 ```
 
-## 初始化（Flutter 安装后）
+## 依赖
+
+- `dio`：HTTP/SSE。
+- `flutter_live2d`：**尚未加入**；下一步接入 Android/iOS 舞台。
+- 暂无 Riverpod/Drift/secure storage；先用 `ChangeNotifier` + 内存历史。
+
+## 验证
 
 ```bash
-# app/ 里已有 design/README，先 scaffold 到临时目录，避免覆盖
-flutter create --org dev.chatvv --project-name chatvv \
-  --platforms=android,ios,linux,macos,windows /tmp/chatvv-scaffold
-# 把 /tmp/chatvv-scaffold 的 lib/、pubspec.yaml、android/ios/... 合入 app/
-cd app
-flutter pub add dynamic_color m3_expressive flutter_secure_storage path_provider
-flutter pub add flutter_riverpod dio flutter_markdown flutter_live2d
+flutter analyze
+flutter test
+flutter build linux --debug
+flutter build apk --debug
 ```
 
-- 先做 `client` 模式：`RemoteChatBackend` + 现有 server。
-- 再加 `full`：`ffi` + `ffigen` + `libchatvv_core`。
-- Flutter flavors：`client` / `full`；native libs 只进 full。
-- Live2D：`flutter_live2d` 只覆盖 Android/iOS；桌面 v1 静态，后续补独立 adapter（多套代码，接口不变）。
-- 具体包版本在实现时再锁；不要一次引入过多依赖。
+## 设计
+
+- [整体架构与 IA](../docs/flutter-app-design.md)
+- [C++ 编译成库 / FFI](../docs/native-core-embedding.md)
+- [视觉 DESIGN](design/DESIGN.md)
+- [角色舞台接口 / 外部模型](design/CHARACTER_STAGE.md)
+- [Live2D 接入笔记](../reference/avatar-tech/LIVE2D.md)
 
 ## 资产许可
 
-- 大肥鱼设定图：**CC BY-NC-SA 4.0，非商业**；署名见 [ATTRIBUTION.md](../reference/deepseek-mascot/ATTRIBUTION.md)。
+- 大肥鱼：**CC BY-NC-SA 4.0，非商业**；署名见 [ATTRIBUTION.md](../reference/deepseek-mascot/ATTRIBUTION.md)。
 - Live2D 模型：**CC BY-NC-SA 4.0**，署名 **上善无形 / ZipZipPipe / 氵六青**；见 [LIVE2D.md](../reference/avatar-tech/LIVE2D.md)。
-- `flutter_live2d`：BSD-3；Cubism Core 为 Live2D Inc. 专有许可，发布前核对。
-- 3D VRM `BlueFatFish` 仅随原插件分发授权，未取得 app 分发许可，未提交。
 - 商业分发前必须替换素材或取得授权。
-
-## 下一步
-
-1. 安装 Flutter stable，`flutter doctor`。
-2. scaffold + 主题/玻璃/大肥鱼，先做静态 Chat 页。
-3. `flutter_live2d` 真机 spike（模型加载、idle、透明叠加、口型参数）。
-4. 接 `client` 模式 SSE，跑通真机。
-5. 再拆 C++ core/FFI。

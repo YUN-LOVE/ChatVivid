@@ -1,6 +1,6 @@
 # Flutter App 设计（v0.1 构思）
 
-> 状态：**方向设计，尚未开始编码**。旧 Web GalGame 已归档到 `archive/web-gal-game/`。
+> 状态：**首版 Client UI 已 scaffold**（Flutter 3.44.2）；Live2D/Full/FFI 后续。旧 Web GalGame 已归档到 `archive/web-gal-game/`。
 > 关联文档：[native-core-embedding.md](native-core-embedding.md) · [app/design/DESIGN.md](../app/design/DESIGN.md) · [reference/README.md](../reference/README.md)
 
 ## 1. 为什么从 Web 换成 Flutter
@@ -99,7 +99,7 @@ class ResponseFailed extends ChatEvent { final String message; }
 
 ```
 chatvv/
-├── app/                    # Flutter（本轮只放设计，不 scaffold）
+├── app/                    # Flutter（已 scaffold，首版 Client UI）
 │   ├── lib/
 │   │   ├── app/            # 路由、模式、启动
 │   │   ├── core/           # theme、motion、glass、result
