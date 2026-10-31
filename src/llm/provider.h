@@ -21,6 +21,7 @@ struct LlmRequest {
   std::string base_url;
   std::string endpoint;
   std::string api_key;
+  std::string ca_bundle;
   int timeout_ms = 120000;
   std::atomic<bool>* cancel = nullptr;
 };

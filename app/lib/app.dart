@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'features/chat/chat_screen.dart';
+import 'app/startup_gate.dart';
 import 'theme/app_theme.dart';
 
 class ChatvvApp extends StatelessWidget {
@@ -14,7 +14,7 @@ class ChatvvApp extends StatelessWidget {
       theme: AppTheme.dark(),
       darkTheme: AppTheme.dark(),
       themeMode: ThemeMode.dark,
-      home: const ChatScreen(),
+      home: const StartupGate(),
     );
   }
 }

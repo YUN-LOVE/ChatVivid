@@ -2,13 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import '../../data/remote_chat_api.dart';
+import '../../data/chat_backend.dart';
 import 'chat_models.dart';
 
 class ChatController extends ChangeNotifier {
-  ChatController({RemoteChatApi? api}) : api = api ?? RemoteChatApi();
+  ChatController({required this.api});
 
-  final RemoteChatApi api;
+  final ChatBackend api;
   final List<ChatMessage> messages = [];
 
   bool busy = false;
@@ -20,7 +20,7 @@ class ChatController extends ChangeNotifier {
   Timer? _notifyTimer;
   bool _disposed = false;
 
-  String get apiBase => api.baseUrl;
+  String get apiBase => api.endpointLabel;
 
   Future<void> initialize() async {
     try {
@@ -166,7 +166,7 @@ class ChatController extends ChangeNotifier {
     _disposed = true;
     _notifyTimer?.cancel();
     _subscription?.cancel();
-    api.dispose();
+    unawaited(api.dispose());
     super.dispose();
   }
 }

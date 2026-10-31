@@ -6,7 +6,7 @@
 
 
 > **方向变更（2026-10-31）**：Web GalGame 前端已归档，改为 **Flutter 原生 app + 可嵌入 C++ 核心**。
-> 当前状态：C++ 后端 M0 可运行；Flutter app 首版 **Client 模式 UI**（顶部静态舞台 + 聊天 + SSE）已在 Pixel 8 Pro 上安装跑通；Live2D 插件实验另开分支，Full 模式/FFI 后续。
+> 当前状态：C++ core / server 可运行；**Full 模式（Dart FFI + 内嵌 C++ core）已在 Linux 和 Android arm64 跑通**，Android 真机在无后端、无 adb reverse 时可回复；Flutter 已有启动门、引导和分组设置。Live2D adapter 仍在独立实验分支。
 
 ## 新架构：两种模式，一套核心
 
@@ -30,7 +30,7 @@ Flutter app
 ## 仓库结构
 
 ```
-app/                    Flutter app（scaffold + 首版 Client UI）
+app/                    Flutter app（Full/Client + 启动/引导/设置）
   design/DESIGN.md      Material 3 Expressive + 毛玻璃 + 大肥鱼
   assets/               头像 / Live2D / 字体计划
 docs/
@@ -104,9 +104,9 @@ export DEEPSEEK_API_KEY=sk-...
 ## 下一步
 
 1. 安装 Flutter stable，`flutter doctor`。
-2. **Client UI 首版已完成**：静态舞台 + Chat + SSE + 连接 sheet。
-3. 接 `flutter_live2d`：Android/iOS 舞台、idle、口型、暂停/兜底。
-4. 加 **full 模式**：拆 `chatvv_core` / C ABI / FFI。
-5. Android Full → iOS/桌面 → 打磨。
+2. **Full 模式已打通**：C ABI、Dart FFI、Android arm64、Linux；无本地回环。
+3. 启动门 / Onboarding / Full ↔ Client 设置已接入。
+4. Windows FFI 与真实 DeepSeek 回归。
+5. Live2D adapter（独立分支）。
 
 旧 Web 版仅作历史参考，不再维护。

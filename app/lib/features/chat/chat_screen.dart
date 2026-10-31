@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../data/app_settings.dart';
+import '../../data/backend_factory.dart';
+import '../settings/settings_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
 import '../character/character_stage.dart';
@@ -9,37 +13,72 @@ import 'chat_controller.dart';
 import 'chat_models.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({
+    super.key,
+    required this.settings,
+    required this.onSettingsChanged,
+  });
+
+  final AppSettings settings;
+  final Future<void> Function(AppSettings settings) onSettingsChanged;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  late final ChatController _chat;
+  ChatController? _chat;
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
   final FocusNode _focus = FocusNode();
+  String? _error;
+  bool _loading = true;
   String? _lastId;
   int _lastLength = 0;
 
   @override
   void initState() {
     super.initState();
-    _chat = ChatController();
-    _chat.addListener(_onChatChanged);
-    _chat.initialize().then((_) {
-      if (!mounted) return;
+    unawaited(_bootstrap());
+  }
+
+  Future<void> _bootstrap() async {
+    if (_loading && _chat != null) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final backend = await createChatBackend(widget.settings);
+      final chat = ChatController(api: backend);
+      chat.addListener(_onChatChanged);
+      await chat.initialize();
+      if (!mounted) {
+        chat.removeListener(_onChatChanged);
+        chat.dispose();
+        return;
+      }
+      setState(() {
+        _chat = chat;
+        _loading = false;
+      });
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scroll.hasClients) return;
         _scroll.jumpTo(_scroll.position.maxScrollExtent);
       });
-    });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.toString();
+      });
+    }
   }
 
   void _onChatChanged() {
-    if (_chat.messages.isEmpty || !_scroll.hasClients) return;
-    final last = _chat.messages.last;
+    final chat = _chat;
+    if (chat == null || chat.messages.isEmpty || !_scroll.hasClients) return;
+    final last = chat.messages.last;
     final changed = last.id != _lastId || last.content.length != _lastLength;
     _lastId = last.id;
     _lastLength = last.content.length;
@@ -60,26 +99,33 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   void _send() {
+    final chat = _chat;
     final text = _input.text;
-    if (text.trim().isEmpty || _chat.busy) return;
+    if (chat == null || text.trim().isEmpty || chat.busy) return;
     _input.clear();
     _focus.requestFocus();
-    _chat.send(text);
+    chat.send(text);
   }
 
   Future<void> _openSettings() async {
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _ConnectionSheet(chat: _chat),
+    final updated = await Navigator.of(context).push<AppSettings>(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(settings: widget.settings),
+      ),
     );
+    if (!mounted || updated == null) return;
+    if (updated.cacheKey != widget.settings.cacheKey) {
+      await widget.onSettingsChanged(updated);
+    }
   }
 
   @override
   void dispose() {
-    _chat.removeListener(_onChatChanged);
-    _chat.dispose();
+    final chat = _chat;
+    if (chat != null) {
+      chat.removeListener(_onChatChanged);
+      chat.dispose();
+    }
     _input.dispose();
     _scroll.dispose();
     _focus.dispose();
@@ -88,6 +134,14 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final chat = _chat;
+    if (chat == null) {
+      return _BootstrapScreen(
+        loading: _loading,
+        error: _error,
+        onRetry: _bootstrap,
+      );
+    }
     final media = MediaQuery.of(context);
     final keyboard = media.viewInsets.bottom > 0;
     final stageHeight = keyboard
@@ -104,7 +158,7 @@ class _ChatScreenState extends State<ChatScreen> {
             bottom: false,
             child: Column(
               children: [
-                _TopBar(chat: _chat, onSettings: _openSettings),
+                _TopBar(chat: chat, onSettings: _openSettings),
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
@@ -115,24 +169,99 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
                 Expanded(
                   child: _ChatSurface(
-                    chat: _chat,
+                    chat: chat,
                     scroll: _scroll,
                   ),
                 ),
                 AnimatedBuilder(
-                  animation: _chat,
+                  animation: chat,
                   builder: (context, _) => _Composer(
-                    chat: _chat,
+                    chat: chat,
                     controller: _input,
                     focus: _focus,
                     onSend: _send,
-                    onStop: _chat.stop,
+                    onStop: chat.stop,
                   ),
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _BootstrapScreen extends StatelessWidget {
+  const _BootstrapScreen({
+    required this.loading,
+    required this.error,
+    required this.onRetry,
+  });
+
+  final bool loading;
+  final String? error;
+  final Future<void> Function() onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.backgroundTop,
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.backgroundTop, AppColors.surface],
+          ),
+        ),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/mascot/avatar.png',
+                  width: 96,
+                  height: 96,
+                ),
+                const SizedBox(height: 20),
+                if (loading) ...[
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 1.5),
+                  ),
+                  const SizedBox(height: 14),
+                  Text(
+                    '正在初始化记忆体…',
+                    style: TextStyle(
+                      color: AppColors.muted.withValues(alpha: 0.75),
+                      fontSize: 12,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ] else ...[
+                  Text(
+                    error ?? '初始化失败',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.coral,
+                      fontSize: 12,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  FilledButton(
+                    onPressed: () => onRetry(),
+                    child: const Text('重试'),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -581,152 +710,6 @@ class _Composer extends StatelessWidget {
                           ),
                   );
                 },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConnectionSheet extends StatelessWidget {
-  const _ConnectionSheet({required this.chat});
-
-  final ChatController chat;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      child: GlassPanel(
-        radius: 28,
-        blur: 22,
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '连接',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Client 模式 · Flutter 直连 chatvvd',
-                style: TextStyle(
-                  color: AppColors.muted.withValues(alpha: 0.72),
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 18),
-              ListenableBuilder(
-                listenable: chat,
-                builder: (context, _) => Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceHigh.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.07),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _StatusDot(online: chat.online),
-                          const Spacer(),
-                          Text(
-                            chat.online ? '已连接' : '离线',
-                            style: TextStyle(
-                              color: chat.online
-                                  ? AppColors.success
-                                  : AppColors.coral,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '后端 API',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 9,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      SelectableText(
-                        chat.apiBase,
-                        style: const TextStyle(
-                          color: AppColors.text,
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      if (chat.error != null) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          chat.error!,
-                          style: const TextStyle(
-                            color: AppColors.coral,
-                            fontSize: 11,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Android 真机：先 adb reverse tcp:8080 tcp:8080，再重连。\n'
-                '启动后端：./build/dev/chatvvd --config config/config.toml',
-                style: TextStyle(
-                  color: AppColors.muted.withValues(alpha: 0.55),
-                  fontSize: 10,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('关闭'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: chat.reconnect,
-                      child: const Text('重新连接'),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

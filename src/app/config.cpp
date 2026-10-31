@@ -44,6 +44,8 @@ std::string read_file(const std::string& path) {
 
 }  // namespace
 
+std::string Config::default_system_prompt() { return kDefaultSystem; }
+
 std::string Config::db_path() const {
   const auto path = std::filesystem::path(storage.data_dir) / "chatvv.db";
   const auto utf8 = path.u8string();
@@ -80,6 +82,7 @@ Config Config::load(const std::string& path) {
       cfg.llm.base_url = (*sec)["base_url"].value_or(cfg.llm.base_url);
       cfg.llm.endpoint = (*sec)["endpoint"].value_or(cfg.llm.endpoint);
       cfg.llm.api_key = (*sec)["api_key"].value_or(cfg.llm.api_key);
+      cfg.llm.ca_bundle = (*sec)["ca_bundle"].value_or(cfg.llm.ca_bundle);
       cfg.llm.api_key_env = (*sec)["api_key_env"].value_or(cfg.llm.api_key_env);
       cfg.llm.model = (*sec)["model"].value_or(cfg.llm.model);
       cfg.llm.reasoning_effort =
@@ -108,6 +111,7 @@ Config Config::load(const std::string& path) {
   cfg.llm.base_url = env_or("CHATVV_LLM_BASE_URL", cfg.llm.base_url);
   cfg.llm.endpoint = env_or("CHATVV_LLM_ENDPOINT", cfg.llm.endpoint);
   cfg.llm.model = env_or("CHATVV_LLM_MODEL", cfg.llm.model);
+  cfg.llm.ca_bundle = env_or("CHATVV_LLM_CA_BUNDLE", cfg.llm.ca_bundle);
   cfg.storage.data_dir = env_or("CHATVV_DATA_DIR", cfg.storage.data_dir);
   cfg.injections.dir = env_or("CHATVV_INJECTIONS_DIR", cfg.injections.dir);
 
