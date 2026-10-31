@@ -149,6 +149,17 @@ std::vector<chatvv::Injection> parse_injections(const char* injections_json,
   return out;
 }
 
+nlohmann::json memory_json(const chatvv::Memory& memory) {
+  return {{"id", memory.id},
+          {"text", memory.text},
+          {"created_at", memory.created_at},
+          {"last_used_at", memory.last_used_at},
+          {"use_count", memory.use_count},
+          {"importance", memory.importance},
+          {"durability", memory.durability},
+          {"status", memory.status}};
+}
+
 }  // namespace
 
 struct chatvv_engine;
@@ -385,6 +396,58 @@ char* chatvv_capabilities(chatvv_engine* engine, char** error_json) {
                          {"streaming", true},
                          {"cancel", true}}
                         .dump());
+}
+
+char* chatvv_memories(chatvv_engine* engine, int32_t limit,
+                       const char* query, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!engine) {
+    set_error(error_json, "invalid_argument", "engine is null");
+    return nullptr;
+  }
+  try {
+    json data = json::array();
+    for (const auto& memory :
+         engine->db->list_memories(limit, query ? query : "")) {
+      data.push_back(memory_json(memory));
+    }
+    return dup_string(json{{"data", std::move(data)}}.dump());
+  } catch (const std::exception& e) {
+    set_error(error_json, "memories_failed", e.what());
+    return nullptr;
+  }
+}
+
+char* chatvv_archive(chatvv_engine* engine, int32_t keep_recent,
+                     char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!engine) {
+    set_error(error_json, "invalid_argument", "engine is null");
+    return nullptr;
+  }
+  try {
+    const auto archived =
+        engine->db->archive_messages(keep_recent > 0 ? keep_recent : 20);
+    json payload{{"archived_messages", archived.archived_messages},
+                 {"cutoff_seq", archived.cutoff_seq},
+                 {"memory", nullptr}};
+    if (archived.archived_messages > 0) {
+      payload["memory"] = memory_json(archived.memory);
+    }
+    return dup_string(payload.dump());
+  } catch (const std::exception& e) {
+    set_error(error_json, "archive_failed", e.what());
+    return nullptr;
+  }
+}
+
+int32_t chatvv_delete_memory(chatvv_engine* engine, const char* memory_id) {
+  if (!engine || !memory_id || !*memory_id) return 0;
+  try {
+    return engine->db->delete_memory(memory_id) ? 1 : 0;
+  } catch (...) {
+    return 0;
+  }
 }
 
 void chatvv_free(char* value) { std::free(value); }

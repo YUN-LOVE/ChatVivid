@@ -31,6 +31,7 @@ class Stmt {
                       SQLITE_TRANSIENT);
   }
   void integer(int i, int64_t v) { sqlite3_bind_int64(st_, i, v); }
+  void real(int i, double v) { sqlite3_bind_double(st_, i, v); }
   void null(int i) { sqlite3_bind_null(st_, i); }
 
   bool step() {
@@ -46,6 +47,7 @@ class Stmt {
     return p ? std::string(reinterpret_cast<const char*>(p)) : std::string();
   }
   int64_t get_int(int i) { return sqlite3_column_int64(st_, i); }
+  double get_double(int i) { return sqlite3_column_double(st_, i); }
 
  private:
   sqlite3_stmt* st_ = nullptr;
@@ -361,6 +363,184 @@ std::vector<StoredEvent> Db::list_events(const std::string& response_id,
     out.push_back({q.get_int(0), q.get_text(1), q.get_text(2)});
   }
   return out;
+}
+
+
+Memory Db::append_memory(const std::string& text, double importance,
+                         int durability) {
+  std::lock_guard lock(mu_);
+  Memory memory;
+  memory.id = ulid();
+  memory.text = text;
+  memory.created_at = now_ms();
+  memory.importance = importance;
+  memory.durability = durability;
+  Stmt ins(db_,
+           "INSERT INTO memories(id, text, created_at, last_used_at, "
+           "use_count, importance, durability, embedding, status) "
+           "VALUES(?, ?, ?, NULL, 0, ?, ?, NULL, 'active')");
+  ins.text(1, memory.id);
+  ins.text(2, memory.text);
+  ins.integer(3, memory.created_at);
+  ins.real(4, memory.importance);
+  ins.integer(5, memory.durability);
+  ins.step();
+  return memory;
+}
+
+std::vector<Memory> Db::list_memories(int limit, const std::string& query) {
+  if (limit <= 0) limit = 30;
+  if (limit > 200) limit = 200;
+  std::lock_guard lock(mu_);
+  Stmt q(db_,
+         "SELECT id, text, created_at, COALESCE(last_used_at, 0), use_count, "
+         "importance, durability, status FROM memories "
+         "WHERE status = 'active' AND (? = '' OR text LIKE '%' || ? || '%') "
+         "ORDER BY created_at DESC LIMIT ?");
+  q.text(1, query);
+  q.text(2, query);
+  q.integer(3, limit);
+  std::vector<Memory> out;
+  while (q.step()) {
+    Memory m;
+    m.id = q.get_text(0);
+    m.text = q.get_text(1);
+    m.created_at = q.get_int(2);
+    m.last_used_at = q.get_int(3);
+    m.use_count = static_cast<int>(q.get_int(4));
+    m.importance = q.get_double(5);
+    m.durability = static_cast<int>(q.get_int(6));
+    m.status = q.get_text(7);
+    out.push_back(std::move(m));
+  }
+  return out;
+}
+
+bool Db::delete_memory(const std::string& id) {
+  std::lock_guard lock(mu_);
+  Stmt del(db_, "DELETE FROM memories WHERE id = ?");
+  del.text(1, id);
+  del.step();
+  return sqlite3_changes(db_) > 0;
+}
+
+void Db::mark_memory_used(const std::string& id) {
+  std::lock_guard lock(mu_);
+  Stmt upd(db_,
+           "UPDATE memories SET last_used_at = ?, use_count = use_count + 1 "
+           "WHERE id = ?");
+  upd.integer(1, now_ms());
+  upd.text(2, id);
+  upd.step();
+}
+
+int64_t Db::archive_cutoff() {
+  std::lock_guard lock(mu_);
+  Stmt q(db_, "SELECT value FROM meta WHERE key = 'archive_cutoff_seq'");
+  if (!q.step()) return 0;
+  try {
+    return std::stoll(q.get_text(0));
+  } catch (...) {
+    return 0;
+  }
+}
+
+ArchiveResult Db::archive_messages(int keep_recent, int max_chars) {
+  if (keep_recent < 1) keep_recent = 1;
+  if (keep_recent > 10000) keep_recent = 10000;
+  if (max_chars < 256) max_chars = 256;
+  std::lock_guard lock(mu_);
+
+  ArchiveResult result;
+  int64_t max_seq = 0;
+  {
+    Stmt q(db_, "SELECT COALESCE(MAX(seq), 0) FROM messages");
+    if (q.step()) max_seq = q.get_int(0);
+  }
+  int64_t old_cutoff = 0;
+  {
+    Stmt q(db_, "SELECT value FROM meta WHERE key = 'archive_cutoff_seq'");
+    if (q.step()) {
+      try {
+        old_cutoff = std::stoll(q.get_text(0));
+      } catch (...) {
+        old_cutoff = 0;
+      }
+    }
+  }
+  const int64_t target = std::max<int64_t>(0, max_seq - keep_recent);
+  if (target <= old_cutoff) return result;
+
+  std::vector<Message> messages;
+  {
+    Stmt q(db_,
+           "SELECT id, seq, role, content, rendered, response_id, created_at "
+           "FROM messages WHERE seq > ? AND seq <= ? ORDER BY seq ASC");
+    q.integer(1, old_cutoff);
+    q.integer(2, target);
+    while (q.step()) {
+      Message m;
+      m.id = q.get_text(0);
+      m.seq = q.get_int(1);
+      m.role = q.get_text(2);
+      m.content = q.get_text(3);
+      m.rendered = q.get_text(4);
+      m.response_id = q.get_text(5);
+      m.created_at = q.get_int(6);
+      messages.push_back(std::move(m));
+    }
+  }
+  if (messages.empty()) return result;
+
+  std::ostringstream text;
+  text << "[归档] " << messages.size() << " 条旧消息\n";
+  for (const auto& message : messages) {
+    const char* label = message.role == "user" ? "用户" : "助理";
+    text << label << ": " << message.content << "\n";
+  }
+  std::string memory_text = text.str();
+  if (static_cast<int>(memory_text.size()) > max_chars) {
+    memory_text.resize(static_cast<size_t>(max_chars));
+    memory_text += "\n…";
+  }
+
+  Memory memory;
+  memory.id = ulid();
+  memory.text = std::move(memory_text);
+  memory.created_at = now_ms();
+  memory.importance = 0.65;
+  memory.durability = 3;
+
+  exec_locked("BEGIN IMMEDIATE");
+  try {
+    Stmt ins(db_,
+             "INSERT INTO memories(id, text, created_at, last_used_at, "
+             "use_count, importance, durability, embedding, status) "
+             "VALUES(?, ?, ?, NULL, 0, ?, ?, NULL, 'active')");
+    ins.text(1, memory.id);
+    ins.text(2, memory.text);
+    ins.integer(3, memory.created_at);
+    ins.real(4, memory.importance);
+    ins.integer(5, memory.durability);
+    ins.step();
+
+    Stmt meta(db_,
+              "INSERT OR REPLACE INTO meta(key, value) "
+              "VALUES('archive_cutoff_seq', ?)");
+    meta.text(1, std::to_string(target));
+    meta.step();
+    exec_locked("COMMIT");
+  } catch (...) {
+    exec_locked("ROLLBACK");
+    throw;
+  }
+
+  result.memory = std::move(memory);
+  result.archived_messages = static_cast<int>(messages.size());
+  result.cutoff_seq = target;
+  log_info("memory.archived",
+           {{"count", result.archived_messages}, {"cutoff", target}});
+  return result;
 }
 
 }  // namespace chatvv

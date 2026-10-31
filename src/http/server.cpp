@@ -101,6 +101,21 @@ void HttpServer::add_cors(httplib::Response& res) const {
   res.set_header("Access-Control-Expose-Headers", "X-Server-Seq, ETag");
 }
 
+namespace {
+
+nlohmann::json memory_json(const chatvv::Memory& memory) {
+  return {{"id", memory.id},
+          {"text", memory.text},
+          {"created_at", memory.created_at},
+          {"last_used_at", memory.last_used_at},
+          {"use_count", memory.use_count},
+          {"importance", memory.importance},
+          {"durability", memory.durability},
+          {"status", memory.status}};
+}
+
+}  // namespace
+
 void HttpServer::json_response(httplib::Response& res,
                                const nlohmann::json& body, int status) const {
   res.status = status;
@@ -297,7 +312,7 @@ void HttpServer::setup_routes() {
                      {"streaming", true},
                      {"injections", true},
                      {"responses_api", true},
-                     {"memory", false},
+                     {"memory", true},
                      {"scheduler", false},
                      {"client_sync", true}}},
                    {"models",
@@ -315,6 +330,57 @@ void HttpServer::setup_routes() {
               if (!authorized(req, res)) return;
               json_response(res, slots_.to_json());
             });
+
+  svr_->Get("/v1/memories",
+            [this](const httplib::Request& req, httplib::Response& res) {
+              if (!authorized(req, res)) return;
+              int limit =
+                  static_cast<int>(parse_i64(req.get_param_value("limit"), 50));
+              if (limit < 1) limit = 1;
+              if (limit > 200) limit = 200;
+              const std::string query = req.get_param_value("query");
+              nlohmann::json data = nlohmann::json::array();
+              for (const auto& memory : db_.list_memories(limit, query)) {
+                data.push_back(memory_json(memory));
+              }
+              json_response(res, {{"data", data}});
+            });
+
+  svr_->Post("/v1/memories/archive",
+             [this](const httplib::Request& req, httplib::Response& res) {
+               if (!authorized(req, res)) return;
+               int keep_recent = 20;
+               try {
+                 const auto body = nlohmann::json::parse(req.body);
+                 keep_recent = body.value("keep_recent", 20);
+               } catch (...) {
+               }
+               try {
+                 const auto archived = db_.archive_messages(keep_recent);
+                 nlohmann::json payload{
+                     {"archived_messages", archived.archived_messages},
+                     {"cutoff_seq", archived.cutoff_seq},
+                     {"memory", nullptr}};
+                 if (archived.archived_messages > 0) {
+                   payload["memory"] = memory_json(archived.memory);
+                 }
+                 json_response(res, payload);
+               } catch (const std::exception& e) {
+                 error_response(res, 500, "archive_failed", e.what());
+               }
+             });
+
+  svr_->Delete(R"(/v1/memories/([^/]+))",
+               [this](const httplib::Request& req, httplib::Response& res) {
+                 if (!authorized(req, res)) return;
+                 const std::string id = req.matches[1];
+                 if (!db_.delete_memory(id)) {
+                   error_response(res, 404, "not_found", "memory not found");
+                   return;
+                 }
+                 res.status = 204;
+                 add_cors(res);
+               });
 
   svr_->Get("/v1/messages",
             [this](const httplib::Request& req, httplib::Response& res) {

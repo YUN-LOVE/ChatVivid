@@ -7,6 +7,7 @@ import 'package:ffi/ffi.dart';
 
 import '../features/chat/chat_models.dart';
 import 'chat_backend.dart';
+import 'memory_entry.dart';
 import 'prompt_injection.dart';
 
 typedef _CreateNative = Pointer<Void> Function(
@@ -41,6 +42,39 @@ typedef _SendExDart = Pointer<Utf8> Function(
   Pointer<NativeFunction<_EventCallbackNative>> callback,
   Pointer<Void> userData,
   Pointer<Pointer<Utf8>> errorJson,
+);
+
+typedef _MemoriesNative = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  Int32 limit,
+  Pointer<Utf8> query,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+typedef _MemoriesDart = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  int limit,
+  Pointer<Utf8> query,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+
+typedef _ArchiveNative = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  Int32 keepRecent,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+typedef _ArchiveDart = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  int keepRecent,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+
+typedef _DeleteMemoryNative = Int32 Function(
+  Pointer<Void> engine,
+  Pointer<Utf8> memoryId,
+);
+typedef _DeleteMemoryDart = int Function(
+  Pointer<Void> engine,
+  Pointer<Utf8> memoryId,
 );
 
 typedef _CancelNative = Void Function(
@@ -103,6 +137,14 @@ class FfiChatApi implements ChatBackend {
     _history = _library.lookupFunction<_HistoryNative, _HistoryDart>(
       'chatvv_history',
     );
+    _memories = _library.lookupFunction<_MemoriesNative, _MemoriesDart>(
+      'chatvv_memories',
+    );
+    _archive = _library.lookupFunction<_ArchiveNative, _ArchiveDart>(
+      'chatvv_archive',
+    );
+    _deleteMemory = _library.lookupFunction<
+        _DeleteMemoryNative, _DeleteMemoryDart>('chatvv_delete_memory');
     _free = _library.lookupFunction<_FreeNative, _FreeDart>('chatvv_free');
 
     _callable = NativeCallable<_EventCallbackNative>.listener(_onNativeEvent);
@@ -128,6 +170,9 @@ class FfiChatApi implements ChatBackend {
   late final _SendExDart _sendEx;
   late final _CancelDart _cancel;
   late final _HistoryDart _history;
+  late final _MemoriesDart _memories;
+  late final _ArchiveDart _archive;
+  late final _DeleteMemoryDart _deleteMemory;
   late final _FreeDart _free;
   late final NativeCallable<_EventCallbackNative> _callable;
 
@@ -348,6 +393,61 @@ class FfiChatApi implements ChatBackend {
     final value = ptr.toDartString();
     _free(ptr);
     return value;
+  }
+
+  @override
+  Future<List<MemoryEntry>> memories({int limit = 50, String query = ''}) async {
+    if (_disposed) return const [];
+    final queryPtr = query.toNativeUtf8();
+    final errorPtr = calloc<Pointer<Utf8>>();
+    final resultPtr = _memories(_engine, limit, queryPtr, errorPtr);
+    calloc.free(queryPtr);
+    if (resultPtr.address == 0) {
+      final message = _takeError(errorPtr);
+      calloc.free(errorPtr);
+      throw ChatApiException(message);
+    }
+    final raw = resultPtr.toDartString();
+    _free(resultPtr);
+    calloc.free(errorPtr);
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) return const [];
+    final data = decoded['data'];
+    if (data is! List) return const [];
+    return data
+        .whereType<Map>()
+        .map((item) => MemoryEntry.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
+  }
+
+  @override
+  Future<MemoryArchiveResult> archive({int keepRecent = 20}) async {
+    if (_disposed) {
+      throw const ChatApiException('FFI engine 已释放');
+    }
+    final errorPtr = calloc<Pointer<Utf8>>();
+    final resultPtr = _archive(_engine, keepRecent, errorPtr);
+    if (resultPtr.address == 0) {
+      final message = _takeError(errorPtr);
+      calloc.free(errorPtr);
+      throw ChatApiException(message);
+    }
+    final raw = resultPtr.toDartString();
+    _free(resultPtr);
+    calloc.free(errorPtr);
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw const ChatApiException('归档响应格式错误');
+    }
+    return MemoryArchiveResult.fromJson(Map<String, dynamic>.from(decoded));
+  }
+
+  @override
+  Future<void> deleteMemory(String id) async {
+    if (_disposed) return;
+    final idPtr = id.toNativeUtf8();
+    _deleteMemory(_engine, idPtr);
+    calloc.free(idPtr);
   }
 
   @override

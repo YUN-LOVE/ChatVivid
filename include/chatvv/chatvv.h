@@ -81,6 +81,14 @@ CHATVV_API char* chatvv_history(chatvv_engine* engine, int32_t limit,
 CHATVV_API char* chatvv_capabilities(chatvv_engine* engine,
                                      char** error_json);
 
+/* Memory archive. JSON arrays/objects; free with chatvv_free(). */
+CHATVV_API char* chatvv_memories(chatvv_engine* engine, int32_t limit,
+                                 const char* query, char** error_json);
+CHATVV_API char* chatvv_archive(chatvv_engine* engine, int32_t keep_recent,
+                                char** error_json);
+CHATVV_API int32_t chatvv_delete_memory(chatvv_engine* engine,
+                                        const char* memory_id);
+
 CHATVV_API void chatvv_free(char* value);
 
 #ifdef __cplusplus

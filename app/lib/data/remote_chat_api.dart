@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 
 import '../features/chat/chat_models.dart';
 import 'chat_backend.dart';
+import 'memory_entry.dart';
 import 'prompt_injection.dart';
 
 const String chatApiBase = String.fromEnvironment(
@@ -137,6 +138,52 @@ class RemoteChatApi implements ChatBackend {
       await _dio.post<dynamic>('/v1/responses/$responseId/cancel');
     } on DioException {
       // Cancelling a already-finished stream is harmless.
+    }
+  }
+
+  @override
+  Future<List<MemoryEntry>> memories({int limit = 50, String query = ''}) async {
+    try {
+      final response = await _dio.get<dynamic>(
+        '/v1/memories',
+        queryParameters: {'limit': limit, 'query': query},
+      );
+      final data = response.data;
+      if (data is! Map) return const [];
+      final raw = data['data'];
+      if (raw is! List) return const [];
+      return raw
+          .whereType<Map>()
+          .map((item) => MemoryEntry.fromJson(Map<String, dynamic>.from(item)))
+          .toList();
+    } on DioException catch (error) {
+      throw ChatApiException(_friendlyError(error));
+    }
+  }
+
+  @override
+  Future<MemoryArchiveResult> archive({int keepRecent = 20}) async {
+    try {
+      final response = await _dio.post<dynamic>(
+        '/v1/memories/archive',
+        data: {'keep_recent': keepRecent},
+      );
+      final data = response.data;
+      if (data is! Map) {
+        throw const ChatApiException('归档响应格式错误');
+      }
+      return MemoryArchiveResult.fromJson(Map<String, dynamic>.from(data));
+    } on DioException catch (error) {
+      throw ChatApiException(_friendlyError(error));
+    }
+  }
+
+  @override
+  Future<void> deleteMemory(String id) async {
+    try {
+      await _dio.delete<dynamic>('/v1/memories/${Uri.encodeComponent(id)}');
+    } on DioException catch (error) {
+      throw ChatApiException(_friendlyError(error));
     }
   }
 
