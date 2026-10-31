@@ -110,7 +110,9 @@ add_test(NAME ffi COMMAND chatvv_ffi_tests)
 # The smoke test is a bash script; Windows only runs the core test.
 if(UNIX)
   add_test(NAME smoke COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/smoke.sh)
-  set_tests_properties(smoke PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+  set_tests_properties(smoke PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    ENVIRONMENT "BIN=$<TARGET_FILE:chatvvd>")
 endif()
 
 install(TARGETS chatvvd chatvv_ffi
