@@ -11,13 +11,14 @@
   - `client`：只连远端 `chatvv-server`（HTTP/SSE），本地只做缓存。
 - 视觉：Material You 3 Expressive + Apple 毛玻璃 + DeepSeek 大肥鱼。
 - 一个持续对话，不做会话列表。
-- Live2D 角色舞台（Android/iOS，`flutter_live2d`）；静态头像兜底，3D 仅作后续实验。
+- Live2D 角色舞台：v1 Android/iOS 用 `flutter_live2d`；桌面后续独立 adapter，先静态兜底；3D 走同一 `CharacterRuntime`，授权到位再接。
 
 ## 设计文档
 
 - [整体架构与 IA](../docs/flutter-app-design.md)
 - [C++ 编译成库 / FFI](../docs/native-core-embedding.md)
 - [视觉与交互 DESIGN](design/DESIGN.md)
+- [角色舞台接口 / 外部模型](design/CHARACTER_STAGE.md)
 - [参考素材](../reference/README.md)
 
 ## 计划中的目录
@@ -60,7 +61,7 @@ flutter pub add flutter_riverpod dio flutter_markdown flutter_live2d
 - 先做 `client` 模式：`RemoteChatBackend` + 现有 server。
 - 再加 `full`：`ffi` + `ffigen` + `libchatvv_core`。
 - Flutter flavors：`client` / `full`；native libs 只进 full。
-- Live2D：`flutter_live2d` 只支持 Android/iOS；桌面用静态头像。
+- Live2D：`flutter_live2d` 只覆盖 Android/iOS；桌面 v1 静态，后续补独立 adapter（多套代码，接口不变）。
 - 具体包版本在实现时再锁；不要一次引入过多依赖。
 
 ## 资产许可

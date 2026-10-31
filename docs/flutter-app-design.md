@@ -26,7 +26,7 @@ Web 版（Astro + Vue + Three.js + WebGL）能跑，但它与“低占用、可�
 - 两种运行模式：`full`（内嵌核心）与 `client`（只连远端 server）。
 - Android 优先，后续 iOS / Windows / macOS / Linux。
 - 低占用：无 WebView、无完整 3D；Live2D 角色层用原生 GL；release 分包；图片 WebP；字体子集；毛玻璃层数受限。
-- Live2D 角色舞台（Android/iOS）：鲸鱼娘 `flutter_live2d`，说话口型、表情、待机动作；静态头像兜底。
+- Live2D 角色舞台：v1 Android/iOS 用 `flutter_live2d`；桌面按“多套 adapter”后补，桌面先静态头像兜底；说话口型、表情、待机动作。
 - 离线可读：Client 模式本地缓存最近消息；Full 模式完全本地 SQLite。
 - UI 可维护：Material 3 语义 token + 可替换的“玻璃”层，不把 blur 写死在业务组件里。
 
@@ -168,6 +168,17 @@ chatvv/
 - 滚动到底部 pill；新消息到达时若用户上滚，不强制跳底。
 - 输入区毛玻璃，固定在底部；键盘弹起时只让 composer 上移，不整页抖动。
 - 顶部模型副标题可点，打开模型/助手快速切换。
+
+### Live2D / 3D 角色舞台
+
+- **手机**：顶部 28–34% 是舞台，角色锚定底部；下方消息流；键盘弹起时舞台折叠到 96–120dp 或淡出。
+- **平板/横屏**：左侧 60–64% 聊天，右侧 36–40% 全高舞台；角色不遮输入区。
+- **中间过渡**：舞台底部 48–72dp 渐变到 `surface`，聊天区顶部 24dp 圆角 + 1px 高光；滚动时舞台轻微视差（-8~-16dp），不硬切。
+- **统一接口**：`CharacterRuntime`（load / playMotion / setExpression / setMouthOpen / lookAt / pause / resume / dispose）；Live2D、VRM、静态图、外部导入共用。详见 [CHARACTER_STAGE.md](../app/design/CHARACTER_STAGE.md)。
+- **Live2D**：`app/assets/live2d/whale-girl/`，`flutter_live2d`，Android/iOS；口型 `ParamMouthOpenY`。
+- **外部模型**：文件选择 → app support → 校验 `model3.json`/VRM/图片 → 记录 license/attribution → 本地 registry；不自动上传、不进安装包。
+- **3D**：同一舞台 slot，后续 `VrmCharacterRuntime`；VRM 授权/渲染评估见 [VRM-3D.md](../reference/avatar-tech/VRM-3D.md)。
+- **性能**：一个 runtime；不在可见页面时 pause；低端/桌面回退静态头像。
 
 ### 抽屉 / 记忆
 
