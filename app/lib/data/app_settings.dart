@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'prompt_injection.dart';
+
 enum BackendMode {
   full('full', 'Full · 内嵌 C++'),
   client('client', 'Only client · 远程');
@@ -27,6 +29,8 @@ class AppSettings {
     required this.fullBaseUrl,
     required this.fullEndpoint,
     required this.apiKey,
+    required this.systemPrompt,
+    required this.injections,
     required this.onboardingComplete,
   });
 
@@ -40,6 +44,8 @@ class AppSettings {
       fullBaseUrl: 'https://api.deepseek.com',
       fullEndpoint: '/responses',
       apiKey: '',
+      systemPrompt: '',
+      injections: const [],
       onboardingComplete: false,
     );
   }
@@ -58,6 +64,14 @@ class AppSettings {
       fullEndpoint:
           (json['full_endpoint'] as String?) ?? defaults.fullEndpoint,
       apiKey: (json['api_key'] as String?) ?? '',
+      systemPrompt: (json['system_prompt'] as String?) ?? '',
+      injections: (json['injections'] as List?)
+              ?.whereType<Map>()
+              .map((item) => PromptInjection.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ))
+              .toList() ??
+          const [],
       onboardingComplete: (json['onboarding_complete'] as bool?) ?? false,
     );
   }
@@ -70,6 +84,8 @@ class AppSettings {
   final String fullBaseUrl;
   final String fullEndpoint;
   final String apiKey;
+  final String systemPrompt;
+  final List<PromptInjection> injections;
   final bool onboardingComplete;
 
   Map<String, Object?> toJson() => {
@@ -81,6 +97,8 @@ class AppSettings {
         'full_base_url': fullBaseUrl,
         'full_endpoint': fullEndpoint,
         'api_key': apiKey,
+        'system_prompt': systemPrompt,
+        'injections': injections.map((item) => item.toJson()).toList(),
         'onboarding_complete': onboardingComplete,
       };
 
@@ -93,6 +111,8 @@ class AppSettings {
     String? fullBaseUrl,
     String? fullEndpoint,
     String? apiKey,
+    String? systemPrompt,
+    List<PromptInjection>? injections,
     bool? onboardingComplete,
   }) {
     return AppSettings(
@@ -104,6 +124,8 @@ class AppSettings {
       fullBaseUrl: fullBaseUrl ?? this.fullBaseUrl,
       fullEndpoint: fullEndpoint ?? this.fullEndpoint,
       apiKey: apiKey ?? this.apiKey,
+      systemPrompt: systemPrompt ?? this.systemPrompt,
+      injections: injections ?? this.injections,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
     );
   }
@@ -117,5 +139,7 @@ class AppSettings {
         fullEndpoint,
         apiKey,
         clientToken,
+        systemPrompt,
+        injections.map((item) => item.toJson().toString()).join(';'),
       ].join('|');
 }

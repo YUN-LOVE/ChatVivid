@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 
 import '../features/chat/chat_models.dart';
 import 'chat_backend.dart';
+import 'prompt_injection.dart';
 
 const String chatApiBase = String.fromEnvironment(
   'CHATVV_API',
@@ -13,8 +14,11 @@ const String chatApiBase = String.fromEnvironment(
 );
 
 class RemoteChatApi implements ChatBackend {
-  RemoteChatApi({String baseUrl = chatApiBase, String apiKey = ''})
-      : baseUrl = _normalize(baseUrl),
+  RemoteChatApi({
+    String baseUrl = chatApiBase,
+    String apiKey = '',
+    this.savedInjections = const [],
+  })  : baseUrl = _normalize(baseUrl),
         _dio = Dio(
           BaseOptions(
             baseUrl: _normalize(baseUrl),
@@ -28,6 +32,7 @@ class RemoteChatApi implements ChatBackend {
         );
 
   final String baseUrl;
+  final List<PromptInjection> savedInjections;
   final Dio _dio;
 
   @override
@@ -67,12 +72,25 @@ class RemoteChatApi implements ChatBackend {
   }
 
   @override
-  Stream<ChatStreamEvent> send(String text) async* {
+  Stream<ChatStreamEvent> send(
+    String text, {
+    List<PromptInjection> injections = const [],
+  }) async* {
     final Response<ResponseBody> response;
     try {
       response = await _dio.post<ResponseBody>(
         '/v1/turns',
-        data: {'message': text, 'stream': true},
+        data: {
+          'message': text,
+          'stream': true,
+          'injections': [
+            ...savedInjections,
+            ...injections,
+          ]
+              .where((item) => item.enabled && item.content.trim().isNotEmpty)
+              .map((item) => item.toApiJson())
+              .toList(),
+        },
         options: Options(
           responseType: ResponseType.stream,
           headers: {'Accept': 'text/event-stream'},

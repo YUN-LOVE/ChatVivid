@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../../data/chat_backend.dart';
+import '../../data/prompt_injection.dart';
 import 'chat_models.dart';
 
 class ChatController extends ChangeNotifier {
@@ -44,7 +45,10 @@ class ChatController extends ChangeNotifier {
     _notifyNow();
   }
 
-  Future<void> send(String raw) async {
+  Future<void> send(
+    String raw, {
+    List<PromptInjection> injections = const [],
+  }) async {
     final text = raw.trim();
     if (text.isEmpty || busy) return;
 
@@ -70,7 +74,7 @@ class ChatController extends ChangeNotifier {
     activeResponseId = null;
     _notifyNow();
 
-    _subscription = api.send(text).listen(
+    _subscription = api.send(text, injections: injections).listen(
       (event) {
         switch (event.type) {
           case ChatStreamEventType.started:

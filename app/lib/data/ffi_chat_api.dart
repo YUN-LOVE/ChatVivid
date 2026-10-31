@@ -7,6 +7,7 @@ import 'package:ffi/ffi.dart';
 
 import '../features/chat/chat_models.dart';
 import 'chat_backend.dart';
+import 'prompt_injection.dart';
 
 typedef _CreateNative = Pointer<Void> Function(
   Pointer<Utf8> configJson,
@@ -25,16 +26,18 @@ typedef _EventCallbackNative = Void Function(
   Int32 eventType,
   Pointer<Utf8> eventJson,
 );
-typedef _SendNative = Pointer<Utf8> Function(
+typedef _SendExNative = Pointer<Utf8> Function(
   Pointer<Void> engine,
   Pointer<Utf8> text,
+  Pointer<Utf8> injectionsJson,
   Pointer<NativeFunction<_EventCallbackNative>> callback,
   Pointer<Void> userData,
   Pointer<Pointer<Utf8>> errorJson,
 );
-typedef _SendDart = Pointer<Utf8> Function(
+typedef _SendExDart = Pointer<Utf8> Function(
   Pointer<Void> engine,
   Pointer<Utf8> text,
+  Pointer<Utf8> injectionsJson,
   Pointer<NativeFunction<_EventCallbackNative>> callback,
   Pointer<Void> userData,
   Pointer<Pointer<Utf8>> errorJson,
@@ -91,7 +94,9 @@ class FfiChatApi implements ChatBackend {
     _destroy = _library.lookupFunction<_DestroyNative, _DestroyDart>(
       'chatvv_destroy',
     );
-    _send = _library.lookupFunction<_SendNative, _SendDart>('chatvv_send');
+    _sendEx = _library.lookupFunction<_SendExNative, _SendExDart>(
+      'chatvv_send_ex',
+    );
     _cancel = _library.lookupFunction<_CancelNative, _CancelDart>(
       'chatvv_cancel',
     );
@@ -120,7 +125,7 @@ class FfiChatApi implements ChatBackend {
   final DynamicLibrary _library;
   late final _CreateDart _create;
   late final _DestroyDart _destroy;
-  late final _SendDart _send;
+  late final _SendExDart _sendEx;
   late final _CancelDart _cancel;
   late final _HistoryDart _history;
   late final _FreeDart _free;
@@ -149,7 +154,10 @@ class FfiChatApi implements ChatBackend {
   }
 
   @override
-  Stream<ChatStreamEvent> send(String text) {
+  Stream<ChatStreamEvent> send(
+    String text, {
+    List<PromptInjection> injections = const [],
+  }) {
     if (_disposed) {
       return Stream.error(const ChatApiException('FFI engine 已释放'));
     }
@@ -160,15 +168,25 @@ class FfiChatApi implements ChatBackend {
     _pending[token] = pending;
 
     final textPtr = text.toNativeUtf8();
+    final Pointer<Utf8> injectionsPtr = injections.isEmpty
+        ? nullptr
+        : jsonEncode(
+            injections
+                .where((item) => item.enabled && item.content.trim().isNotEmpty)
+                .map((item) => item.toApiJson())
+                .toList(),
+          ).toNativeUtf8();
     final errorPtr = calloc<Pointer<Utf8>>();
-    final idPtr = _send(
+    final idPtr = _sendEx(
       _engine,
       textPtr,
+      injectionsPtr,
       _callable.nativeFunction,
       Pointer<Void>.fromAddress(token),
       errorPtr,
     );
     calloc.free(textPtr);
+    if (injectionsPtr.address != 0) calloc.free(injectionsPtr);
 
     if (idPtr.address == 0) {
       final message = _takeError(errorPtr);
