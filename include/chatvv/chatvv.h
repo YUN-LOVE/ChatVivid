@@ -60,6 +60,16 @@ CHATVV_API char* chatvv_send(chatvv_engine* engine, const char* text,
                              chatvv_event_cb cb, void* user_data,
                              char** error_json);
 
+/*
+ * Same as chatvv_send, with per-turn injections. injections_json is a JSON
+ * array of {name,position,mode,trust,description,content,depth,priority,
+ * enabled}; it is used by prompt management and file attachments.
+ */
+CHATVV_API char* chatvv_send_ex(chatvv_engine* engine, const char* text,
+                                const char* injections_json,
+                                chatvv_event_cb cb, void* user_data,
+                                char** error_json);
+
 CHATVV_API void chatvv_cancel(chatvv_engine* engine,
                               const char* response_id);
 

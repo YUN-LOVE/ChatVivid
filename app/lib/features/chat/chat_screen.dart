@@ -1,14 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/app_settings.dart';
 import '../../data/backend_factory.dart';
+import '../../data/prompt_injection.dart';
 import '../settings/settings_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
 import '../character/character_stage.dart';
+import 'chat_attachment.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
 
@@ -31,6 +35,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
   final FocusNode _focus = FocusNode();
+  final List<ChatAttachment> _attachments = [];
   String? _error;
   bool _loading = true;
   String? _lastId;
@@ -98,13 +103,89 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Future<void> _pickFiles() async {
+    try {
+      final files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: const [
+          'txt', 'md', 'json', 'csv', 'yaml', 'yml', 'toml', 'xml',
+          'html', 'dart', 'kt', 'java', 'c', 'h', 'cpp', 'py', 'js',
+          'ts', 'sh', 'log',
+        ],
+      );
+      if (files.isEmpty) return;
+      var total = _attachments.fold<int>(0, (sum, item) => sum + item.bytes);
+      for (final file in files) {
+        final length = await file.length() ?? 0;
+        if (length > 256 * 1024) {
+          _showMessage('${file.name} 超过 256 KB，已跳过');
+          continue;
+        }
+        if (total + length > 1024 * 1024) {
+          _showMessage('附件总量超过 1 MB，已停止添加');
+          break;
+        }
+        try {
+          final bytes = await file.readAsBytes();
+          final content = utf8.decode(bytes);
+          if (!mounted) return;
+          setState(() {
+            _attachments.add(
+              ChatAttachment(
+                name: file.name,
+                content: content,
+                bytes: bytes.length,
+              ),
+            );
+          });
+          total += bytes.length;
+        } on FormatException {
+          _showMessage('${file.name} 不是 UTF-8 文本，已跳过');
+        }
+      }
+    } catch (error) {
+      _showMessage('文件选择失败：$error');
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  void _removeAttachment(int index) {
+    setState(() => _attachments.removeAt(index));
+  }
+
   void _send() {
     final chat = _chat;
-    final text = _input.text;
-    if (chat == null || text.trim().isEmpty || chat.busy) return;
+    if (chat == null || chat.busy) return;
+    final attachments = List<ChatAttachment>.of(_attachments);
+    final text = _input.text.trim();
+    if (text.isEmpty && attachments.isEmpty) return;
+    final injections = <PromptInjection>[
+      for (var i = 0; i < attachments.length; i++)
+        PromptInjection(
+          id: 'attachment-$i',
+          name: attachments[i].name,
+          position: 'before_latest',
+          trust: 'data',
+          description: 'uploaded file',
+          priority: 500,
+          content: '[文件] ${attachments[i].name}\n\n${attachments[i].content}',
+        ),
+    ];
+    final display = [
+      if (text.isNotEmpty) text,
+      if (attachments.isNotEmpty)
+        '📎 ${attachments.map((item) => item.name).join('、')}',
+    ].join('\n');
     _input.clear();
+    setState(() => _attachments.clear());
     _focus.requestFocus();
-    chat.send(text);
+    chat.send(display, injections: injections);
   }
 
   Future<void> _openSettings() async {
@@ -179,6 +260,9 @@ class _ChatScreenState extends State<ChatScreen> {
                     chat: chat,
                     controller: _input,
                     focus: _focus,
+                    attachments: _attachments,
+                    onAttach: _pickFiles,
+                    onRemoveAttachment: _removeAttachment,
                     onSend: _send,
                     onStop: chat.stop,
                   ),
@@ -636,6 +720,9 @@ class _Composer extends StatelessWidget {
     required this.chat,
     required this.controller,
     required this.focus,
+    required this.attachments,
+    required this.onAttach,
+    required this.onRemoveAttachment,
     required this.onSend,
     required this.onStop,
   });
@@ -643,6 +730,9 @@ class _Composer extends StatelessWidget {
   final ChatController chat;
   final TextEditingController controller;
   final FocusNode focus;
+  final List<ChatAttachment> attachments;
+  final VoidCallback onAttach;
+  final ValueChanged<int> onRemoveAttachment;
   final VoidCallback onSend;
   final VoidCallback onStop;
 
@@ -655,61 +745,88 @@ class _Composer extends StatelessWidget {
         child: GlassPanel(
           radius: 28,
           blur: 20,
-          padding: const EdgeInsets.fromLTRB(14, 2, 6, 2),
-          child: Row(
+          padding: const EdgeInsets.fromLTRB(8, 6, 6, 2),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.auto_awesome_rounded,
-                size: 17,
-                color: AppColors.primary,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  focusNode: focus,
-                  minLines: 1,
-                  maxLines: 5,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => onSend(),
-                  style: const TextStyle(
-                    color: AppColors.text,
-                    fontSize: 14.5,
-                    height: 1.45,
-                  ),
-                  decoration: const InputDecoration(
-                    hintText: '说点什么…',
-                    border: InputBorder.none,
-                    isDense: true,
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
+              if (attachments.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (var i = 0; i < attachments.length; i++)
+                        InputChip(
+                          label: Text(
+                            attachments[i].name,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          onDeleted: () => onRemoveAttachment(i),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                    ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 4),
-              ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, _) {
-                  final canSend = value.text.trim().isNotEmpty && !chat.busy;
-                  return AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 160),
-                    child: chat.busy
-                        ? IconButton.filled(
-                            key: const ValueKey('stop'),
-                            onPressed: onStop,
-                            tooltip: '停止',
-                            icon: const Icon(Icons.stop_rounded, size: 20),
-                          )
-                        : IconButton.filled(
-                            key: const ValueKey('send'),
-                            onPressed: canSend ? onSend : null,
-                            tooltip: '发送',
-                            icon: const Icon(
-                              Icons.arrow_upward_rounded,
-                              size: 20,
-                            ),
-                          ),
-                  );
-                },
+              Row(
+                children: [
+                  IconButton(
+                    onPressed: onAttach,
+                    tooltip: '添加文件',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                  ),
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      focusNode: focus,
+                      minLines: 1,
+                      maxLines: 5,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => onSend(),
+                      style: const TextStyle(
+                        color: AppColors.text,
+                        fontSize: 14.5,
+                        height: 1.45,
+                      ),
+                      decoration: const InputDecoration(
+                        hintText: '说点什么…',
+                        border: InputBorder.none,
+                        isDense: true,
+                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: controller,
+                    builder: (context, value, _) {
+                      final canSend =
+                          (value.text.trim().isNotEmpty ||
+                                  attachments.isNotEmpty) &&
+                              !chat.busy;
+                      return AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 160),
+                        child: chat.busy
+                            ? IconButton.filled(
+                                key: const ValueKey('stop'),
+                                onPressed: onStop,
+                                tooltip: '停止',
+                                icon: const Icon(Icons.stop_rounded, size: 20),
+                              )
+                            : IconButton.filled(
+                                key: const ValueKey('send'),
+                                onPressed: canSend ? onSend : null,
+                                tooltip: '发送',
+                                icon: const Icon(
+                                  Icons.arrow_upward_rounded,
+                                  size: 20,
+                                ),
+                              ),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),

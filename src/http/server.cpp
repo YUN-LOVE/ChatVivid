@@ -138,8 +138,10 @@ std::vector<Injection> HttpServer::parse_injections(
     Injection inj;
     inj.name = "api-" + std::to_string(index++);
     inj.position = item.value("position", std::string("before_latest"));
+    inj.mode = item.value("mode", std::string("append"));
     inj.body = item.value("content", std::string());
     inj.trust = item.value("trust", std::string("data"));
+    inj.description = item.value("description", std::string());
     inj.priority = item.value("priority", 100);
     inj.depth = item.value("depth", 0);
     inj.enabled = !inj.body.empty();
