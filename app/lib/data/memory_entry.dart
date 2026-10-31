@@ -45,20 +45,31 @@ class MemoryArchiveResult {
     required this.archivedMessages,
     required this.cutoffSeq,
     this.memory,
+    this.memories = const [],
   });
 
   factory MemoryArchiveResult.fromJson(Map<String, dynamic> json) {
     final raw = json['memory'];
+    final rawList = json['memories'];
+    final items = rawList is List
+        ? rawList
+            .whereType<Map>()
+            .map((item) => MemoryEntry.fromJson(Map<String, dynamic>.from(item)))
+            .toList()
+        : <MemoryEntry>[];
+    if (items.isEmpty && raw is Map) {
+      items.add(MemoryEntry.fromJson(Map<String, dynamic>.from(raw)));
+    }
     return MemoryArchiveResult(
       archivedMessages: (json['archived_messages'] as num?)?.toInt() ?? 0,
       cutoffSeq: (json['cutoff_seq'] as num?)?.toInt() ?? 0,
-      memory: raw is Map
-          ? MemoryEntry.fromJson(Map<String, dynamic>.from(raw))
-          : null,
+      memory: items.isEmpty ? null : items.first,
+      memories: items,
     );
   }
 
   final int archivedMessages;
   final int cutoffSeq;
   final MemoryEntry? memory;
+  final List<MemoryEntry> memories;
 }

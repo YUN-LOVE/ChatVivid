@@ -365,19 +365,23 @@ void HttpServer::setup_routes() {
                }
                try {
                  auto archived = db_.archive_messages(keep_recent);
-                 if (archived.archived_messages > 0 && embedding_ &&
-                     embedding_->ready()) {
-                   const auto values = embedding_->embed(archived.memory.text);
-                   if (!values.empty()) {
-                     db_.set_memory_embedding(archived.memory.id, values);
+                 nlohmann::json memories = nlohmann::json::array();
+                 for (const auto& memory : archived.memories) {
+                   if (embedding_ && embedding_->ready()) {
+                     const auto values = embedding_->embed(memory.text);
+                     if (!values.empty()) {
+                       db_.set_memory_embedding(memory.id, values);
+                     }
                    }
+                   memories.push_back(memory_json(memory));
                  }
                  nlohmann::json payload{
                      {"archived_messages", archived.archived_messages},
                      {"cutoff_seq", archived.cutoff_seq},
+                     {"memories", std::move(memories)},
                      {"memory", nullptr}};
-                 if (archived.archived_messages > 0) {
-                   payload["memory"] = memory_json(archived.memory);
+                 if (!archived.memories.empty()) {
+                   payload["memory"] = memory_json(archived.memories.front());
                  }
                  json_response(res, payload);
                } catch (const std::exception& e) {
@@ -390,19 +394,23 @@ void HttpServer::setup_routes() {
                if (!authorized(req, res)) return;
                try {
                  auto archived = db_.archive_messages(0);
-                 if (archived.archived_messages > 0 && embedding_ &&
-                     embedding_->ready()) {
-                   const auto values = embedding_->embed(archived.memory.text);
-                   if (!values.empty()) {
-                     db_.set_memory_embedding(archived.memory.id, values);
+                 nlohmann::json memories = nlohmann::json::array();
+                 for (const auto& memory : archived.memories) {
+                   if (embedding_ && embedding_->ready()) {
+                     const auto values = embedding_->embed(memory.text);
+                     if (!values.empty()) {
+                       db_.set_memory_embedding(memory.id, values);
+                     }
                    }
+                   memories.push_back(memory_json(memory));
                  }
                  db_.clear_context();
                  nlohmann::json payload{
                      {"archived_messages", archived.archived_messages},
+                     {"memories", std::move(memories)},
                      {"memory", nullptr}};
-                 if (archived.archived_messages > 0) {
-                   payload["memory"] = memory_json(archived.memory);
+                 if (!archived.memories.empty()) {
+                   payload["memory"] = memory_json(archived.memories.front());
                  }
                  json_response(res, payload);
                } catch (const std::exception& e) {

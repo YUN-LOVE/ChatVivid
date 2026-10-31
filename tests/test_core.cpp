@@ -135,15 +135,18 @@ int main() {
   CHECK(archived.cutoff_seq == 7);
   CHECK(db.archive_cutoff() == 7);
   CHECK(!archived.memory.text.empty());
+  CHECK(archived.memories.size() == 4);
   const auto memories = db.list_memories(10, "archive message");
-  CHECK(memories.size() == 1);
+  CHECK(memories.size() == 3);
   const auto ctx_after = build_context(db, store, cfg, "after archive");
   CHECK(ctx_after.instructions.find("长期记忆") != std::string::npos);
   CHECK(ctx_after.input.size() == 5);  // 3 recent + at_depth + current
   db.clear_context();
   CHECK(db.max_seq() == 0);
-  CHECK(db.list_memories(10, "archive message").size() == 1);
-  CHECK(db.delete_memory(archived.memory.id));
+  CHECK(db.list_memories(10, "archive message").size() == 3);
+  for (const auto& memory : archived.memories) {
+    CHECK(db.delete_memory(memory.id));
+  }
   CHECK(db.list_memories(10, "").empty());
 
   // Local GGUF embedding/RAG model loaded through llama.cpp.

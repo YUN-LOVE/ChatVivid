@@ -45,7 +45,8 @@ struct Memory {
 };
 
 struct ArchiveResult {
-  Memory memory;
+  Memory memory;              // first unit, kept for compatibility
+  std::vector<Memory> memories;  // one user/assistant unit per entry
   int archived_messages = 0;
   int64_t cutoff_seq = 0;
 };
