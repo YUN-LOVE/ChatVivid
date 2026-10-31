@@ -1,6 +1,6 @@
 # Flutter App 设计（v0.1 构思）
 
-> 状态：**首版 Client UI 已在 Pixel 8 Pro 安装跑通**（Flutter 3.44.2 + SSE）；Live2D 插件实验在 `feature/live2d-stage`，Full/FFI 后续。旧 Web GalGame 已归档到 `archive/web-gal-game/`。
+> 状态：**Full（Dart FFI + 内嵌 C++ core）与 Only client 双模式已接入**；Android/Linux FFI 已跑通，启动门/引导/分组设置已落地。Live2D 在独立实验分支，Windows 完整包待补。
 > 关联文档：[native-core-embedding.md](native-core-embedding.md) · [app/design/DESIGN.md](../app/design/DESIGN.md) · [reference/README.md](../reference/README.md)
 
 ## 1. 为什么从 Web 换成 Flutter
@@ -99,7 +99,7 @@ class ResponseFailed extends ChatEvent { final String message; }
 
 ```
 chatvv/
-├── app/                    # Flutter（已 scaffold，首版 Client UI）
+├── app/                    # Flutter（Full/Client + 启动/引导/设置）
 │   ├── lib/
 │   │   ├── app/            # 路由、模式、启动
 │   │   ├── core/           # theme、motion、glass、result
