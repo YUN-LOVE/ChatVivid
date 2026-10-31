@@ -68,64 +68,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundTop,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.backgroundTop, AppColors.surface],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _close();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundTop,
+        body: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [AppColors.backgroundTop, AppColors.surface],
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final wide = constraints.maxWidth >= 760;
-              return Column(
-                children: [
-                  _SettingsBar(onBack: _close),
-                  Expanded(
-                    child: wide
-                        ? Row(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              SizedBox(
-                                width: 280,
-                                child: _CategoryRail(
-                                  selected: _selected,
-                                  onSelect: (index) =>
-                                      setState(() => _selected = index),
-                                ),
-                              ),
-                              Expanded(
-                                child: SettingsDetail(
-                                  category: _categories[_selected],
-                                  settings: _settings,
-                                  onChanged: _apply,
-                                ),
-                              ),
-                            ],
-                          )
-                        : _CategoryList(
-                            settings: _settings,
-                            onOpen: (index) async {
-                              final result = await Navigator.of(context)
-                                  .push<AppSettings>(
-                                MaterialPageRoute(
-                                  builder: (_) => SettingsDetailPage(
-                                    category: _categories[index],
-                                    settings: _settings,
+          child: SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final wide = constraints.maxWidth >= 760;
+                return Column(
+                  children: [
+                    _SettingsBar(onBack: _close),
+                    Expanded(
+                      child: wide
+                          ? Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                SizedBox(
+                                  width: 280,
+                                  child: _CategoryRail(
+                                    selected: _selected,
+                                    onSelect: (index) =>
+                                        setState(() => _selected = index),
                                   ),
                                 ),
-                              );
-                              if (result != null) _apply(result);
-                            },
-                          ),
-                  ),
-                ],
-              );
-            },
+                                Expanded(
+                                  child: SettingsDetail(
+                                    category: _categories[_selected],
+                                    settings: _settings,
+                                    onChanged: _apply,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : _CategoryList(
+                              settings: _settings,
+                              onOpen: (index) async {
+                                final result = await Navigator.of(context)
+                                    .push<AppSettings>(
+                                  MaterialPageRoute(
+                                    builder: (_) => SettingsDetailPage(
+                                      category: _categories[index],
+                                      settings: _settings,
+                                    ),
+                                  ),
+                                );
+                                if (result != null) _apply(result);
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            ),
           ),
         ),
       ),
@@ -350,7 +356,7 @@ class _CategoryTile extends StatelessWidget {
   }
 }
 
-class SettingsDetailPage extends StatelessWidget {
+class SettingsDetailPage extends StatefulWidget {
   const SettingsDetailPage({
     super.key,
     required this.category,
@@ -361,19 +367,34 @@ class SettingsDetailPage extends StatelessWidget {
   final AppSettings settings;
 
   @override
+  State<SettingsDetailPage> createState() => _SettingsDetailPageState();
+}
+
+class _SettingsDetailPageState extends State<SettingsDetailPage> {
+  late AppSettings _draft = widget.settings;
+
+  void _close() {
+    Navigator.of(context).pop(_draft);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundTop,
-      appBar: AppBar(
-        title: Text(category.title),
-        leading: BackButton(
-          onPressed: () => Navigator.of(context).pop(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _close();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.backgroundTop,
+        appBar: AppBar(
+          title: Text(widget.category.title),
+          leading: BackButton(onPressed: _close),
         ),
-      ),
-      body: SettingsDetail(
-        category: category,
-        settings: settings,
-        onChanged: (next) => Navigator.of(context).pop(next),
+        body: SettingsDetail(
+          category: widget.category,
+          settings: widget.settings,
+          onChanged: (next) => setState(() => _draft = next),
+        ),
       ),
     );
   }
@@ -410,14 +431,36 @@ class _SettingsDetailState extends State<SettingsDetail> {
   late String _provider =
       _settings.provider == 'mock' ? 'mock' : 'deepseek';
 
+  List<TextEditingController> get _controllers => [
+        _apiKey,
+        _model,
+        _fullBase,
+        _clientBase,
+        _clientToken,
+      ];
+
+  @override
+  void initState() {
+    super.initState();
+    for (final controller in _controllers) {
+      controller.addListener(_emit);
+    }
+  }
+
   @override
   void dispose() {
-    _apiKey.dispose();
-    _model.dispose();
-    _fullBase.dispose();
-    _clientBase.dispose();
-    _clientToken.dispose();
+    for (final controller in _controllers) {
+      controller.removeListener(_emit);
+      controller.dispose();
+    }
     super.dispose();
+  }
+
+  void _emit() {
+    if (!mounted) return;
+    final next = _collect();
+    setState(() => _settings = next);
+    widget.onChanged(next);
   }
 
   AppSettings _collect() {
@@ -436,9 +479,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   void _save() {
-    final next = _collect();
-    setState(() => _settings = next);
-    widget.onChanged(next);
+    _emit();
   }
 
   @override
@@ -484,6 +525,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           selected: {_settings.mode},
           onSelectionChanged: (value) {
             setState(() => _settings = _settings.copyWith(mode: value.first));
+            _emit();
           },
         ),
         const SizedBox(height: 16),
@@ -496,6 +538,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
             selected: {_provider},
             onSelectionChanged: (value) {
               setState(() => _provider = value.first);
+              _emit();
             },
           ),
           const SizedBox(height: 14),

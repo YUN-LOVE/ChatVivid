@@ -31,6 +31,9 @@ class RemoteChatApi implements ChatBackend {
   final Dio _dio;
 
   @override
+  String get modeLabel => 'Only client';
+
+  @override
   String get endpointLabel => baseUrl;
 
   static String _normalize(String value) {

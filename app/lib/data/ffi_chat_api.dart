@@ -82,7 +82,9 @@ class FfiChatApi implements ChatBackend {
   FfiChatApi({
     String? libraryPath,
     required Map<String, Object?> config,
-  }) : _library = _openLibrary(libraryPath) {
+  })  : _provider = (config['provider'] ?? 'mock').toString(),
+        _model = (config['model'] ?? 'deepseek-chat').toString(),
+        _library = _openLibrary(libraryPath) {
     _create = _library.lookupFunction<_CreateNative, _CreateDart>(
       'chatvv_create',
     );
@@ -113,6 +115,8 @@ class FfiChatApi implements ChatBackend {
     }
   }
 
+  final String _provider;
+  final String _model;
   final DynamicLibrary _library;
   late final _CreateDart _create;
   late final _DestroyDart _destroy;
@@ -128,7 +132,10 @@ class FfiChatApi implements ChatBackend {
   final Map<int, _PendingCall> _pending = {};
 
   @override
-  String get endpointLabel => 'embedded FFI';
+  String get modeLabel => 'Full · ${_provider == 'mock' ? 'mock' : 'native'}';
+
+  @override
+  String get endpointLabel => _model;
 
   static DynamicLibrary _openLibrary(String? explicitPath) {
     final configured = explicitPath ??
@@ -248,14 +255,27 @@ class FfiChatApi implements ChatBackend {
     if (response is Map) {
       final error = response['error'];
       if (error is Map && error['message'] != null) {
-        return error['message'].toString();
+        return _short(error['message'].toString());
       }
     }
     final error = payload['error'];
     if (error is Map && error['message'] != null) {
-      return error['message'].toString();
+      return _short(error['message'].toString());
     }
-    return error?.toString() ?? '本轮生成失败';
+    if (payload['message'] != null) {
+      return _short(payload['message'].toString());
+    }
+    // Providers often wrap the real message inside a serialized error body.
+    final raw = jsonEncode(payload);
+    final match = RegExp(r'"message"\s*:\s*"([^"]+)"').firstMatch(raw);
+    if (match != null) return _short(match.group(1)!);
+    return _short(raw);
+  }
+
+  static String _short(String value) {
+    final oneLine = value.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (oneLine.length <= 220) return oneLine;
+    return '${oneLine.substring(0, 220)}…';
   }
 
   @override
