@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import '../../data/app_settings.dart';
@@ -13,6 +11,7 @@ import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
 import '../character/character_stage.dart';
 import 'chat_attachment.dart';
+import 'file_upload_service.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
 
@@ -105,44 +104,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _pickFiles() async {
     try {
-      final files = await FilePicker.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: const [
-          'txt', 'md', 'json', 'csv', 'yaml', 'yml', 'toml', 'xml',
-          'html', 'dart', 'kt', 'java', 'c', 'h', 'cpp', 'py', 'js',
-          'ts', 'sh', 'log',
-        ],
-      );
-      if (files.isEmpty) return;
-      var total = _attachments.fold<int>(0, (sum, item) => sum + item.bytes);
-      for (final file in files) {
-        final length = await file.length() ?? 0;
-        if (length > 256 * 1024) {
-          _showMessage('${file.name} 超过 256 KB，已跳过');
-          continue;
-        }
-        if (total + length > 1024 * 1024) {
-          _showMessage('附件总量超过 1 MB，已停止添加');
-          break;
-        }
-        try {
-          final bytes = await file.readAsBytes();
-          final content = utf8.decode(bytes);
-          if (!mounted) return;
-          setState(() {
-            _attachments.add(
-              ChatAttachment(
-                name: file.name,
-                content: content,
-                bytes: bytes.length,
-              ),
-            );
-          });
-          total += bytes.length;
-        } on FormatException {
-          _showMessage('${file.name} 不是 UTF-8 文本，已跳过');
-        }
-      }
+      final files = await pickTextFiles();
+      if (files.isEmpty || !mounted) return;
+      setState(() => _attachments.addAll(files));
+      final skipped = files.length;
+      if (skipped == 0) _showMessage('没有可用的文本文件');
     } catch (error) {
       _showMessage('文件选择失败：$error');
     }

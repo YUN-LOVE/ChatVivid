@@ -35,6 +35,11 @@ const _categories = [
     icon: Icons.hub_rounded,
   ),
   SettingsCategory(
+    title: '提示词与注入',
+    description: '系统提示词、上下文注入',
+    icon: Icons.auto_awesome_rounded,
+  ),
+  SettingsCategory(
     title: '角色与舞台',
     description: '静态角色、Live2D、外部模型',
     icon: Icons.face_retouching_natural_rounded,
