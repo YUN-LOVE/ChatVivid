@@ -182,12 +182,14 @@ glass:
 
 - 手机键盘弹起：舞台折叠到 96–120dp 或隐藏，优先保证输入和消息可见。
 - 沉浸模式（可选）：点角色进入全屏舞台，聊天气泡浮在玻璃层上；再点退出。
-- 模型：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情 / 8 动作）；Flutter 用 `flutter_live2d`。
+- 模型：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情 / 8 动作）；v1 Android/iOS 用 `flutter_live2d`。
 - 口型：TTS RMS → `ParamMouthOpenY`；停止朗读归零。
 - 动作：空闲 `idle`；思考偏头；完成 `开心兴奋`/`自拍`；出错 `悲伤`/`晕晕`；摸头 `脸红`。
 - 触控：插件自带眼睛/头跟随；点击头/身体触发不同表情（HitAreas: Head/Body）。
+- 中间过渡：舞台底部 48–72dp 渐变到 `surface`，聊天区顶部 24dp 圆角 + 1px 高光；滚动时舞台轻微视差，不硬切。
+- 接口：`CharacterRuntime` 统一 Live2D / VRM / 静态图 / 外部模型；详见 [CHARACTER_STAGE.md](CHARACTER_STAGE.md)。
 - 性能：一个 `Live2DView`；不可见/后台 `setRenderingPaused(true)`；低端关闭，显示静态头像。
-- 3D：v1 不做；VRM 评估见 `reference/avatar-tech/VRM-3D.md`。
+- 3D：同一舞台 slot，`VrmCharacterRuntime` 预留；授权在谈，到位即接；评估见 `reference/avatar-tech/VRM-3D.md`。
 
 ### 记忆库
 
@@ -229,7 +231,7 @@ glass:
 - 装饰：只在空状态、关于页、记忆空态出现；聊天中不重复大图。
 - Live2D：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情/8 动作）。舞台优先用它，静态图作为兜底。
 - 不改角色性别/服装设定；不把 DeepSeek 官方 logo 与同人角色混淆；注明非官方。
-- 3D VRM 只做参考，不进入 v1；见 [VRM-3D.md](../../reference/avatar-tech/VRM-3D.md)。
+- 3D VRM 授权在谈；v1 先 Live2D，`CharacterRuntime` 已预留 VRM adapter；见 [VRM-3D.md](../../reference/avatar-tech/VRM-3D.md)。
 
 ### 许可
 
@@ -278,5 +280,5 @@ glass:
 - 不要给每个卡片都加 blur；不要玻璃叠玻璃。
 - 不要照搬 RikkaHub 的多会话/Workspace/媒体功能。
 - 不要把 DeepSeek 官方 logo、RikkaHub 截图、AGPL 代码直接放进 app。
-- 不要用 WebView 跑 Live2D；Live2D 用原生 GL（`flutter_live2d`）。
-- 不要 v1 上 3D VRM；18 MB + 3D 引擎不值得，先做好 2D Live2D。
+- 移动端不要用 WebView 跑 Live2D；用原生 GL（`flutter_live2d`）。桌面如需要 WebView 兜底，作为独立 adapter。
+- v1 先做好 2D Live2D；3D VRM 授权/渲染就绪后再接，但别让 18 MB 模型拖垮首版。
