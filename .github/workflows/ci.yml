@@ -64,7 +64,9 @@ jobs:
         shell: bash
         run: |
           LOG=$(find build -name LastTest.log | head -1)
-          { echo '### ctest LastTest.log'; echo '```'; cat "$LOG" 2>/dev/null || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$LOG" ]; then
+            echo "::error::$(tr '\n' '%0A' < "$LOG" | head -c 3000)"
+          fi
 
   backend-macos-arm64:
     name: backend / macos arm64
@@ -85,7 +87,9 @@ jobs:
         shell: bash
         run: |
           LOG=$(find build -name LastTest.log | head -1)
-          { echo '### ctest LastTest.log'; echo '```'; cat "$LOG" 2>/dev/null || true; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$LOG" ]; then
+            echo "::error::$(tr '\n' '%0A' < "$LOG" | head -c 3000)"
+          fi
 
   backend-windows-x64:
     name: backend / windows x64
