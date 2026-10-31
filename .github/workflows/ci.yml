@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build \
+            libsqlite3-dev libcurl4-openssl-dev
+      - run: cmake --preset dev
+      - run: cmake --build --preset dev
+      - run: ctest --preset dev
+
+  linux-arm64:
+    # GitHub's native arm64 runner. If your plan does not include it,
+    # replace this job with the arm64-cross preset plus a qemu smoke step.
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build \
+            libsqlite3-dev libcurl4-openssl-dev
+      - run: cmake --preset linux-arm64
+      - run: cmake --build --preset linux-arm64
+      - run: ctest --preset linux-arm64
+
+  macos-arm64:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+      - run: brew install cmake ninja curl
+      - run: cmake --preset macos-arm64 -DCURL_ROOT=$(brew --prefix curl)
+      - run: cmake --build --preset macos-arm64
+      - run: ctest --preset macos-arm64
+
+  windows-x64:
+    runs-on: windows-latest
+    env:
+      VCPKG_ROOT: C:\vcpkg
+    steps:
+      - uses: actions/checkout@v4
+      - name: deps (vcpkg manifest)
+        run: C:\vcpkg\vcpkg.exe install --triplet x64-windows
+      - run: cmake --preset windows-x64
+      - run: cmake --build --preset windows-x64
+      - run: ctest --preset windows-x64

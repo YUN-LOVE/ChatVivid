@@ -1,0 +1,46 @@
+# build / runtime
+build/
+data/
+.env
+*.db
+*.db-wal
+*.db-shm
+*.log
+compile_commands.json
+
+# dependencies / toolchains
+node_modules/
+.venv/
+.dart_tool/
+.pub-cache/
+
+# OS / IDE
+.DS_Store
+.idea/
+*.iml
+*.swp
+
+# archived large assets: keep README, not the 3D binaries
+archive/galgame-assets/*
+!archive/galgame-assets/README.md
+archive/python-tts/.venv/
+
+# local study material (RikkaHub screenshots etc.)
+.tmp-ref/
+
+# Flutter
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/build/
+app/android/.gradle/
+app/ios/Pods/
+app/macos/Pods/
+
+# old web caches, if someone restores the archived frontend
+archive/web-gal-game/node_modules/
+archive/web-gal-game/dist/
+archive/web-gal-game/.astro/
+archive/web-gal-game/.store/
+archive/web-gal-game/.pnpm-store/
+archive/web-gal-game/.npm-cache/
+archive/web-gal-game/.chromium*/

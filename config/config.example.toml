@@ -1,0 +1,36 @@
+# chatvv 配置示例
+# 复制为 config/config.toml 后按需修改。
+
+[server]
+bind = "127.0.0.1"
+port = 8080
+# 留空表示本机不鉴权；对局域网开放时请设置。
+# api_key = "change-me"
+cors_origin = "*"
+
+[llm]
+# mock | deepseek
+provider = "mock"
+
+# DeepSeek 的 Responses 端点：base_url + endpoint
+base_url = "https://api.deepseek.com"
+endpoint = "/responses"
+model = "deepseek-flash"
+
+# none | low | high | max
+reasoning_effort = "none"
+max_output_tokens = 4096
+timeout_ms = 120000
+
+# 推荐用环境变量，不要把 key 写进仓库
+api_key_env = "DEEPSEEK_API_KEY"
+# api_key = "sk-..."
+
+[storage]
+data_dir = "./data"
+
+[injections]
+dir = "./config/injections"
+
+[prompt]
+# system_file = "./config/prompts/system.md"
