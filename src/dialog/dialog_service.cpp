@@ -35,15 +35,21 @@ std::string extract_text(const nlohmann::json& output) {
 }  // namespace
 
 DialogService::DialogService(const Config& cfg, Db& db, InjectionStore& slots,
-                             ResponseHub& hub, Provider& provider)
-    : cfg_(cfg), db_(db), slots_(slots), hub_(hub), provider_(provider) {}
+                             ResponseHub& hub, Provider& provider,
+                             EmbeddingEngine* embedding)
+    : cfg_(cfg),
+      db_(db),
+      slots_(slots),
+      hub_(hub),
+      provider_(provider),
+      embedding_(embedding) {}
 
 DialogService::~DialogService() { shutdown(); }
 
 DialogService::StartResult DialogService::start(
     const std::string& text, const std::vector<Injection>& extra,
     const std::string& instructions_override) {
-  BuiltContext ctx = build_context(db_, slots_, cfg_, text, extra);
+  BuiltContext ctx = build_context(db_, slots_, cfg_, text, extra, embedding_);
   if (!instructions_override.empty()) {
     ctx.instructions = instructions_override;
   }

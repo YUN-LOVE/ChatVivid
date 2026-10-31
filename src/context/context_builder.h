@@ -10,6 +10,7 @@
 namespace chatvv {
 
 class Db;
+class EmbeddingEngine;
 struct Config;
 
 struct BuiltContext {
@@ -21,6 +22,7 @@ struct BuiltContext {
 
 BuiltContext build_context(Db& db, const InjectionStore& slots,
                            const Config& cfg, const std::string& user_text,
-                           const std::vector<Injection>& extra = {});
+                           const std::vector<Injection>& extra = {},
+                           EmbeddingEngine* embedding = nullptr);
 
 }  // namespace chatvv

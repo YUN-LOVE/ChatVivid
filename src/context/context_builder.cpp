@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "app/config.h"
+#include "memory/embedding.h"
 #include "store/db.h"
 #include "util/util.h"
 
@@ -60,7 +61,8 @@ std::string join_bodies(const std::vector<Injection>& slots) {
 
 BuiltContext build_context(Db& db, const InjectionStore& slots,
                            const Config& cfg, const std::string& user_text,
-                           const std::vector<Injection>& extra) {
+                           const std::vector<Injection>& extra,
+                           EmbeddingEngine* embedding) {
   std::vector<Injection> all = slots.all();
   for (const auto& e : extra) {
     if (e.enabled) all.push_back(e);
@@ -110,7 +112,17 @@ BuiltContext build_context(Db& db, const InjectionStore& slots,
 
   nlohmann::json used_memories = nlohmann::json::array();
   std::string memory_block;
-  for (const auto& memory : db.list_memories(12, "")) {
+  std::vector<Memory> selected_memories;
+  if (embedding && embedding->ready()) {
+    auto query_embedding = embedding->embed(user_text);
+    if (!query_embedding.empty()) {
+      selected_memories = db.search_memories(query_embedding, 8);
+    }
+  }
+  if (selected_memories.empty()) {
+    selected_memories = db.list_memories(8, "");
+  }
+  for (const auto& memory : selected_memories) {
     if (memory_block.size() + memory.text.size() > 6000) break;
     if (!memory_block.empty()) memory_block += "\n";
     memory_block += "- " + memory.text;
@@ -192,6 +204,7 @@ BuiltContext build_context(Db& db, const InjectionStore& slots,
                   {"history_truncated", history_truncated},
                   {"archive_cutoff_seq", archive_cutoff},
                   {"memories", used_memories},
+                  {"rag", embedding != nullptr && embedding->ready()},
                   {"instructions_tokens", estimate_tokens(instructions)},
                   {"input_tokens_estimate", estimate_tokens(ctx.input.dump())},
                   {"position_counts",

@@ -85,6 +85,69 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
     }
   }
 
+  Future<void> _saveContext() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    try {
+      final result = await widget.backend.saveContext();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.archivedMessages > 0
+                ? '上下文已存入记忆库（${result.archivedMessages} 条），并已清空'
+                : '上下文已清空',
+          ),
+        ),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('保存上下文失败：$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _clearContext() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清除上下文？'),
+        content: const Text('当前对话消息会被删除，已归档的记忆会保留。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await widget.backend.clearContext();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('上下文已清除，记忆库保留')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('清除失败：$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _delete(MemoryEntry memory) async {
     try {
       await widget.backend.deleteMemory(memory.id);
@@ -198,6 +261,23 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
               onPressed: _busy ? null : _archive,
               icon: const Icon(Icons.archive_outlined, size: 18),
               label: Text(_busy ? '归档中…' : '归档'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _saveContext,
+              icon: const Icon(Icons.move_to_inbox_outlined, size: 17),
+              label: const Text('存入记忆并清空'),
+            ),
+            OutlinedButton.icon(
+              onPressed: _busy ? null : _clearContext,
+              icon: const Icon(Icons.delete_sweep_outlined, size: 17),
+              label: const Text('清除上下文'),
             ),
           ],
         ),

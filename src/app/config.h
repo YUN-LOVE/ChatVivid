@@ -25,6 +25,12 @@ struct Config {
     int timeout_ms = 120000;
   } llm;
 
+  struct Embedding {
+    std::string model;
+    int threads = 2;
+    bool enabled = true;
+  } embedding;
+
   struct Storage {
     std::string data_dir = "./data";
   } storage;

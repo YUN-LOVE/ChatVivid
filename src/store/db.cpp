@@ -3,6 +3,7 @@
 #include <sqlite3.h>
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 
 #include "util/log.h"
@@ -48,6 +49,9 @@ class Stmt {
   }
   int64_t get_int(int i) { return sqlite3_column_int64(st_, i); }
   double get_double(int i) { return sqlite3_column_double(st_, i); }
+  sqlite3_stmt* raw() { return st_; }
+  const void* get_blob(int i) { return sqlite3_column_blob(st_, i); }
+  int get_bytes(int i) { return sqlite3_column_bytes(st_, i); }
 
  private:
   sqlite3_stmt* st_ = nullptr;
@@ -434,6 +438,88 @@ void Db::mark_memory_used(const std::string& id) {
   upd.step();
 }
 
+void Db::set_memory_embedding(const std::string& id,
+                              const std::vector<float>& embedding) {
+  if (embedding.empty()) return;
+  std::lock_guard lock(mu_);
+  Stmt upd(db_, "UPDATE memories SET embedding = ? WHERE id = ?");
+  sqlite3_bind_blob(upd.raw(), 1, embedding.data(),
+                    static_cast<int>(embedding.size() * sizeof(float)),
+                    SQLITE_TRANSIENT);
+  upd.text(2, id);
+  upd.step();
+}
+
+std::vector<Memory> Db::search_memories(const std::vector<float>& query,
+                                        int limit) {
+  if (query.empty() || limit <= 0) return {};
+  std::lock_guard lock(mu_);
+  Stmt q(db_,
+         "SELECT id, text, created_at, COALESCE(last_used_at, 0), use_count, "
+         "importance, durability, status, embedding FROM memories "
+         "WHERE status = 'active' AND embedding IS NOT NULL");
+  struct Candidate {
+    Memory memory;
+    double score = 0.0;
+  };
+  std::vector<Candidate> candidates;
+  while (q.step()) {
+    const void* blob = q.get_blob(8);
+    const int bytes = q.get_bytes(8);
+    if (!blob || bytes <= 0 ||
+        bytes % static_cast<int>(sizeof(float)) != 0) {
+      continue;
+    }
+    const auto* values = static_cast<const float*>(blob);
+    const size_t count = static_cast<size_t>(bytes / sizeof(float));
+    if (count != query.size()) continue;
+    double dot = 0.0;
+    double norm = 0.0;
+    for (size_t i = 0; i < count; ++i) {
+      dot += static_cast<double>(values[i]) * query[i];
+      norm += static_cast<double>(values[i]) * values[i];
+    }
+    if (norm <= 1e-12) continue;
+    Memory memory;
+    memory.id = q.get_text(0);
+    memory.text = q.get_text(1);
+    memory.created_at = q.get_int(2);
+    memory.last_used_at = q.get_int(3);
+    memory.use_count = static_cast<int>(q.get_int(4));
+    memory.importance = q.get_double(5);
+    memory.durability = static_cast<int>(q.get_int(6));
+    memory.status = q.get_text(7);
+    candidates.push_back({std::move(memory), dot / std::sqrt(norm)});
+  }
+  std::sort(candidates.begin(), candidates.end(),
+            [](const Candidate& a, const Candidate& b) {
+              return a.score > b.score;
+            });
+  std::vector<Memory> out;
+  for (auto& candidate : candidates) {
+    if (static_cast<int>(out.size()) >= limit) break;
+    out.push_back(std::move(candidate.memory));
+  }
+  return out;
+}
+
+void Db::clear_context() {
+  std::lock_guard lock(mu_);
+  exec_locked("BEGIN IMMEDIATE");
+  try {
+    exec_locked("DELETE FROM response_events");
+    exec_locked("DELETE FROM responses");
+    exec_locked("DELETE FROM messages");
+    exec_locked("INSERT OR REPLACE INTO meta(key, value) VALUES('message_seq', '0')");
+    exec_locked("DELETE FROM meta WHERE key = 'archive_cutoff_seq'");
+    exec_locked("COMMIT");
+  } catch (...) {
+    exec_locked("ROLLBACK");
+    throw;
+  }
+  log_info("context.cleared", {});
+}
+
 int64_t Db::archive_cutoff() {
   std::lock_guard lock(mu_);
   Stmt q(db_, "SELECT value FROM meta WHERE key = 'archive_cutoff_seq'");
@@ -446,7 +532,7 @@ int64_t Db::archive_cutoff() {
 }
 
 ArchiveResult Db::archive_messages(int keep_recent, int max_chars) {
-  if (keep_recent < 1) keep_recent = 1;
+  if (keep_recent < 0) keep_recent = 0;
   if (keep_recent > 10000) keep_recent = 10000;
   if (max_chars < 256) max_chars = 256;
   std::lock_guard lock(mu_);

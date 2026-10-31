@@ -55,8 +55,32 @@ function(chatvv_warnings target)
   endif()
 endfunction()
 
+# Local RAG embeddings. llama.cpp is vendored and built as static CPU code.
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_IS_DEV OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_COMMON OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_SERVER OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_APP OFF CACHE BOOL "" FORCE)
+set(LLAMA_BUILD_MTMD OFF CACHE BOOL "" FORCE)
+set(GGML_METAL OFF CACHE BOOL "" FORCE)
+set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
+set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+add_subdirectory(third_party/llama.cpp EXCLUDE_FROM_ALL)
+# LTO across the large vendored llama/ggml graph is not worth the CI time.
+foreach(_llama_target llama ggml ggml-base ggml-cpu)
+  if(TARGET ${_llama_target})
+    set_target_properties(${_llama_target} PROPERTIES
+      INTERPROCEDURAL_OPTIMIZATION OFF)
+  endif()
+endforeach()
+
 add_library(chatvv_core STATIC
   src/util/log.cpp
+  src/memory/embedding.cpp
   src/util/ulid.cpp
   src/app/config.cpp
   src/store/db.cpp
@@ -68,7 +92,9 @@ add_library(chatvv_core STATIC
   src/dialog/response_hub.cpp
   src/dialog/dialog_service.cpp)
 target_include_directories(chatvv_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
-target_link_libraries(chatvv_core PUBLIC chatvv_deps)
+target_include_directories(chatvv_core SYSTEM PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/include)
+target_link_libraries(chatvv_core PUBLIC chatvv_deps llama)
 set_target_properties(chatvv_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 chatvv_warnings(chatvv_core)
 
@@ -97,6 +123,8 @@ chatvv_warnings(chatvvd)
 enable_testing()
 add_executable(chatvv_tests tests/test_core.cpp)
 target_link_libraries(chatvv_tests PRIVATE chatvv_core)
+target_compile_definitions(chatvv_tests PRIVATE
+  CHATVV_TEST_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/app/assets/models/bge-small-zh-v1.5-q8_0.gguf")
 chatvv_warnings(chatvv_tests)
 add_test(NAME core COMMAND chatvv_tests)
 

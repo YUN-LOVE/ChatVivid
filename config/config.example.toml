@@ -34,3 +34,9 @@ dir = "./config/injections"
 
 [prompt]
 # system_file = "./config/prompts/system.md"
+
+[embedding]
+# GGUF embedding model used for RAG memory retrieval.
+model = "./data/models/bge-small-zh-v1.5-q8_0.gguf"
+threads = 2
+enabled = true
