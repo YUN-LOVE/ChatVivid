@@ -2,6 +2,9 @@
 
 ## 已有
 
+- `cacert.pem`：curl/Mozilla CA bundle，Android Full 的 OpenSSL 直连使用；
+  由 `curl.se/ca` 生成，随 App 打包，不包含私钥。
+
 - `live2d/whale-girl/`：**鲸鱼娘 Live2D Cubism 4 模型**，约 4.3 MB。
   - 44 表情、8 动作、物理、`ParamMouthOpenY` 口型参数。
   - 入口：`c_0120.model3.json`；Flutter 用 `flutter_live2d`。
