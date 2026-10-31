@@ -121,7 +121,7 @@ jobs:
             git clone --depth 1 https://github.com/microsoft/vcpkg C:\vcpkg
           }
           C:\vcpkg\bootstrap-vcpkg.bat
-          C:\vcpkg\vcpkg.exe install --triplet x64-windows
+          C:\vcpkg\vcpkg.exe install --classic --triplet x64-windows curl sqlite3
       - name: Configure
         run: cmake --preset windows-x64
       - name: Build
