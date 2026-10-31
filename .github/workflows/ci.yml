@@ -89,7 +89,7 @@ jobs:
 
   backend-windows-x64:
     name: backend / windows x64
-    runs-on: windows-latest
+    runs-on: windows-2022
     timeout-minutes: 45
     env:
       VCPKG_ROOT: C:\vcpkg
