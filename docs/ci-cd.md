@@ -55,7 +55,7 @@ Release job 的规则：
 
 ## App 构建/签名
 
-- app 已 scaffold；CI 会跑 `flutter analyze/test` + debug APK；Live2D 尚未接入。
+- app 已在 Pixel 8 Pro 真机验证；CI 会跑 `flutter analyze/test` + debug APK；Live2D 尚未合入。
 - app 已 scaffold；release 默认用 Flutter 的 debug signing（只适合内测）。
 - 正式 Android 签名后续加 secrets：
   - `ANDROID_KEYSTORE_BASE64`
