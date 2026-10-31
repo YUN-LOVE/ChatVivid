@@ -185,7 +185,7 @@ abstract interface class ChatBackend {
 - C ABI 单测：create/send/cancel/history/destroy；回调线程/顺序；错误 JSON；重复 destroy。
 - 用 mock provider 跑 CI，不依赖真实 API。
 - Flutter：`ffi` 集成测试在 Linux/macOS 桌面跑；Android 真机 smoke。
-- 泄漏：ASan/LSan（桌面）、Xcode Instruments/Android Studio profiler。
+- 泄漏：ASan/LSan（桌面）、Xcode Instruments、`simpleperf`/Perfetto。
 - 断线/重放：server 侧已有测试；Full 侧用 SQLite 事件重放。
 
 ## 9. 风险
