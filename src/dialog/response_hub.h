@@ -25,6 +25,7 @@ struct WaitResult {
 // the hub only covers the current process lifetime.
 class ResponseHub {
  public:
+  void open(const std::string& id);
   void publish(const std::string& id, int64_t seq, const std::string& type,
                const std::string& data);
   void finish(const std::string& id);

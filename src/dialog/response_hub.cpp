@@ -4,6 +4,11 @@
 
 namespace chatvv {
 
+void ResponseHub::open(const std::string& id) {
+  std::lock_guard lock(mu_);
+  states_[id];
+}
+
 void ResponseHub::publish(const std::string& id, int64_t seq,
                           const std::string& type, const std::string& data) {
   {
