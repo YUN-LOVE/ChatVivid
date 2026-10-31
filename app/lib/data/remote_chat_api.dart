@@ -13,7 +13,7 @@ const String chatApiBase = String.fromEnvironment(
 );
 
 class RemoteChatApi implements ChatBackend {
-  RemoteChatApi({String baseUrl = chatApiBase})
+  RemoteChatApi({String baseUrl = chatApiBase, String apiKey = ''})
       : baseUrl = _normalize(baseUrl),
         _dio = Dio(
           BaseOptions(
@@ -21,6 +21,9 @@ class RemoteChatApi implements ChatBackend {
             connectTimeout: const Duration(seconds: 8),
             receiveTimeout: const Duration(seconds: 90),
             sendTimeout: const Duration(seconds: 15),
+            headers: apiKey.isEmpty
+                ? null
+                : {'Authorization': 'Bearer $apiKey'},
           ),
         );
 
