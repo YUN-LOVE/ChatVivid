@@ -7,14 +7,14 @@
 
 Web 版（Astro + Vue + Three.js + WebGL）能跑，但它与“低占用、可移植、单机优先”的目标冲突：
 
-- 浏览器/WebGL 常驻内存高，3D 角色和毛玻璃都不是低占用方案。
+- 浏览器/WebGL 常驻内存高，3D 场景和无节制的毛玻璃都不是低占用方案。
 - Web 前端无法把 C++ 核心作为库直接调用，必须额外跑一个 server 进程。
 - 移动端 WebView/浏览器在后台、离线、文件系统、TTS、通知上都受限。
-- 3D GalGame 的资源（PMX + 贴图 17 MB）与 2D Material UI 的方向不一致。
+- 3D GalGame 的 3D 资产（PMX + 贴图 17 MB）被归档；Live2D 是 2D 角色层，另算。
 
 新方向：
 
-- **Flutter 原生 UI**，2D、轻量、无 WebView、无 3D 场景。
+- **Flutter 原生 UI**，2D/2.5D、轻量、无 WebView；Live2D 用原生 GL，不做完整 3D 世界。
 - **C++ 后端编译成库**，Full 模式由 Flutter 通过 C ABI 直接调用；同一套核心再编译一个独立 `chatvv-server` 二进制，供 Client-only 模式使用。
 - 设计语言：**Material You 3 Expressive 的颜色/形状/排版 + Apple 毛玻璃的层次**，主视觉是 DeepSeek “大肥鱼/鲸鱼娘”。
 
@@ -25,7 +25,8 @@ Web 版（Astro + Vue + Three.js + WebGL）能跑，但它与“低占用、可�
 - 单用户、单条持续对话，不做会话列表和多租户。
 - 两种运行模式：`full`（内嵌核心）与 `client`（只连远端 server）。
 - Android 优先，后续 iOS / Windows / macOS / Linux。
-- 低占用：无 WebView/3D；release 分包；图片 WebP；字体子集；毛玻璃层数受限。
+- 低占用：无 WebView、无完整 3D；Live2D 角色层用原生 GL；release 分包；图片 WebP；字体子集；毛玻璃层数受限。
+- Live2D 角色舞台（Android/iOS）：鲸鱼娘 `flutter_live2d`，说话口型、表情、待机动作；静态头像兜底。
 - 离线可读：Client 模式本地缓存最近消息；Full 模式完全本地 SQLite。
 - UI 可维护：Material 3 语义 token + 可替换的“玻璃”层，不把 blur 写死在业务组件里。
 
@@ -34,7 +35,7 @@ Web 版（Astro + Vue + Three.js + WebGL）能跑，但它与“低占用、可�
 - 多会话、多用户、团队协作。
 - 内置模型推理（不在手机上跑 LLM）。
 - 完整 MCP/Skills 市场；先把内置 memory/tool 做稳。
-- 复杂 3D、Live2D、WebGL。
+- 完整 3D 世界/多角色/WebGL；Live2D 是 v1 角色层，3D 只作为后续实验。
 - 商业分发（大肥鱼素材是 CC BY-NC-SA，非商业）。
 
 ## 3. 两种模式
@@ -219,8 +220,9 @@ RikkaHub 的助手卡片可借鉴：大圆角卡、温度 chip、Prompt 预览�
 
 | 项 | 目标 |
 |---|---|
-| APK（arm64，client） | < 25 MB（不含用户数据） |
-| APK（arm64，full） | < 40 MB（含 core + 依赖） |
+| APK（arm64，client） | < 30 MB（含 Live2D 资源，不含用户数据） |
+| APK（arm64，full） | < 45 MB（含 core + 依赖 + Live2D） |
+| Live2D | 4.3 MB 模型；一个 GL view；不可见暂停 |
 | 冷启动 | < 1.5 s（中端机） |
 | 常驻内存 | < 180 MB（聊天页） |
 | 毛玻璃 | 同屏 ≤ 3 个 BackdropFilter；低端默认关 |
@@ -232,7 +234,10 @@ RikkaHub 的助手卡片可借鉴：大圆角卡、温度 chip、Prompt 预览�
 
 ## 9. 资产与许可
 
-- 大肥鱼/鲸鱼娘：`reference/deepseek-mascot/`，**CC BY-NC-SA 4.0**，非商业；署名链见 [ATTRIBUTION.md](../reference/deepseek-mascot/ATTRIBUTION.md)。App 内“关于/许可”必须展示。
+- 大肥鱼/鲸鱼娘设定图：`reference/deepseek-mascot/`，**CC BY-NC-SA 4.0**，非商业；署名链见 [ATTRIBUTION.md](../reference/deepseek-mascot/ATTRIBUTION.md)。
+- Live2D 模型：`app/assets/live2d/whale-girl/`，**CC BY-NC-SA 4.0**；署名 **上善无形 / ZipZipPipe / 氵六青**；见 [LIVE2D.md](../reference/avatar-tech/LIVE2D.md)。
+- `flutter_live2d`：BSD-3-Clause；内置 Live2D Cubism Core 为 Live2D Inc. 专有许可，发布前核对。
+- 3D VRM `BlueFatFish`：作者 **木子恶魔**；仅随原插件分发授权，未拿到 app 分发许可，未提交；见 [VRM-3D.md](../reference/avatar-tech/VRM-3D.md)。
 - RikkaHub：**AGPL-3.0**，仅参考交互，不复制代码/资源。
 - `m3_expressive`：MIT；`dynamic_color`：Apache-2.0；Flutter/three 等按各自许可。
 - 图标：Material Symbols（Apache-2.0）子集。
@@ -243,13 +248,15 @@ RikkaHub 的助手卡片可借鉴：大圆角卡、温度 chip、Prompt 预览�
 
 ### M1 — Client 模式 UI（推荐先做）
 
-- Flutter scaffold + 主题/玻璃/大肥鱼资产。
+- Flutter scaffold + 主题/玻璃/大肥鱼静态资产。
 - Chat 页面 + SSE + 历史拉取 + 停止/重生成。
+- `flutter_live2d` 真机 spike：加载模型、idle、透明叠加。
 - 设置/连接/关于；Android 真机。
 - 不碰 C++。
 
 ### M2 — Client 完整
 
+- Live2D 舞台：布局、口型、表情/动作映射、暂停/兜底。
 - 本地 Drift 缓存、断线重连、通知、TTS、Markdown/代码高亮。
 - 记忆库 UI（先 mock/只读）。
 - 分包/体积测量。
@@ -279,3 +286,5 @@ RikkaHub 的助手卡片可借鉴：大圆角卡、温度 chip、Prompt 预览�
 4. 大肥鱼用基础白色连体服，还是古风盘髻作为默认？头像用 Q 版，Onboarding 用古风？
 5. 动态取色默认开，还是默认固定“深海蓝”以保证品牌一致？
 6. 是否保留旧 Web 版作为“legacy demo”，还是彻底不维护？
+7. Live2D 默认布局：顶部舞台、右侧分栏，还是全屏沉浸？
+8. 3D VRM 是否作为 v2 实验，还是不做？

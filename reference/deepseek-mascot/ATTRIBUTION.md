@@ -33,6 +33,22 @@
 - `crops/avatar.png`：从基础正面裁出头像区域，去白底，缩放到 256×256。
 - 未修改角色设定、颜色、服装或比例。
 
+## Live2D 模型（app/assets/live2d/whale-girl）
+
+Live2D 绑定/动作/表情由 **氵六青**（B 站 UID 11272072）制作，随
+[Andersen216/dsh-whale-girl-live2d](https://github.com/Andersen216/dsh-whale-girl-live2d) 分发。
+原插件代码 MIT；`assets/model/**` 为 **CC BY-NC-SA 4.0**，非商业。
+
+- 形象链：上善无形「溟月」→ ZipZipPipe 女仆鲸鱼娘 → 氵六青 Live2D。
+- 修改：补充 `model3.json` 的 `Expressions` 列表、把 `ParamMouthOpenY` 加入 `LipSync` group；未改模型/贴图。
+- 模型目录另有 `AUTHORS.md`、`NOTICE.md`、`PROVENANCE.md`、`LICENSE-CC-BY-NC-SA-4.0.txt`，必须保留。
+
+## 3D 模型（未提交）
+
+`BlueFatFish.vrm`，作者 **木子恶魔**，来源 [APlayBox](https://www.aplaybox.com/details/model/ayXkRzVflmnd)；
+仅随 `drliuhuan/dsh-plugin-vrmpet3d` 获得分发授权，未取得 chatvv 的分发许可。
+不提交、不随 app 打包；评估见 [VRM-3D.md](../avatar-tech/VRM-3D.md)。
+
 ## 免责声明
 
 这是个人非官方同人资源，不代表 DeepSeek 官方；DeepSeek 名称/商标归其权利人。

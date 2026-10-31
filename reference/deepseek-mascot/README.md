@@ -35,6 +35,12 @@ licenses/
 `source/character-sheet-README.md` 与 `licenses/` 是上游快照；其中相对链接指向原仓库，
 在本工作区不保证可解析。`licenses/` 的文本不要修改。
 
+## 动作模型
+
+- **Live2D**：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情 / 8 动作，4.3 MB）。
+  接入、口型、性能见 [LIVE2D.md](../avatar-tech/LIVE2D.md)。
+- **3D VRM**：`BlueFatFish.vrm`（18.5 MB，木子恶魔）仅作参考；授权/渲染评估见 [VRM-3D.md](../avatar-tech/VRM-3D.md)。
+
 ## 在 App 里的用法
 
 - 头像：`crops/avatar.png`，用于助手消息、抽屉、通知。

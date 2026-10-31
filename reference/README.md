@@ -7,6 +7,7 @@
 | `rikkahub/` | RikkaHub 的交互/视觉笔记、链接 | **AGPL-3.0**：只参考 UI/IA，不复制代码或资源 |
 | `material-3-expressive/` | M3 Expressive、Flutter 补位包、毛玻璃/动态取色笔记 | 链接 + MIT/Apache 包说明 |
 | `deepseek-mascot/` | DeepSeek 大肥鱼/鲸鱼娘设定图、裁剪、署名 | **CC BY-NC-SA 4.0**：非商业、署名、相同方式共享 |
+| `avatar-tech/` | Live2D / VRM 模型候选、Flutter 接入、许可评估 | 模型许可分层，见各文件 |
 
 ## 使用边界
 
@@ -23,4 +24,8 @@
 - m3_expressive: https://pub.dev/packages/m3_expressive
 - dynamic_color: https://github.com/material-foundation/flutter-packages/tree/main/packages/dynamic_color
 - 大肥鱼资源库: https://github.com/xiaoweigen/deepseek-dafeiyu-assets
+- Live2D 鲸鱼娘: https://github.com/Andersen216/dsh-whale-girl-live2d
+- B站免费 Live2D 模型: https://www.bilibili.com/video/BV1ALnw6YEGK/
+- flutter_live2d: https://github.com/linh18nd/flutter_live2d
+- 3D BlueFatFish: https://github.com/drliuhuan/dsh-plugin-vrmpet3d
 - CC BY-NC-SA 4.0: https://creativecommons.org/licenses/by-nc-sa/4.0/

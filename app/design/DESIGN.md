@@ -138,6 +138,57 @@ glass:
 - 顶部模型副标题可点，打开模型/助手 sheet。
 - 输入区支持多行、@ 记忆、附件、语音；发送后保留草稿历史（撤销）。
 
+### Live2D 舞台（Chat 的两种布局）
+
+**手机：顶部舞台**
+
+```
+┌──────────────────────────────┐
+│ ☰  水仙女          ⋮   ＋    │
+│    deepseek-chat · 记忆体     │
+├──────────────────────────────┤
+│   ╭──────────────────────╮   │
+│   │    [Live2D 角色]      │   │  28–34% 高，透明 GL
+│   │    鲸鱼娘 · 待机     │   │  渐变/玻璃底
+│   ╰──────────────────────╯   │
+│                              │
+│  [头像] 今天想从哪里开始？     │
+│  ⧉ ↻ ✎ ♪ ⋯                  │
+│                  ╭─────────╮ │
+│                  │ 你好呀   │ │
+│                  ╰─────────╯ │
+│  ▸ 正在回忆 3 条…             │
+├──────────────────────────────┤
+│ ╭──────────────────────────╮ │
+│ │ 说点什么…            📎  │ │
+│ ╰──────────────────────────╯ │
+│  ✦   ◼   ＋            ➤     │
+└──────────────────────────────┘
+```
+
+**平板/横屏：右侧分栏**
+
+```
+┌────────────────────────┬──────────────┐
+│ ☰ 水仙女        ⋮  ＋ │              │
+│                        │  [Live2D]    │
+│  对话流（60–64%）       │  36–40% 全高 │
+│                        │  触控/表情    │
+│ ╭────────────────────╮ │              │
+│ │ 说点什么…      📎  │ │              │
+│ ╰────────────────────╯ │              │
+└────────────────────────┴──────────────┘
+```
+
+- 手机键盘弹起：舞台折叠到 96–120dp 或隐藏，优先保证输入和消息可见。
+- 沉浸模式（可选）：点角色进入全屏舞台，聊天气泡浮在玻璃层上；再点退出。
+- 模型：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情 / 8 动作）；Flutter 用 `flutter_live2d`。
+- 口型：TTS RMS → `ParamMouthOpenY`；停止朗读归零。
+- 动作：空闲 `idle`；思考偏头；完成 `开心兴奋`/`自拍`；出错 `悲伤`/`晕晕`；摸头 `脸红`。
+- 触控：插件自带眼睛/头跟随；点击头/身体触发不同表情（HitAreas: Head/Body）。
+- 性能：一个 `Live2DView`；不可见/后台 `setRenderingPaused(true)`；低端关闭，显示静态头像。
+- 3D：v1 不做；VRM 评估见 `reference/avatar-tech/VRM-3D.md`。
+
 ### 记忆库
 
 ```
@@ -176,11 +227,16 @@ glass:
 - App icon：头像 + 深海蓝底 + 轻微内发光（后续做 adaptive icon）。
 - 加载：头像做 1.5% scale 呼吸；不做复杂 Lottie，省体积。
 - 装饰：只在空状态、关于页、记忆空态出现；聊天中不重复大图。
+- Live2D：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情/8 动作）。舞台优先用它，静态图作为兜底。
 - 不改角色性别/服装设定；不把 DeepSeek 官方 logo 与同人角色混淆；注明非官方。
+- 3D VRM 只做参考，不进入 v1；见 [VRM-3D.md](../../reference/avatar-tech/VRM-3D.md)。
 
 ### 许可
 
-- **CC BY-NC-SA 4.0**，非商业；署名链见 [ATTRIBUTION.md](../../reference/deepseek-mascot/ATTRIBUTION.md)。
+- **CC BY-NC-SA 4.0**，非商业。
+- 设定图署名：上善无形 / ZipZipPipe / YunYueSama / xiaoweigen，见 [ATTRIBUTION.md](../../reference/deepseek-mascot/ATTRIBUTION.md)。
+- **Live2D 模型署名：上善无形 / ZipZipPipe / 氵六青**；见 [LIVE2D.md](../../reference/avatar-tech/LIVE2D.md)。
+- `flutter_live2d` 插件 BSD-3；内置 Cubism Core 为 Live2D Inc. 专有许可，需在关于页一并列出。
 - App 内“关于 → 许可”必须可读地展示署名、来源、许可、修改说明。
 - 如果未来商业分发：替换为原创/委托角色，或取得各权利人商业授权。
 
@@ -197,6 +253,9 @@ glass:
 - `MorphingSendButton`（send/stop）
 - `ThinkingIndicator`（m3_expressive）
 - `EmptyState`（大肥鱼 + 一句文案 + 一个行动）
+- `Live2DStage`（透明 GL view、布局/折叠/暂停）
+- `LipSyncDriver`（TTS RMS → `ParamMouthOpenY`）
+- `CharacterExpressionMap`（app 状态 → 表情/动作）
 - `UndoPill`
 
 ## 10. 无障碍与性能
@@ -205,7 +264,8 @@ glass:
 - 触控目标 ≥ 48dp；字体缩放 200% 不截断；支持屏幕阅读器 label。
 - 减少动效：跟随系统 `MediaQuery.disableAnimations`；关闭呼吸/弹跳。
 - 性能：每个消息项 `RepaintBoundary`；图片 `cacheWidth`；长列表 `ListView.builder`；blur 层不滚动。
-- 低端设备：默认关闭玻璃、关闭动态取色动画、图片降采样。
+- 低端设备：默认关闭玻璃、关闭动态取色动画、图片降采样；Live2D 不可见时暂停，低端回退静态头像。
+- Live2D：只保留一个 GL view；舞台滚出/键盘弹起/退后台暂停；不把 Live2D 放进滚动列表。
 
 ## 11. Do / Don't
 
@@ -218,4 +278,5 @@ glass:
 - 不要给每个卡片都加 blur；不要玻璃叠玻璃。
 - 不要照搬 RikkaHub 的多会话/Workspace/媒体功能。
 - 不要把 DeepSeek 官方 logo、RikkaHub 截图、AGPL 代码直接放进 app。
-- 不要用 3D/WebView 换一点视觉，牺牲启动和内存。
+- 不要用 WebView 跑 Live2D；Live2D 用原生 GL（`flutter_live2d`）。
+- 不要 v1 上 3D VRM；18 MB + 3D 引擎不值得，先做好 2D Live2D。

@@ -24,14 +24,15 @@ Flutter app
 
 - 同一套 C++ 核心，既能编成 server，也能编成 lib。
 - Flutter 只写一次 UI；`EmbeddedBackend` / `RemoteBackend` 共用 domain 事件。
-- 低占用：无 WebView、无 3D、无 Python 依赖；2D Material UI + 系统 TTS。
+- 低占用：无 WebView、无完整 3D、无 Python 依赖；Live2D 角色层用原生 GL；2D Material UI + 系统 TTS。
+- Live2D：鲸鱼娘模型已放入 `app/assets/live2d/whale-girl/`，Flutter 侧计划用 `flutter_live2d`；详见 [Live2D 接入笔记](reference/avatar-tech/LIVE2D.md)。
 
 ## 仓库结构
 
 ```
 app/                    Flutter app（设计/目录已建，未 scaffold）
   design/DESIGN.md      Material 3 Expressive + 毛玻璃 + 大肥鱼
-  assets/               头像/空状态/字体计划
+  assets/               头像 / Live2D / 字体计划
 docs/
   flutter-app-design.md 整体架构、两种模式、IA、里程碑
   native-core-embedding.md  C ABI、线程、构建矩阵
@@ -80,19 +81,24 @@ export DEEPSEEK_API_KEY=sk-...
 - [C++ 编译成库](docs/native-core-embedding.md)：`chatvv_core` / `chatvv_ffi` / `chatvv_server`、C ABI、线程模型、平台构建。
 - [视觉设计](app/design/DESIGN.md)：Deep Sea Glass、色板、字体、毛玻璃配方、组件。
 - [参考目录](reference/README.md)：RikkaHub / Material 3 Expressive / 大肥鱼。
+- [Live2D 接入](reference/avatar-tech/LIVE2D.md)：鲸鱼娘模型、`flutter_live2d`、口型/动作/性能。
+- [3D VRM 评估](reference/avatar-tech/VRM-3D.md)：BlueFatFish、为什么暂不进 v1。
 
 ## 参考与许可
 
-- 大肥鱼/鲸鱼娘素材：**CC BY-NC-SA 4.0，非商业**；署名链见 [ATTRIBUTION.md](reference/deepseek-mascot/ATTRIBUTION.md)。
+- 大肥鱼/鲸鱼娘设定图：**CC BY-NC-SA 4.0，非商业**；署名链见 [ATTRIBUTION.md](reference/deepseek-mascot/ATTRIBUTION.md)。
+- Live2D 模型：**CC BY-NC-SA 4.0**，署名 **上善无形 / ZipZipPipe / 氵六青**；见 [LIVE2D.md](reference/avatar-tech/LIVE2D.md)。
+- `flutter_live2d`：BSD-3；内置 Cubism Core 为 Live2D Inc. 专有许可，发布前核对。
 - RikkaHub：**AGPL-3.0**，仅参考交互，不复制代码/资源。
 - `m3_expressive`：MIT；`dynamic_color`：Apache-2.0；Noto 字体：OFL；Material Symbols：Apache-2.0。
-- 3D 模型：由项目所有者提供，版权归原作者，不在仓库许可内。
+- 3D 模型：旧 `Vodyanitsa` 由项目所有者提供；`BlueFatFish.vrm` 仅随原插件授权分发，未提交，版权归 **木子恶魔**。
 
 ## 下一步
 
 1. 安装 Flutter stable，`flutter doctor`。
 2. 先做 **client 模式** UI：Chat + SSE + 设置 + 大肥鱼/玻璃主题。
-3. 再加 **full 模式**：拆 `chatvv_core` / C ABI / FFI。
-4. Android Full → iOS/桌面 → 打磨。
+3. `flutter_live2d` 真机 spike：加载鲸鱼娘、idle、口型、透明叠加。
+4. 再加 **full 模式**：拆 `chatvv_core` / C ABI / FFI。
+5. Android Full → iOS/桌面 → 打磨。
 
 旧 Web 版仅作历史参考，不再维护。
