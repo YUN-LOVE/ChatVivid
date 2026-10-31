@@ -3,7 +3,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../data/app_settings.dart';
 import '../../data/backend_factory.dart';
+import '../settings/settings_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
 import '../character/character_stage.dart';
@@ -11,7 +13,14 @@ import 'chat_controller.dart';
 import 'chat_models.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({
+    super.key,
+    required this.settings,
+    required this.onSettingsChanged,
+  });
+
+  final AppSettings settings;
+  final Future<void> Function(AppSettings settings) onSettingsChanged;
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -40,7 +49,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _error = null;
     });
     try {
-      final backend = await createChatBackend();
+      final backend = await createChatBackend(widget.settings);
       final chat = ChatController(api: backend);
       chat.addListener(_onChatChanged);
       await chat.initialize();
@@ -99,14 +108,15 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _openSettings() async {
-    final chat = _chat;
-    if (chat == null) return;
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _ConnectionSheet(chat: chat),
+    final updated = await Navigator.of(context).push<AppSettings>(
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(settings: widget.settings),
+      ),
     );
+    if (!mounted || updated == null) return;
+    if (updated.cacheKey != widget.settings.cacheKey) {
+      await widget.onSettingsChanged(updated);
+    }
   }
 
   @override
@@ -700,152 +710,6 @@ class _Composer extends StatelessWidget {
                           ),
                   );
                 },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConnectionSheet extends StatelessWidget {
-  const _ConnectionSheet({required this.chat});
-
-  final ChatController chat;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-      child: GlassPanel(
-        radius: 28,
-        blur: 22,
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
-        child: SafeArea(
-          top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.16),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                '连接',
-                style: TextStyle(
-                  color: AppColors.text,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Client 模式 · Flutter 直连 chatvvd',
-                style: TextStyle(
-                  color: AppColors.muted.withValues(alpha: 0.72),
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 18),
-              ListenableBuilder(
-                listenable: chat,
-                builder: (context, _) => Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceHigh.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.07),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          _StatusDot(online: chat.online),
-                          const Spacer(),
-                          Text(
-                            chat.online ? '已连接' : '离线',
-                            style: TextStyle(
-                              color: chat.online
-                                  ? AppColors.success
-                                  : AppColors.coral,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                      const Text(
-                        '后端 API',
-                        style: TextStyle(
-                          color: AppColors.muted,
-                          fontSize: 9,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      SelectableText(
-                        chat.apiBase,
-                        style: const TextStyle(
-                          color: AppColors.text,
-                          fontSize: 12,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      if (chat.error != null) ...[
-                        const SizedBox(height: 10),
-                        Text(
-                          chat.error!,
-                          style: const TextStyle(
-                            color: AppColors.coral,
-                            fontSize: 11,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                'Android 真机：先 adb reverse tcp:8080 tcp:8080，再重连。\n'
-                '启动后端：./build/dev/chatvvd --config config/config.toml',
-                style: TextStyle(
-                  color: AppColors.muted.withValues(alpha: 0.55),
-                  fontSize: 10,
-                  height: 1.55,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('关闭'),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton(
-                      onPressed: chat.reconnect,
-                      child: const Text('重新连接'),
-                    ),
-                  ),
-                ],
               ),
             ],
           ),

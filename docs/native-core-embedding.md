@@ -1,6 +1,6 @@
 # 把 C++ 后端编译成库（FFI 设计）
 
-> 状态：**计划，不先改代码**。现有 `src/`/`CMakeLists.txt` 保持可构建；Flutter 先走 Client 模式的 HTTP/SSE。
+> 状态：**C ABI 已实现，Linux/Android arm64 已跑通**；Windows/macOS 仍待补。详见 [full-mode.md](full-mode.md)。
 > 关联：[Flutter App 设计](flutter-app-design.md) · [app/design/DESIGN.md](../app/design/DESIGN.md)
 
 ## 1. 现有代码怎么切

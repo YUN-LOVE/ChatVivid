@@ -1,21 +1,34 @@
 # chatvv app (Flutter)
 
-> 状态：**首版 Client 模式 UI 已在 Pixel 8 Pro (Android 12) 安装跑通**（Flutter 3.44.2）。
-> 已实现：顶部静态大肥鱼舞台、渐变过渡、聊天列表、SSE 发送/停止、连接设置 sheet。
-> Live2D 插件实验在 `feature/live2d-stage` 分支，当前 `main` 仍使用静态舞台。
+> 状态：**Full / Only client 双模式已接入**，Android 真机已验证 FFI（无后端、无 adb reverse）。
+> 已实现：启动门、4 步引导、Full/Client 设置、顶部静态舞台、聊天、SSE/FFI。
+> Live2D 插件实验在 `feature/live2d-stage` 分支，主分支仍使用静态舞台。
 > 未实现：Live2D runtime、Full/FFI、记忆库、助手管理、TTS。
 > 当前环境 Flutter 3.44.2 / Dart 3.12.2；Android SDK 36。
 
 ## 运行
 
-### 后端
+### Full（Android / Linux）
+
+Android 先生成并打包内嵌 core：
+
+```bash
+./scripts/build-android-ffi.sh
+cd app
+flutter build apk --debug --target-platform android-arm64
+```
+
+App 首次启动进入引导，默认 Android 选 Full。Full **不需要** `chatvvd`，
+也不需要 `adb reverse`。Linux 可 `LD_LIBRARY_PATH=../build/dev flutter run -d linux`。
+
+### Only client
 
 ```bash
 cd ..
 ./build/dev/chatvvd --config config/config.toml
 ```
 
-默认 mock provider，监听 `127.0.0.1:8080`。
+后在引导/设置里选 Only client，填服务器地址。
 
 ### Linux 桌面
 
