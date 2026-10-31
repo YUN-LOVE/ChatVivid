@@ -578,24 +578,50 @@ ArchiveResult Db::archive_messages(int keep_recent, int max_chars) {
   }
   if (messages.empty()) return result;
 
-  std::ostringstream text;
-  text << "[归档] " << messages.size() << " 条旧消息\n";
+  // Pair one user input with the following assistant reply. One memory per
+  // exchange keeps RAG hits specific instead of matching a whole transcript.
+  std::vector<std::pair<std::string, std::string>> units;
+  std::string pending_user;
   for (const auto& message : messages) {
-    const char* label = message.role == "user" ? "用户" : "助理";
-    text << label << ": " << message.content << "\n";
+    if (message.role == "user") {
+      if (!pending_user.empty()) {
+        units.emplace_back(pending_user, "");
+      }
+      pending_user = message.content;
+    } else if (message.role == "assistant") {
+      if (!pending_user.empty()) {
+        units.emplace_back(pending_user, message.content);
+        pending_user.clear();
+      } else {
+        units.emplace_back("", message.content);
+      }
+    }
   }
-  std::string memory_text = text.str();
-  if (static_cast<int>(memory_text.size()) > max_chars) {
-    memory_text.resize(static_cast<size_t>(max_chars));
-    memory_text += "\n…";
-  }
+  if (!pending_user.empty()) units.emplace_back(pending_user, "");
+  if (units.empty()) return result;
 
-  Memory memory;
-  memory.id = ulid();
-  memory.text = std::move(memory_text);
-  memory.created_at = now_ms();
-  memory.importance = 0.65;
-  memory.durability = 3;
+  std::vector<Memory> created;
+  created.reserve(units.size());
+  const int64_t created_at = now_ms();
+  for (const auto& [user_text, assistant_text] : units) {
+    std::string text;
+    if (!user_text.empty()) text += "用户: " + user_text;
+    if (!assistant_text.empty()) {
+      if (!text.empty()) text += "\n";
+      text += "助理: " + assistant_text;
+    }
+    if (static_cast<int>(text.size()) > max_chars) {
+      text.resize(static_cast<size_t>(max_chars));
+      text += "\n…";
+    }
+    Memory memory;
+    memory.id = ulid();
+    memory.text = std::move(text);
+    memory.created_at = created_at;
+    memory.importance = 0.65;
+    memory.durability = 3;
+    created.push_back(std::move(memory));
+  }
 
   exec_locked("BEGIN IMMEDIATE");
   try {
@@ -603,13 +629,16 @@ ArchiveResult Db::archive_messages(int keep_recent, int max_chars) {
              "INSERT INTO memories(id, text, created_at, last_used_at, "
              "use_count, importance, durability, embedding, status) "
              "VALUES(?, ?, ?, NULL, 0, ?, ?, NULL, 'active')");
-    ins.text(1, memory.id);
-    ins.text(2, memory.text);
-    ins.integer(3, memory.created_at);
-    ins.real(4, memory.importance);
-    ins.integer(5, memory.durability);
-    ins.step();
-
+    for (const auto& memory : created) {
+      sqlite3_reset(ins.raw());
+      sqlite3_clear_bindings(ins.raw());
+      ins.text(1, memory.id);
+      ins.text(2, memory.text);
+      ins.integer(3, memory.created_at);
+      ins.real(4, memory.importance);
+      ins.integer(5, memory.durability);
+      ins.step();
+    }
     Stmt meta(db_,
               "INSERT OR REPLACE INTO meta(key, value) "
               "VALUES('archive_cutoff_seq', ?)");
@@ -621,12 +650,14 @@ ArchiveResult Db::archive_messages(int keep_recent, int max_chars) {
     throw;
   }
 
-  result.memory = std::move(memory);
   result.archived_messages = static_cast<int>(messages.size());
   result.cutoff_seq = target;
+  result.memories = std::move(created);
+  if (!result.memories.empty()) result.memory = result.memories.front();
   log_info("memory.archived",
-           {{"count", result.archived_messages}, {"cutoff", target}});
+           {{"messages", result.archived_messages},
+            {"memories", result.memories.size()},
+            {"cutoff", target}});
   return result;
 }
-
 }  // namespace chatvv

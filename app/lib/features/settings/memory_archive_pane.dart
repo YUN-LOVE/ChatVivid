@@ -68,8 +68,8 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            result.archivedMessages > 0
-                ? '已归档 ${result.archivedMessages} 条旧消息'
+            result.memories.isNotEmpty
+                ? '已归档 ${result.archivedMessages} 条消息，生成 ${result.memories.length} 条记忆'
                 : '没有可归档的旧消息',
           ),
         ),
@@ -94,8 +94,8 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            result.archivedMessages > 0
-                ? '上下文已存入记忆库（${result.archivedMessages} 条），并已清空'
+            result.memories.isNotEmpty
+                ? '已存入 ${result.memories.length} 条记忆（${result.archivedMessages} 条消息），上下文已清空'
                 : '上下文已清空',
           ),
         ),

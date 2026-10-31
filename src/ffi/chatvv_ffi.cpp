@@ -444,17 +444,22 @@ char* chatvv_archive(chatvv_engine* engine, int32_t keep_recent,
   try {
     const auto archived =
         engine->db->archive_messages(keep_recent > 0 ? keep_recent : 20);
-    json payload{{"archived_messages", archived.archived_messages},
-                 {"cutoff_seq", archived.cutoff_seq},
-                 {"memory", nullptr}};
-    if (archived.archived_messages > 0) {
+    json memories = json::array();
+    for (const auto& memory : archived.memories) {
       if (engine->embedding && engine->embedding->ready()) {
-        const auto values = engine->embedding->embed(archived.memory.text);
+        const auto values = engine->embedding->embed(memory.text);
         if (!values.empty()) {
-          engine->db->set_memory_embedding(archived.memory.id, values);
+          engine->db->set_memory_embedding(memory.id, values);
         }
       }
-      payload["memory"] = memory_json(archived.memory);
+      memories.push_back(memory_json(memory));
+    }
+    json payload{{"archived_messages", archived.archived_messages},
+                 {"cutoff_seq", archived.cutoff_seq},
+                 {"memories", std::move(memories)},
+                 {"memory", nullptr}};
+    if (!archived.memories.empty()) {
+      payload["memory"] = memory_json(archived.memories.front());
     }
     return dup_string(payload.dump());
   } catch (const std::exception& e) {
@@ -480,18 +485,22 @@ char* chatvv_save_context(chatvv_engine* engine, char** error_json) {
   }
   try {
     auto archived = engine->db->archive_messages(0);
-    if (archived.archived_messages > 0 && engine->embedding &&
-        engine->embedding->ready()) {
-      const auto values = engine->embedding->embed(archived.memory.text);
-      if (!values.empty()) {
-        engine->db->set_memory_embedding(archived.memory.id, values);
+    json memories = json::array();
+    for (const auto& memory : archived.memories) {
+      if (engine->embedding && engine->embedding->ready()) {
+        const auto values = engine->embedding->embed(memory.text);
+        if (!values.empty()) {
+          engine->db->set_memory_embedding(memory.id, values);
+        }
       }
+      memories.push_back(memory_json(memory));
     }
     engine->db->clear_context();
     json payload{{"archived_messages", archived.archived_messages},
+                 {"memories", std::move(memories)},
                  {"memory", nullptr}};
-    if (archived.archived_messages > 0) {
-      payload["memory"] = memory_json(archived.memory);
+    if (!archived.memories.empty()) {
+      payload["memory"] = memory_json(archived.memories.front());
     }
     return dup_string(payload.dump());
   } catch (const std::exception& e) {
