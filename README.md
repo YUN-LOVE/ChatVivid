@@ -6,7 +6,7 @@
 
 
 > **方向变更（2026-10-31）**：Web GalGame 前端已归档，改为 **Flutter 原生 app + 可嵌入 C++ 核心**。
-> 当前状态：C++ 后端 M0 可运行；Flutter app 已 scaffold，首版 **Client 模式 UI**（顶部静态舞台 + 聊天 + SSE）跑通构建；Live2D/Full 模式/FFI 后续。
+> 当前状态：C++ 后端 M0 可运行；Flutter app 首版 **Client 模式 UI**（顶部静态舞台 + 聊天 + SSE）已在 Pixel 8 Pro 上安装跑通；Live2D 插件实验另开分支，Full 模式/FFI 后续。
 
 ## 新架构：两种模式，一套核心
 

@@ -1,6 +1,6 @@
 # Flutter App 设计（v0.1 构思）
 
-> 状态：**首版 Client UI 已 scaffold**（Flutter 3.44.2）；Live2D/Full/FFI 后续。旧 Web GalGame 已归档到 `archive/web-gal-game/`。
+> 状态：**首版 Client UI 已在 Pixel 8 Pro 安装跑通**（Flutter 3.44.2 + SSE）；Live2D 插件实验在 `feature/live2d-stage`，Full/FFI 后续。旧 Web GalGame 已归档到 `archive/web-gal-game/`。
 > 关联文档：[native-core-embedding.md](native-core-embedding.md) · [app/design/DESIGN.md](../app/design/DESIGN.md) · [reference/README.md](../reference/README.md)
 
 ## 1. 为什么从 Web 换成 Flutter
