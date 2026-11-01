@@ -39,6 +39,8 @@ class McpClient {
       ),
     );
     String? sessionId;
+    Map<String, String> sessionHeaders() =>
+        sessionId == null ? {} : {'Mcp-Session-Id': sessionId!};
 
     Future<Map<String, dynamic>> rpc(
       int id,
@@ -54,9 +56,7 @@ class McpClient {
           'params': params,
         },
         options: Options(
-          headers: {
-            if (sessionId != null) 'Mcp-Session-Id': sessionId,
-          },
+          headers: sessionHeaders(),
           validateStatus: (status) => status != null && status < 500,
         ),
       );
@@ -83,9 +83,7 @@ class McpClient {
       '',
       data: {'jsonrpc': '2.0', 'method': 'notifications/initialized'},
       options: Options(
-        headers: {
-          if (sessionId != null) 'Mcp-Session-Id': sessionId,
-        },
+        headers: sessionHeaders(),
       ),
     );
     final result = await rpc(2, 'tools/list', <String, dynamic>{});
