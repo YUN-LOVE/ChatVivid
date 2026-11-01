@@ -1,3 +1,5 @@
+import 'dart:io' as io;
+
 import 'package:flutter/material.dart';
 import 'package:rive/rive.dart';
 
@@ -6,7 +8,9 @@ import '../../theme/app_theme.dart';
 /// The top character stage. A local Rive animation occupies the character slot;
 /// the static mascot remains as the loading/fallback image.
 class CharacterStage extends StatefulWidget {
-  const CharacterStage({super.key});
+  const CharacterStage({super.key, this.customRivePath = ''});
+
+  final String customRivePath;
 
   @override
   State<CharacterStage> createState() => _CharacterStageState();
@@ -14,14 +18,55 @@ class CharacterStage extends StatefulWidget {
 
 class _CharacterStageState extends State<CharacterStage> {
   int _taps = 0;
-  late final FileLoader _riveLoader = FileLoader.fromAsset(
-    'assets/rive/walking.riv',
-    riveFactory: Factory.flutter,
-  );
+  FileLoader? _riveLoader;
+
+  @override
+  void initState() {
+    super.initState();
+    _prepareLoader();
+  }
+
+  @override
+  void didUpdateWidget(CharacterStage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.customRivePath != widget.customRivePath) {
+      _riveLoader?.dispose();
+      _riveLoader = null;
+      _prepareLoader();
+    }
+  }
+
+  Future<void> _prepareLoader() async {
+    try {
+      FileLoader loader;
+      if (widget.customRivePath.isNotEmpty) {
+        final bytes = await io.File(widget.customRivePath).readAsBytes();
+        final file = await File.decode(
+          bytes,
+          riveFactory: Factory.flutter,
+        );
+        if (file == null) throw StateError('Rive decode returned null');
+        loader = FileLoader.fromFile(file, riveFactory: Factory.flutter);
+      } else {
+        loader = FileLoader.fromAsset(
+          'assets/rive/walking.riv',
+          riveFactory: Factory.flutter,
+        );
+      }
+      if (!mounted) {
+        loader.dispose();
+        return;
+      }
+      setState(() => _riveLoader = loader);
+    } catch (error) {
+      debugPrint('Rive loader failed: $error');
+      if (mounted) setState(() {});
+    }
+  }
 
   @override
   void dispose() {
-    _riveLoader.dispose();
+    _riveLoader?.dispose();
     super.dispose();
   }
 
@@ -59,31 +104,41 @@ class _CharacterStageState extends State<CharacterStage> {
                     onTap: () => setState(() => _taps++),
                     child: SizedBox(
                       height: height * 0.94,
-                      child: RiveWidgetBuilder(
-                        fileLoader: _riveLoader,
-                        stateMachineSelector:
-                            StateMachineSelector.byName('State Machine 1'),
-                        onFailed: (error, stackTrace) {
-                          debugPrint('Rive load failed: $error');
-                        },
-                        builder: (context, state) => switch (state) {
-                          RiveLoading() => Image.asset(
-                            'assets/mascot/full.png',
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                          ),
-                          RiveFailed() => Image.asset(
-                            'assets/mascot/full.png',
-                            fit: BoxFit.contain,
-                            filterQuality: FilterQuality.medium,
-                          ),
-                          RiveLoaded() => RiveWidget(
-                            controller: state.controller,
-                            fit: Fit.contain,
-                            alignment: Alignment.bottomCenter,
-                          ),
-                        },
-                      ),
+                      child: _riveLoader == null
+                          ? Image.asset(
+                              'assets/mascot/full.png',
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            )
+                          : RiveWidgetBuilder(
+                              fileLoader: _riveLoader!,
+                              stateMachineSelector:
+                                  widget.customRivePath.isEmpty
+                                      ? StateMachineSelector.byName(
+                                          'State Machine 1',
+                                        )
+                                      : const StateMachineDefault(),
+                              onFailed: (error, stackTrace) {
+                                debugPrint('Rive load failed: $error');
+                              },
+                              builder: (context, state) => switch (state) {
+                                RiveLoading() => Image.asset(
+                                  'assets/mascot/full.png',
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.medium,
+                                ),
+                                RiveFailed() => Image.asset(
+                                  'assets/mascot/full.png',
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.medium,
+                                ),
+                                RiveLoaded() => RiveWidget(
+                                  controller: state.controller,
+                                  fit: Fit.contain,
+                                  alignment: Alignment.bottomCenter,
+                                ),
+                              },
+                            ),
                     ),
                   ),
                 ),

@@ -12,9 +12,11 @@ import java.nio.charset.StandardCharsets
 class MainActivity : FlutterActivity() {
     companion object {
         private const val REQUEST_FILES = 1001
+        private const val REQUEST_MODEL = 1002
     }
 
     private var pendingFiles: MethodChannel.Result? = null
+    private var pendingModel: MethodChannel.Result? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -42,6 +44,18 @@ class MainActivity : FlutterActivity() {
                         }
                         startActivityForResult(intent, REQUEST_FILES)
                     }
+                    "pickRiveFile" -> {
+                        if (pendingModel != null) {
+                            result.error("busy", "file picker is already open", null)
+                            return@setMethodCallHandler
+                        }
+                        pendingModel = result
+                        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "*/*"
+                        }
+                        startActivityForResult(intent, REQUEST_MODEL)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -49,6 +63,33 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_MODEL) {
+            val modelResult = pendingModel ?: return
+            pendingModel = null
+            if (resultCode != Activity.RESULT_OK || data?.data == null) {
+                modelResult.success(null)
+                return
+            }
+            try {
+                val uri = data.data!!
+                val bytes = contentResolver.openInputStream(uri)?.use {
+                    it.readBytes()
+                }
+                if (bytes == null || bytes.isEmpty()) {
+                    modelResult.error("read_failed", "empty file", null)
+                    return
+                }
+                modelResult.success(
+                    mapOf(
+                        "name" to displayName(uri),
+                        "bytes" to bytes,
+                    ),
+                )
+            } catch (error: Exception) {
+                modelResult.error("read_failed", error.message, null)
+            }
+            return
+        }
         if (requestCode != REQUEST_FILES) return
         val result = pendingFiles ?: return
         pendingFiles = null
