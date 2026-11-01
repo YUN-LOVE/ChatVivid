@@ -22,6 +22,7 @@ enum BackendMode {
 enum CharacterMode {
   rive('rive'),
   staticImage('static'),
+  altImage('alt'),
   custom('custom');
 
   const CharacterMode(this.wireName);
@@ -30,7 +31,7 @@ enum CharacterMode {
 
   static CharacterMode fromWire(String? value) => CharacterMode.values.firstWhere(
         (mode) => mode.wireName == value,
-        orElse: () => CharacterMode.rive,
+        orElse: () => CharacterMode.staticImage,
       );
 }
 
@@ -69,7 +70,7 @@ class AppSettings {
       skills: const [],
       mcpServers: const [],
       characterRivePath: '',
-      characterMode: CharacterMode.rive,
+      characterMode: CharacterMode.staticImage,
       agentEnabled: false,
       onboardingComplete: false,
     );

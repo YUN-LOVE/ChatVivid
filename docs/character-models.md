@@ -1,6 +1,13 @@
 # 角色模型制作与导入
 
-默认舞台使用 **Rive**（`assets/rive/walking.riv`）；外部导入使用 **Rive `.riv`**。Rive 文件运行时不依赖 Live2D/Spine 编辑器，Android、Linux、Windows 都能加载。
+默认舞台使用两张 **PNG 立绘**（`assets/mascot/dafeiyu-front.png` / `dafeiyu-alt.png`）；内置 Rive `walking.riv` 作为可选动画模式，外部导入支持 `.riv` / `.svg`。
+
+## 内置立绘
+
+- `dafeiyu-front.png`：从角色设定图裁出的正面全身，已去白底
+- `dafeiyu-alt.png`：第二张立绘，已去黑底
+- 默认使用正面女仆装；设置里可切换“蓝色女仆”立绘
+- 立绘模式是静态图；需要呼吸/眨眼动画时切换到 Rive 或导入自己的 `.riv`
 
 ## Rive 制作
 
