@@ -925,12 +925,22 @@ class _SettingsDetailState extends State<SettingsDetail> {
       children: [
         _SettingCard(
           icon: Icons.image_rounded,
-          title: '静态立绘',
-          subtitle: '内置大肥鱼头像/立绘',
+          title: '立绘 · 女仆装',
+          subtitle: '正面全身 · 默认',
           trailing: _settings.characterMode == CharacterMode.staticImage
               ? const Icon(Icons.check_rounded, color: AppColors.success)
               : const Icon(Icons.chevron_right_rounded),
           onTap: () => _setCharacterMode(CharacterMode.staticImage),
+        ),
+        const SizedBox(height: 10),
+        _SettingCard(
+          icon: Icons.image_rounded,
+          title: '立绘 · 蓝色女仆',
+          subtitle: '替换服装立绘',
+          trailing: _settings.characterMode == CharacterMode.altImage
+              ? const Icon(Icons.check_rounded, color: AppColors.success)
+              : const Icon(Icons.chevron_right_rounded),
+          onTap: () => _setCharacterMode(CharacterMode.altImage),
         ),
         const SizedBox(height: 10),
         _SettingCard(

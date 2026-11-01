@@ -49,7 +49,9 @@ class _CharacterStageState extends State<CharacterStage> {
     final custom = widget.characterMode == CharacterMode.custom;
     final isSvg = custom &&
         widget.customRivePath.toLowerCase().endsWith('.svg');
-    if (widget.characterMode == CharacterMode.staticImage || isSvg) {
+    if (widget.characterMode == CharacterMode.staticImage ||
+        widget.characterMode == CharacterMode.altImage ||
+        isSvg) {
       if (mounted) setState(() {});
       return;
     }
@@ -83,7 +85,15 @@ class _CharacterStageState extends State<CharacterStage> {
 
     if (mode == CharacterMode.staticImage) {
       return Image.asset(
-        'assets/mascot/full.png',
+        'assets/mascot/dafeiyu-front.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+      );
+    }
+
+    if (mode == CharacterMode.altImage) {
+      return Image.asset(
+        'assets/mascot/dafeiyu-alt.png',
         fit: BoxFit.contain,
         filterQuality: FilterQuality.medium,
       );
