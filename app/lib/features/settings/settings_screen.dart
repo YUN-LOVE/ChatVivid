@@ -53,7 +53,7 @@ const _categories = [
   ),
   SettingsCategory(
     title: '角色与舞台',
-    description: '静态角色、Live2D、外部模型',
+    description: 'Rive 角色、静态图、外部模型',
     icon: Icons.face_retouching_natural_rounded,
   ),
   SettingsCategory(
@@ -736,12 +736,9 @@ class _SettingsDetailState extends State<SettingsDetail> {
         const SizedBox(height: 10),
         _SettingCard(
           icon: Icons.view_in_ar_rounded,
-          title: 'Live2D',
-          subtitle: 'adapter 渲染验证中，暂不启用',
-          trailing: const Text(
-            'EXPERIMENTAL',
-            style: TextStyle(color: AppColors.muted, fontSize: 8),
-          ),
+          title: 'Rive 角色',
+          subtitle: '本地动画 · 待机/点击互动',
+          trailing: const Icon(Icons.check_rounded, color: AppColors.success),
           onTap: () {},
         ),
         const SizedBox(height: 10),

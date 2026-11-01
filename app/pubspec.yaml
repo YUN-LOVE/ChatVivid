@@ -12,6 +12,7 @@ dependencies:
   dio: ^5.11.1
   ffi: ^2.1.4
   flutter_markdown_plus: ^1.0.12
+  rive: ^0.14.11
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -23,6 +24,7 @@ flutter:
     - assets/cacert.pem
     - assets/models/bge-small-zh-v1.5-q8_0.gguf
     - assets/mascot/
+    - assets/rive/
     - assets/live2d/whale-girl/
     - assets/live2d/whale-girl/c_0120.2048/
     - assets/live2d/whale-girl/motions/

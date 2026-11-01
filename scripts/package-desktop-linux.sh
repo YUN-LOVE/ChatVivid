@@ -6,6 +6,7 @@ cmake --preset release
 cmake --build build/release --target chatvv_ffi -j"$(nproc)"
 cd app
 flutter pub get
+dart run rive_native:setup --verbose -p linux
 flutter build linux --release
 BUNDLE="$ROOT/app/build/linux/x64/release/bundle"
 mkdir -p "$BUNDLE/lib" "$ROOT/artifacts"

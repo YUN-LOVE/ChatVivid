@@ -1,11 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:rive/rive.dart';
 
 import '../../theme/app_theme.dart';
 
-/// The top character stage. The first build uses the transparent mascot art;
-/// the Live2D runtime will occupy the same slot later.
-class CharacterStage extends StatelessWidget {
+/// The top character stage. A local Rive animation occupies the character slot;
+/// the static mascot remains as the loading/fallback image.
+class CharacterStage extends StatefulWidget {
   const CharacterStage({super.key});
+
+  @override
+  State<CharacterStage> createState() => _CharacterStageState();
+}
+
+class _CharacterStageState extends State<CharacterStage> {
+  int _taps = 0;
+  late final FileLoader _riveLoader = FileLoader.fromAsset(
+    'assets/rive/walking.riv',
+    riveFactory: Factory.flutter,
+  );
+
+  @override
+  void dispose() {
+    _riveLoader.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,11 +55,36 @@ class CharacterStage extends StatelessWidget {
                 alignment: Alignment.bottomCenter,
                 child: Padding(
                   padding: EdgeInsets.only(bottom: height * 0.01),
-                  child: Image.asset(
-                    'assets/mascot/full.png',
-                    height: height * 0.94,
-                    fit: BoxFit.contain,
-                    filterQuality: FilterQuality.medium,
+                  child: GestureDetector(
+                    onTap: () => setState(() => _taps++),
+                    child: SizedBox(
+                      height: height * 0.94,
+                      child: RiveWidgetBuilder(
+                        fileLoader: _riveLoader,
+                        stateMachineSelector:
+                            StateMachineSelector.byName('State Machine 1'),
+                        onFailed: (error, stackTrace) {
+                          debugPrint('Rive load failed: $error');
+                        },
+                        builder: (context, state) => switch (state) {
+                          RiveLoading() => Image.asset(
+                            'assets/mascot/full.png',
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.medium,
+                          ),
+                          RiveFailed() => Image.asset(
+                            'assets/mascot/full.png',
+                            fit: BoxFit.contain,
+                            filterQuality: FilterQuality.medium,
+                          ),
+                          RiveLoaded() => RiveWidget(
+                            controller: state.controller,
+                            fit: Fit.contain,
+                            alignment: Alignment.bottomCenter,
+                          ),
+                        },
+                      ),
+                    ),
                   ),
                 ),
               );
@@ -50,7 +93,7 @@ class CharacterStage extends StatelessWidget {
           Positioned(
             left: 20,
             bottom: 76,
-            child: _StageBadge(),
+            child: _StageBadge(taps: _taps),
           ),
           Positioned(
             left: 0,
@@ -137,6 +180,10 @@ class _Glow extends StatelessWidget {
 }
 
 class _StageBadge extends StatelessWidget {
+  const _StageBadge({required this.taps});
+
+  final int taps;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -158,8 +205,8 @@ class _StageBadge extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 7),
-          const Text(
-            '鲸鱼娘 · 待机',
+          Text(
+            '鲸鱼娘 · ${taps == 0 ? '待机' : '已互动 $taps'}',
             style: TextStyle(
               color: AppColors.muted,
               fontSize: 9,

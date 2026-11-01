@@ -244,6 +244,9 @@ jobs:
       - name: Pub get
         working-directory: app
         run: flutter pub get
+      - name: Rive native setup
+        working-directory: app
+        run: dart run rive_native:setup --verbose -p android
       - name: Analyze
         working-directory: app
         run: flutter analyze

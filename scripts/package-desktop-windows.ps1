@@ -16,6 +16,7 @@ cmake --build "$Root\build\windows-ffi" --target chatvv_ffi --config Release
 Push-Location "$Root\app"
 try {
   flutter pub get
+  dart run rive_native:setup --verbose -p windows
   flutter build windows --release
   $Out = "$Root\app\build\windows\x64\runner\Release"
   Copy-Item "$Root\build\windows-ffi\Release\chatvv_ffi.dll" $Out
