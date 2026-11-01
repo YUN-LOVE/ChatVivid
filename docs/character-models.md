@@ -1,6 +1,19 @@
 # 角色模型制作与导入
 
-当前舞台使用 **Rive**。Rive 文件是 `.riv`，运行时不依赖 Live2D/Spine 编辑器，Android、Linux、Windows 都能直接加载。
+默认舞台使用 **SVG 分层角色**（`assets/character/maid-whale*.svg`），在 Flutter 中做呼吸缩放和定时眨眼；外部导入使用 **Rive `.riv`**。Rive 文件运行时不依赖 Live2D/Spine 编辑器，Android、Linux、Windows 都能加载。
+
+## 默认 SVG 动画
+
+- `maid-whale.svg`：睁眼层
+- `maid-whale-blink.svg`：闭眼层
+- 呼吸：`AnimationController` 控制轻微纵向缩放和位移
+- 眨眼：每 4 秒切换到闭眼层 160ms
+
+### 转成 Rive
+
+在 Rive Editor 导入上述 SVG，按 Head/Body/Eyes/Tail 分组，建立
+`idle` / `blink` / `breath` 动画和默认 State Machine，导出 `.riv`。应用内
+“导入外部模型”可直接替换默认舞台。
 
 ## Rive 制作
 
