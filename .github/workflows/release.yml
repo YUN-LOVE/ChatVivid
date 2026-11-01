@@ -194,10 +194,28 @@ jobs:
           ./scripts/build-android-ffi.sh
       - name: Build APK
         working-directory: app
-        run: flutter build apk --release --target-platform android-arm64
+        shell: bash
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          SHA=$(git rev-parse --short HEAD)
+          VERSION="0.1.$COUNT"
+          flutter build apk --release --target-platform android-arm64 \
+            --build-name="$VERSION" --build-number="$COUNT" \
+            --dart-define=APP_VERSION="$VERSION" \
+            --dart-define=BUILD_NUMBER="$COUNT" \
+            --dart-define=BUILD_COMMIT="$SHA"
       - name: Build AAB
         working-directory: app
-        run: flutter build appbundle --release --target-platform android-arm64
+        shell: bash
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          SHA=$(git rev-parse --short HEAD)
+          VERSION="0.1.$COUNT"
+          flutter build appbundle --release --target-platform android-arm64 \
+            --build-name="$VERSION" --build-number="$COUNT" \
+            --dart-define=APP_VERSION="$VERSION" \
+            --dart-define=BUILD_NUMBER="$COUNT" \
+            --dart-define=BUILD_COMMIT="$SHA"
       - name: Stage artifacts
         run: |
           mkdir -p artifacts

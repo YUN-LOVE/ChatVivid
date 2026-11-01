@@ -19,6 +19,21 @@ enum BackendMode {
   }
 }
 
+enum CharacterMode {
+  rive('rive'),
+  staticImage('static'),
+  custom('custom');
+
+  const CharacterMode(this.wireName);
+
+  final String wireName;
+
+  static CharacterMode fromWire(String? value) => CharacterMode.values.firstWhere(
+        (mode) => mode.wireName == value,
+        orElse: () => CharacterMode.rive,
+      );
+}
+
 class AppSettings {
   const AppSettings({
     required this.mode,
@@ -34,6 +49,7 @@ class AppSettings {
     required this.skills,
     required this.mcpServers,
     required this.characterRivePath,
+    required this.characterMode,
     required this.agentEnabled,
     required this.onboardingComplete,
   });
@@ -53,6 +69,7 @@ class AppSettings {
       skills: const [],
       mcpServers: const [],
       characterRivePath: '',
+      characterMode: CharacterMode.rive,
       agentEnabled: false,
       onboardingComplete: false,
     );
@@ -91,6 +108,9 @@ class AppSettings {
               .toList() ??
           const [],
       characterRivePath: (json['character_rive_path'] as String?) ?? '',
+      characterMode: CharacterMode.fromWire(
+        json['character_mode'] as String?,
+      ),
       agentEnabled: (json['agent_enabled'] as bool?) ?? false,
       onboardingComplete: (json['onboarding_complete'] as bool?) ?? false,
     );
@@ -109,6 +129,7 @@ class AppSettings {
   final List<Skill> skills;
   final List<McpServer> mcpServers;
   final String characterRivePath;
+  final CharacterMode characterMode;
   final bool agentEnabled;
   final bool onboardingComplete;
 
@@ -126,6 +147,7 @@ class AppSettings {
         'skills': skills.map((item) => item.toJson()).toList(),
         'mcp_servers': mcpServers.map((item) => item.toJson()).toList(),
         'character_rive_path': characterRivePath,
+        'character_mode': characterMode.wireName,
         'agent_enabled': agentEnabled,
         'onboarding_complete': onboardingComplete,
       };
@@ -144,6 +166,7 @@ class AppSettings {
     List<Skill>? skills,
     List<McpServer>? mcpServers,
     String? characterRivePath,
+    CharacterMode? characterMode,
     bool? agentEnabled,
     bool? onboardingComplete,
   }) {
@@ -161,6 +184,7 @@ class AppSettings {
       skills: skills ?? this.skills,
       mcpServers: mcpServers ?? this.mcpServers,
       characterRivePath: characterRivePath ?? this.characterRivePath,
+      characterMode: characterMode ?? this.characterMode,
       agentEnabled: agentEnabled ?? this.agentEnabled,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
     );
@@ -180,6 +204,7 @@ class AppSettings {
         skills.map((item) => item.toJson().toString()).join(';'),
         mcpServers.map((item) => item.toJson().toString()).join(';'),
         characterRivePath,
+        characterMode.wireName,
         agentEnabled,
       ].join('|');
 }

@@ -12,6 +12,7 @@ dependencies:
   dio: ^5.11.1
   ffi: ^2.1.4
   flutter_markdown_plus: ^1.0.12
+  flutter_svg: 2.2.4
   rive: ^0.14.11
 dev_dependencies:
   flutter_test:

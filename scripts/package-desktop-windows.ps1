@@ -17,7 +17,14 @@ Push-Location "$Root\app"
 try {
   flutter pub get
   dart run rive_native:setup --verbose -p windows
-  flutter build windows --release
+  $CommitCount = (git -C $Root rev-list --count HEAD).Trim()
+  $CommitSha = (git -C $Root rev-parse --short HEAD).Trim()
+  $Version = "0.1.$CommitCount"
+  flutter build windows --release `
+    --build-name=$Version --build-number=$CommitCount `
+    --dart-define=APP_VERSION=$Version `
+    --dart-define=BUILD_NUMBER=$CommitCount `
+    --dart-define=BUILD_COMMIT=$CommitSha
   $Out = "$Root\app\build\windows\x64\runner\Release"
   Copy-Item "$Root\build\windows-ffi\Release\chatvv_ffi.dll" $Out
   New-Item -ItemType Directory -Force -Path "$Root\artifacts" | Out-Null
