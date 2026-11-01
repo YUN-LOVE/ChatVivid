@@ -230,6 +230,56 @@ jobs:
           path: artifacts/*
           if-no-files-found: error
 
+  app-release-linux:
+    name: package / desktop linux
+    needs: detect-app
+    if: needs.detect-app.outputs.has_app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Install desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev libsqlite3-dev libcurl4-openssl-dev libssl-dev
+      - name: Build and package
+        run: ./scripts/package-desktop-linux.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chatvv-app-linux
+          path: artifacts/*
+          if-no-files-found: error
+
+  app-release-windows:
+    name: package / desktop windows
+    needs: detect-app
+    if: needs.detect-app.outputs.has_app == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Build and package
+        shell: pwsh
+        run: ./scripts/package-desktop-windows.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chatvv-app-windows
+          path: artifacts/*
+          if-no-files-found: error
+
   release:
     name: github release
     needs:
@@ -237,7 +287,9 @@ jobs:
       - backend-linux-arm64
       - backend-windows-x64
       - app-release
-    if: ${{ always() && needs.backend-linux-x64.result == 'success' && needs.backend-linux-arm64.result == 'success' && needs.backend-windows-x64.result == 'success' && (needs.app-release.result == 'success' || needs.app-release.result == 'skipped') }}
+      - app-release-linux
+      - app-release-windows
+    if: ${{ always() && needs.backend-linux-x64.result == 'success' && needs.backend-linux-arm64.result == 'success' && needs.backend-windows-x64.result == 'success' && (needs.app-release.result == 'success' || needs.app-release.result == 'skipped') && (needs.app-release-linux.result == 'success' || needs.app-release-linux.result == 'skipped') && (needs.app-release-windows.result == 'success' || needs.app-release-windows.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
