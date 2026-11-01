@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/build_info.dart';
 import '../../data/app_paths.dart';
 import 'dart:io';
 
@@ -881,10 +882,15 @@ class _SettingsDetailState extends State<SettingsDetail> {
       final support = await appSupportDirectory();
       final dir = Directory('${support.path}/character');
       await dir.create(recursive: true);
-      final file = File('${dir.path}/imported.riv');
+      final lower = picked.name.toLowerCase();
+      final extension = lower.endsWith('.svg') ? 'svg' : 'riv';
+      final file = File('${dir.path}/imported.$extension');
       await file.writeAsBytes(picked.bytes, flush: true);
       setState(() {
-        _settings = _settings.copyWith(characterRivePath: file.path);
+        _settings = _settings.copyWith(
+          characterRivePath: file.path,
+          characterMode: CharacterMode.custom,
+        );
       });
       _emit();
       if (!mounted) return;
@@ -900,7 +906,17 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   void _clearRive() {
-    setState(() => _settings = _settings.copyWith(characterRivePath: ''));
+    setState(() {
+      _settings = _settings.copyWith(
+        characterRivePath: '',
+        characterMode: CharacterMode.rive,
+      );
+    });
+    _emit();
+  }
+
+  void _setCharacterMode(CharacterMode mode) {
+    setState(() => _settings = _settings.copyWith(characterMode: mode));
     _emit();
   }
 
@@ -908,20 +924,34 @@ class _SettingsDetailState extends State<SettingsDetail> {
     return Column(
       children: [
         _SettingCard(
+          icon: Icons.image_rounded,
+          title: '静态立绘',
+          subtitle: '内置大肥鱼头像/立绘',
+          trailing: _settings.characterMode == CharacterMode.staticImage
+              ? const Icon(Icons.check_rounded, color: AppColors.success)
+              : const Icon(Icons.chevron_right_rounded),
+          onTap: () => _setCharacterMode(CharacterMode.staticImage),
+        ),
+        const SizedBox(height: 10),
+        _SettingCard(
           icon: Icons.view_in_ar_rounded,
           title: 'Rive 角色',
-          subtitle: '本地动画 · 待机/点击互动',
-          trailing: const Icon(Icons.check_rounded, color: AppColors.success),
-          onTap: () {},
+          subtitle: '内置 walking.riv · 待机动画',
+          trailing: _settings.characterMode == CharacterMode.rive
+              ? const Icon(Icons.check_rounded, color: AppColors.success)
+              : const Icon(Icons.chevron_right_rounded),
+          onTap: () => _setCharacterMode(CharacterMode.rive),
         ),
         const SizedBox(height: 10),
         _SettingCard(
           icon: Icons.download_rounded,
           title: '导入外部模型',
           subtitle: _settings.characterRivePath.isEmpty
-              ? 'Rive .riv 文件；导入后替换当前角色'
-              : '当前使用外部模型 · 点击重新导入',
-          trailing: const Icon(Icons.chevron_right_rounded),
+              ? '支持 Rive .riv / SVG；导入后启用'
+              : '当前：${_settings.characterRivePath.split('/').last} · 点击重新导入',
+          trailing: _settings.characterMode == CharacterMode.custom
+              ? const Icon(Icons.check_rounded, color: AppColors.success)
+              : const Icon(Icons.chevron_right_rounded),
           onTap: _importRive,
         ),
         if (_settings.characterRivePath.isNotEmpty) ...[
@@ -1014,28 +1044,65 @@ class _SettingsDetailState extends State<SettingsDetail> {
   Widget _about() {
     return Column(
       children: [
-        const _SettingCard(
+        _SettingCard(
           icon: Icons.info_outline_rounded,
-          title: 'chatvv',
-          subtitle: '0.1.0 · Flutter 3.44 · C++23 core',
-          trailing: SizedBox.shrink(),
+          title: 'ChatVivid',
+          subtitle: '$buildLabel · commit $commitLabel · Flutter 3.44',
+          trailing: const SizedBox.shrink(),
           onTap: null,
         ),
         const SizedBox(height: 10),
-        const _SettingCard(
+        _SettingCard(
           icon: Icons.article_outlined,
           title: '开源许可',
-          subtitle: '查看第三方许可',
-          trailing: Icon(Icons.chevron_right_rounded),
-          onTap: null,
+          subtitle: 'Flutter、Rive、llama.cpp 等第三方许可',
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => showLicensePage(
+            context: context,
+            applicationName: 'ChatVivid',
+            applicationVersion: buildLabel,
+          ),
         ),
         const SizedBox(height: 10),
-        const _SettingCard(
+        _SettingCard(
           icon: Icons.face_rounded,
-          title: '角色署名',
-          subtitle: '上善无形 / ZipZipPipe / 氵六青',
-          trailing: Icon(Icons.chevron_right_rounded),
-          onTap: null,
+          title: '角色与资产署名',
+          subtitle: '大肥鱼角色 / Rive sample / BGE 模型',
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => showDialog<void>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('角色与资产署名'),
+              content: const SingleChildScrollView(
+                child: Text(
+                  '大肥鱼角色设定：上善无形 / ZipZipPipe / 氵六青\n\n'
+                  '默认 Rive 动画：Rive Flutter 示例资产 walking.riv\n'
+                  'RAG embedding：BAAI bge-small-zh-v1.5 (MIT)，经 llama.cpp 加载\n\n'
+                  'Rive runtime 为 MIT 许可；示例资产请按原仓库许可使用。',
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('关闭'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        _SettingCard(
+          icon: Icons.code_rounded,
+          title: '源代码',
+          subtitle: 'github.com/YUN-LOVE/ChatVivid',
+          trailing: const Icon(Icons.copy_rounded, size: 16),
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('https://github.com/YUN-LOVE/ChatVivid'),
+              ),
+            );
+          },
         ),
       ],
     );

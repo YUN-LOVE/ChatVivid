@@ -37,7 +37,7 @@ Future<PickedModelFile?> pickRiveFile() async {
     }
     final result = await Process.run('zenity', [
       '--file-selection',
-      '--file-filter=Rive 模型 | *.riv',
+      '--file-filter=Rive / SVG 模型 | *.riv *.svg',
     ]);
     if (result.exitCode != 0) return null;
     final path = (result.stdout as String).trim();
@@ -53,7 +53,7 @@ Future<PickedModelFile?> pickRiveFile() async {
     const script = r'''
 Add-Type -AssemblyName System.Windows.Forms
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
-$dialog.Filter = "Rive model|*.riv|All files|*.*"
+$dialog.Filter = "Rive or SVG|*.riv;*.svg|All files|*.*"
 if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
   $dialog.FileName
 }

@@ -261,7 +261,16 @@ jobs:
           fi
       - name: Build debug APK
         working-directory: app
-        run: flutter build apk --debug --target-platform android-arm64
+        shell: bash
+        run: |
+          COUNT=$(git rev-list --count HEAD)
+          SHA=$(git rev-parse --short HEAD)
+          VERSION="0.1.$COUNT"
+          flutter build apk --debug --target-platform android-arm64 \
+            --build-name="$VERSION" --build-number="$COUNT" \
+            --dart-define=APP_VERSION="$VERSION" \
+            --dart-define=BUILD_NUMBER="$COUNT" \
+            --dart-define=BUILD_COMMIT="$SHA"
       - uses: actions/upload-artifact@v4
         with:
           name: chatvv-app-android

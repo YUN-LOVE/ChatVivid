@@ -220,6 +220,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   child: stageHeight > 0
                       ? CharacterStage(
                           customRivePath: widget.settings.characterRivePath,
+                          characterMode: widget.settings.characterMode,
                         )
                       : const SizedBox.shrink(),
                 ),
