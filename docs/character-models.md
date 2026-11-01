@@ -12,9 +12,11 @@
 
 ## 导入应用
 
-设置 → 角色与舞台 → 导入外部模型 → 选择 `.riv`。
+设置 → 角色与舞台 → 导入外部模型 → 选择 `.riv` 或 `.svg`。
 
-文件会复制到应用 support 目录的 `character/imported.riv`，设置保存绝对路径。舞台通过 `FileLoader.fromFile` 加载；导入失败会自动回退到内置角色。
+Rive 文件会复制到 `character/imported.riv`，通过 `FileLoader.fromFile` 加载；
+SVG 会复制到 `character/imported.svg`，通过 `flutter_svg` 静态渲染。
+导入后角色模式切换为 external；失败会回退内置角色。
 
 导入文件需要包含可用的默认 State Machine，否则 Rive 会报
 `Default state machine not found`。如果角色只有 Animation，请先在 Rive Editor 里包一层 State Machine。
