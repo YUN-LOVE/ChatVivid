@@ -1,8 +1,6 @@
-import 'dart:async';
 import 'dart:io' as io;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:rive/rive.dart';
 
 import '../../theme/app_theme.dart';
@@ -39,18 +37,19 @@ class _CharacterStageState extends State<CharacterStage> {
   }
 
   Future<void> _prepareLoader() async {
-    if (widget.customRivePath.isEmpty) {
-      if (mounted) setState(() {});
-      return;
-    }
     try {
-      final bytes = await io.File(widget.customRivePath).readAsBytes();
-      final file = await File.decode(bytes, riveFactory: Factory.flutter);
-      if (file == null) throw StateError('Rive decode returned null');
-      final loader = FileLoader.fromFile(
-        file,
-        riveFactory: Factory.flutter,
-      );
+      FileLoader loader;
+      if (widget.customRivePath.isNotEmpty) {
+        final bytes = await io.File(widget.customRivePath).readAsBytes();
+        final file = await File.decode(bytes, riveFactory: Factory.flutter);
+        if (file == null) throw StateError('Rive decode returned null');
+        loader = FileLoader.fromFile(file, riveFactory: Factory.flutter);
+      } else {
+        loader = FileLoader.fromAsset(
+          'assets/rive/walking.riv',
+          riveFactory: Factory.flutter,
+        );
+      }
       if (!mounted) {
         loader.dispose();
         return;
@@ -102,15 +101,13 @@ class _CharacterStageState extends State<CharacterStage> {
                     onTap: () => setState(() => _taps++),
                     child: SizedBox(
                       height: height * 0.94,
-                      child: widget.customRivePath.isEmpty
-                          ? const MaidWhaleStage()
-                          : _riveLoader == null
-                              ? Image.asset(
-                                  'assets/mascot/full.png',
-                                  fit: BoxFit.contain,
-                                  filterQuality: FilterQuality.medium,
-                                )
-                              : RiveWidgetBuilder(
+                      child: _riveLoader == null
+                          ? Image.asset(
+                              'assets/mascot/full.png',
+                              fit: BoxFit.contain,
+                              filterQuality: FilterQuality.medium,
+                            )
+                          : RiveWidgetBuilder(
                               fileLoader: _riveLoader!,
                               stateMachineSelector:
                                   widget.customRivePath.isEmpty
@@ -172,75 +169,6 @@ class _CharacterStageState extends State<CharacterStage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class MaidWhaleStage extends StatefulWidget {
-  const MaidWhaleStage({super.key});
-
-  @override
-  State<MaidWhaleStage> createState() => _MaidWhaleStageState();
-}
-
-class _MaidWhaleStageState extends State<MaidWhaleStage>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _breath = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 2800),
-  )..repeat(reverse: true);
-  Timer? _blinkTimer;
-  bool _blink = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _scheduleBlink();
-  }
-
-  void _scheduleBlink() {
-    _blinkTimer?.cancel();
-    _blinkTimer = Timer(const Duration(seconds: 4), () {
-      if (!mounted) return;
-      setState(() => _blink = true);
-      Future<void>.delayed(const Duration(milliseconds: 160), () {
-        if (!mounted) return;
-        setState(() => _blink = false);
-        _scheduleBlink();
-      });
-    });
-  }
-
-  @override
-  void dispose() {
-    _blinkTimer?.cancel();
-    _breath.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _breath,
-      builder: (context, child) {
-        final t = _breath.value;
-        return Transform.scale(
-          alignment: Alignment.bottomCenter,
-          scaleX: 1 - 0.004 * t,
-          scaleY: 1 + 0.012 * t,
-          child: Transform.translate(
-            offset: Offset(0, -2.0 * t),
-            child: child,
-          ),
-        );
-      },
-      child: SvgPicture.asset(
-        _blink
-            ? 'assets/character/maid-whale-blink.svg'
-            : 'assets/character/maid-whale.svg',
-        fit: BoxFit.contain,
-        alignment: Alignment.bottomCenter,
       ),
     );
   }

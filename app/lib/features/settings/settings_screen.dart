@@ -908,9 +908,9 @@ class _SettingsDetailState extends State<SettingsDetail> {
     return Column(
       children: [
         _SettingCard(
-          icon: Icons.face_retouching_natural_rounded,
-          title: '大肥鱼 · 女仆装',
-          subtitle: '默认 · 呼吸与眨眼动画',
+          icon: Icons.view_in_ar_rounded,
+          title: 'Rive 角色',
+          subtitle: '本地动画 · 待机/点击互动',
           trailing: const Icon(Icons.check_rounded, color: AppColors.success),
           onTap: () {},
         ),
