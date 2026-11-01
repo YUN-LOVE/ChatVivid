@@ -1,4 +1,6 @@
+import 'mcp_server.dart';
 import 'prompt_injection.dart';
+import 'skill.dart';
 
 enum BackendMode {
   full('full', 'Full · 内嵌 C++'),
@@ -29,6 +31,10 @@ class AppSettings {
     required this.apiKey,
     required this.systemPrompt,
     required this.injections,
+    required this.skills,
+    required this.mcpServers,
+    required this.characterRivePath,
+    required this.agentEnabled,
     required this.onboardingComplete,
   });
 
@@ -44,6 +50,10 @@ class AppSettings {
       apiKey: '',
       systemPrompt: '',
       injections: const [],
+      skills: const [],
+      mcpServers: const [],
+      characterRivePath: '',
+      agentEnabled: false,
       onboardingComplete: false,
     );
   }
@@ -70,6 +80,18 @@ class AppSettings {
                   ))
               .toList() ??
           const [],
+      skills: (json['skills'] as List?)
+              ?.whereType<Map>()
+              .map((item) => Skill.fromJson(Map<String, dynamic>.from(item)))
+              .toList() ??
+          const [],
+      mcpServers: (json['mcp_servers'] as List?)
+              ?.whereType<Map>()
+              .map((item) => McpServer.fromJson(Map<String, dynamic>.from(item)))
+              .toList() ??
+          const [],
+      characterRivePath: (json['character_rive_path'] as String?) ?? '',
+      agentEnabled: (json['agent_enabled'] as bool?) ?? false,
       onboardingComplete: (json['onboarding_complete'] as bool?) ?? false,
     );
   }
@@ -84,6 +106,10 @@ class AppSettings {
   final String apiKey;
   final String systemPrompt;
   final List<PromptInjection> injections;
+  final List<Skill> skills;
+  final List<McpServer> mcpServers;
+  final String characterRivePath;
+  final bool agentEnabled;
   final bool onboardingComplete;
 
   Map<String, Object?> toJson() => {
@@ -97,6 +123,10 @@ class AppSettings {
         'api_key': apiKey,
         'system_prompt': systemPrompt,
         'injections': injections.map((item) => item.toJson()).toList(),
+        'skills': skills.map((item) => item.toJson()).toList(),
+        'mcp_servers': mcpServers.map((item) => item.toJson()).toList(),
+        'character_rive_path': characterRivePath,
+        'agent_enabled': agentEnabled,
         'onboarding_complete': onboardingComplete,
       };
 
@@ -111,6 +141,10 @@ class AppSettings {
     String? apiKey,
     String? systemPrompt,
     List<PromptInjection>? injections,
+    List<Skill>? skills,
+    List<McpServer>? mcpServers,
+    String? characterRivePath,
+    bool? agentEnabled,
     bool? onboardingComplete,
   }) {
     return AppSettings(
@@ -124,6 +158,10 @@ class AppSettings {
       apiKey: apiKey ?? this.apiKey,
       systemPrompt: systemPrompt ?? this.systemPrompt,
       injections: injections ?? this.injections,
+      skills: skills ?? this.skills,
+      mcpServers: mcpServers ?? this.mcpServers,
+      characterRivePath: characterRivePath ?? this.characterRivePath,
+      agentEnabled: agentEnabled ?? this.agentEnabled,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
     );
   }
@@ -139,5 +177,9 @@ class AppSettings {
         clientToken,
         systemPrompt,
         injections.map((item) => item.toJson().toString()).join(';'),
+        skills.map((item) => item.toJson().toString()).join(';'),
+        mcpServers.map((item) => item.toJson().toString()).join(';'),
+        characterRivePath,
+        agentEnabled,
       ].join('|');
 }

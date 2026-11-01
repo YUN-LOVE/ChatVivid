@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 
 import '../../data/app_paths.dart';
+import 'dart:io';
+
 import '../../data/app_settings.dart';
 import '../../data/chat_backend.dart';
+import '../../data/skill.dart';
 import '../../data/prompt_injection.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
+import '../chat/file_upload_service.dart';
 import 'injection_editor.dart';
 import 'memory_archive_pane.dart';
+import 'mcp_pane.dart';
+import 'skill_editor.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({
@@ -45,6 +51,16 @@ const _categories = [
     title: '提示词与注入',
     description: '系统提示词、上下文注入',
     icon: Icons.auto_awesome_rounded,
+  ),
+  SettingsCategory(
+    title: '技能',
+    description: '可启用的提示词工作流',
+    icon: Icons.extension_rounded,
+  ),
+  SettingsCategory(
+    title: 'MCP 与 Agent',
+    description: 'MCP 服务器、工具与代理',
+    icon: Icons.hub_outlined,
   ),
   SettingsCategory(
     title: '记忆归档',
@@ -521,6 +537,8 @@ class _SettingsDetailState extends State<SettingsDetail> {
         const SizedBox(height: 18),
         if (widget.category.title == '连接与后端') _connection(),
         if (widget.category.title == '提示词与注入') _prompts(),
+        if (widget.category.title == '技能') _skills(),
+        if (widget.category.title == 'MCP 与 Agent') _mcp(),
         if (widget.category.title == '记忆归档') _memory(),
         if (widget.category.title == '角色与舞台') _character(),
         if (widget.category.title == '外观') _appearance(),
@@ -719,8 +737,171 @@ class _SettingsDetailState extends State<SettingsDetail> {
     _emit();
   }
 
+  Future<void> _editSkill([Skill? initial]) async {
+    final result = await Navigator.of(context).push<Skill>(
+      MaterialPageRoute(builder: (_) => SkillEditorPage(initial: initial)),
+    );
+    if (!mounted || result == null) return;
+    final next = [..._settings.skills];
+    final index = next.indexWhere((item) => item.id == result.id);
+    if (index >= 0) {
+      next[index] = result;
+    } else {
+      next.add(result);
+    }
+    setState(() => _settings = _settings.copyWith(skills: next));
+    _emit();
+  }
+
+  void _removeSkill(int index) {
+    final next = [..._settings.skills]..removeAt(index);
+    setState(() => _settings = _settings.copyWith(skills: next));
+    _emit();
+  }
+
+  Widget _skills() {
+    return Column(
+      children: [
+        Row(
+          children: [
+            const Text(
+              '已安装技能',
+              style: TextStyle(
+                color: AppColors.text,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: () => _editSkill(),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('新建'),
+            ),
+          ],
+        ),
+        if (_settings.skills.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Text(
+              '暂无技能。技能是启用后自动加入系统提示词的工作流。',
+              style: TextStyle(
+                color: AppColors.muted.withValues(alpha: 0.65),
+                fontSize: 11,
+              ),
+            ),
+          )
+        else
+          for (var i = 0; i < _settings.skills.length; i++) ...[
+            Container(
+              padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceHigh.withValues(alpha: 0.38),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _settings.skills[i].name,
+                          style: const TextStyle(
+                            color: AppColors.text,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (_settings.skills[i].description.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Text(
+                            _settings.skills[i].description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: AppColors.muted,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _settings.skills[i].enabled,
+                    onChanged: (enabled) {
+                      final next = [..._settings.skills];
+                      next[i] = next[i].copyWith(enabled: enabled);
+                      setState(
+                        () => _settings = _settings.copyWith(skills: next),
+                      );
+                      _emit();
+                    },
+                  ),
+                  IconButton(
+                    onPressed: () => _removeSkill(i),
+                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        const SizedBox(height: 12),
+        const _SettingCard(
+          icon: Icons.smart_toy_outlined,
+          title: 'Agent 模式',
+          subtitle: '系统提示词已预留，MCP 工具循环下一步接入',
+          trailing: Icon(Icons.chevron_right_rounded),
+          onTap: null,
+        ),
+      ],
+    );
+  }
+
+  Widget _mcp() {
+    return McpPane(
+      settings: _settings,
+      onChanged: (next) {
+        setState(() => _settings = next);
+        _emit();
+      },
+    );
+  }
+
   Widget _memory() {
     return MemoryArchivePane(backend: widget.backend);
+  }
+
+  Future<void> _importRive() async {
+    try {
+      final picked = await pickRiveFile();
+      if (picked == null || !mounted) return;
+      final support = await appSupportDirectory();
+      final dir = Directory('${support.path}/character');
+      await dir.create(recursive: true);
+      final file = File('${dir.path}/imported.riv');
+      await file.writeAsBytes(picked.bytes, flush: true);
+      setState(() {
+        _settings = _settings.copyWith(characterRivePath: file.path);
+      });
+      _emit();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导入 ${picked.name}')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导入失败：$error')),
+      );
+    }
+  }
+
+  void _clearRive() {
+    setState(() => _settings = _settings.copyWith(characterRivePath: ''));
+    _emit();
   }
 
   Widget _character() {
@@ -745,10 +926,23 @@ class _SettingsDetailState extends State<SettingsDetail> {
         _SettingCard(
           icon: Icons.download_rounded,
           title: '导入外部模型',
-          subtitle: 'VRM / Live2D 文件夹',
-          trailing: const Icon(Icons.lock_outline, size: 16),
-          onTap: () {},
+          subtitle: _settings.characterRivePath.isEmpty
+              ? 'Rive .riv 文件；导入后替换当前角色'
+              : '当前使用外部模型 · 点击重新导入',
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: _importRive,
         ),
+        if (_settings.characterRivePath.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _clearRive,
+              icon: const Icon(Icons.restore_rounded, size: 16),
+              label: const Text('恢复内置角色'),
+            ),
+          ),
+        ],
       ],
     );
   }

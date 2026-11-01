@@ -6,6 +6,74 @@ import 'package:flutter/services.dart';
 import 'chat_attachment.dart';
 
 const MethodChannel _filesChannel = MethodChannel('chatvv/files');
+
+class PickedModelFile {
+  const PickedModelFile({required this.name, required this.bytes});
+
+  final String name;
+  final Uint8List bytes;
+}
+
+/// Native picker for a Rive/Spine model. Returns raw bytes so the caller can
+/// copy it into the app support directory and pass an absolute path to Rive.
+Future<PickedModelFile?> pickRiveFile() async {
+  if (Platform.isAndroid) {
+    final raw = await _filesChannel.invokeMethod<Map<dynamic, dynamic>>(
+      'pickRiveFile',
+    );
+    if (raw == null) return null;
+    final bytes = raw['bytes'];
+    if (bytes is! Uint8List) return null;
+    return PickedModelFile(
+      name: raw['name']?.toString() ?? 'model.riv',
+      bytes: bytes,
+    );
+  }
+
+  if (Platform.isLinux) {
+    final which = await Process.run('sh', ['-c', 'command -v zenity']);
+    if (which.exitCode != 0) {
+      throw const FileSystemException('缺少 zenity，无法打开文件选择器');
+    }
+    final result = await Process.run('zenity', [
+      '--file-selection',
+      '--file-filter=Rive 模型 | *.riv',
+    ]);
+    if (result.exitCode != 0) return null;
+    final path = (result.stdout as String).trim();
+    if (path.isEmpty) return null;
+    final file = File(path);
+    return PickedModelFile(
+      name: file.uri.pathSegments.last,
+      bytes: await file.readAsBytes(),
+    );
+  }
+
+  if (Platform.isWindows) {
+    const script = r'''
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Filter = "Rive model|*.riv|All files|*.*"
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+  $dialog.FileName
+}
+''';
+    final result = await Process.run(
+      'powershell',
+      ['-NoProfile', '-STA', '-Command', script],
+    );
+    if (result.exitCode != 0) return null;
+    final path = (result.stdout as String).trim();
+    if (path.isEmpty) return null;
+    final file = File(path);
+    return PickedModelFile(
+      name: file.uri.pathSegments.last,
+      bytes: await file.readAsBytes(),
+    );
+  }
+
+  throw const FileSystemException('当前平台暂不支持模型导入');
+}
 const int _maxFileBytes = 256 * 1024;
 const int _maxTotalBytes = 1024 * 1024;
 

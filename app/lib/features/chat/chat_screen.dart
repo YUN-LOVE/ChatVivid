@@ -218,7 +218,9 @@ class _ChatScreenState extends State<ChatScreen> {
                   curve: Curves.easeOutCubic,
                   height: stageHeight,
                   child: stageHeight > 0
-                      ? const CharacterStage()
+                      ? CharacterStage(
+                          customRivePath: widget.settings.characterRivePath,
+                        )
                       : const SizedBox.shrink(),
                 ),
                 Expanded(

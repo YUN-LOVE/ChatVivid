@@ -11,16 +11,28 @@ import 'ffi_chat_api.dart';
 import 'remote_chat_api.dart';
 
 Future<ChatBackend> createChatBackend(AppSettings settings) async {
+  final skills = settings.skills.where((skill) => skill.enabled).toList();
+  final skillPrompt = skills
+      .map((skill) =>
+          '## Skill: ${skill.name}\n${skill.description}\n${skill.instructions}')
+      .join('\n\n');
+  final combinedSystem = [
+    if (settings.systemPrompt.trim().isNotEmpty) settings.systemPrompt.trim(),
+    if (skillPrompt.isNotEmpty) '[技能]\n$skillPrompt',
+    if (settings.agentEnabled)
+      '[Agent] 当前处于 Agent 模式。优先使用已接入的工具；没有工具时明确说明。',
+  ].join('\n\n');
+
   if (settings.mode == BackendMode.client) {
     final saved = <PromptInjection>[
-      if (settings.systemPrompt.trim().isNotEmpty)
+      if (combinedSystem.isNotEmpty)
         PromptInjection(
           id: 'system-prompt',
           name: 'system-prompt',
           position: 'system',
           mode: 'replace',
           trust: 'instruction',
-          content: settings.systemPrompt.trim(),
+          content: combinedSystem,
         ),
       ...settings.injections,
     ];
@@ -70,7 +82,7 @@ Future<ChatBackend> createChatBackend(AppSettings settings) async {
       'api_key': settings.apiKey,
       'model': settings.model,
       'ca_bundle': caFile.path,
-      'system_prompt': settings.systemPrompt,
+      'system_prompt': combinedSystem,
       'embedding_model': modelFile.path,
       'embedding_threads': 2,
     },
