@@ -93,7 +93,8 @@ add_library(chatvv_core STATIC
   src/llm/mock_provider.cpp
   src/llm/responses_provider.cpp
   src/dialog/response_hub.cpp
-  src/dialog/dialog_service.cpp)
+  src/dialog/dialog_service.cpp
+  src/tts/edge_tts.cpp)
 target_include_directories(chatvv_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(chatvv_core SYSTEM PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/include)

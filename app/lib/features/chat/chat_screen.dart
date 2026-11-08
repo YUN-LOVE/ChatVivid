@@ -730,10 +730,7 @@ class _DialogueCard extends StatelessWidget {
         padding: EdgeInsets.zero,
         child: Column(
           children: [
-            GestureDetector(
-              onTap: onToggle,
-              behavior: HitTestBehavior.opaque,
-              child: SizedBox(
+            SizedBox(
                 height: 26,
                 child: Row(
                   children: [
@@ -757,9 +754,14 @@ class _DialogueCard extends StatelessWidget {
                       ),
                     ),
                     Spacer(),
-                    GestureDetector(
-                      onTap: onSpeak,
-                      child: Icon(
+                    IconButton(
+                      onPressed: onSpeak,
+                      padding: EdgeInsets.zero,
+                      constraints: BoxConstraints.tightFor(
+                        width: 34,
+                        height: 26,
+                      ),
+                      icon: Icon(
                         speaking
                             ? Icons.stop_circle_outlined
                             : Icons.volume_up_rounded,
@@ -768,17 +770,19 @@ class _DialogueCard extends StatelessWidget {
                       ),
                     ),
                     SizedBox(width: 10),
-                    Icon(
-                      collapsed
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
-                      size: 17,
-                      color: AppColors.muted,
+                    GestureDetector(
+                      onTap: onToggle,
+                      child: Icon(
+                        collapsed
+                            ? Icons.keyboard_arrow_up_rounded
+                            : Icons.keyboard_arrow_down_rounded,
+                        size: 17,
+                        color: AppColors.muted,
+                      ),
                     ),
                     SizedBox(width: 10),
                   ],
                 ),
-              ),
             ),
             if (!collapsed)
               Expanded(

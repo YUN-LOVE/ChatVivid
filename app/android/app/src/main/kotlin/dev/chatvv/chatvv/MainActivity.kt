@@ -2,6 +2,7 @@ package dev.chatvv.chatvv
 
 import android.app.Activity
 import android.content.Intent
+import android.media.MediaPlayer
 import android.net.Uri
 import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
@@ -17,6 +18,8 @@ class MainActivity : FlutterActivity() {
 
     private var pendingFiles: MethodChannel.Result? = null
     private var pendingModel: MethodChannel.Result? = null
+    private var mediaPlayer: MediaPlayer? = null
+    private var audioChannel: MethodChannel? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -27,6 +30,53 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        audioChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger, "chatvv/audio",
+        )
+        audioChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "play" -> {
+                    val path = call.argument<String>("path")
+                    if (path == null) {
+                        result.error("invalid_argument", "path is required", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        mediaPlayer?.release()
+                        mediaPlayer = MediaPlayer().apply {
+                            setDataSource(path)
+                            setOnCompletionListener {
+                                audioChannel?.invokeMethod("completed", null)
+                            }
+                            setOnErrorListener { _, what, extra ->
+                                audioChannel?.invokeMethod(
+                                    "error",
+                                    mapOf("what" to what, "extra" to extra),
+                                )
+                                true
+                            }
+                            prepare()
+                            start()
+                        }
+                        result.success(true)
+                    } catch (error: Exception) {
+                        result.error("play_failed", error.message, null)
+                    }
+                }
+                "stop" -> {
+                    try {
+                        mediaPlayer?.stop()
+                    } catch (_: Exception) {
+                        // Already completed/released.
+                    }
+                    mediaPlayer?.release()
+                    mediaPlayer = null
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "chatvv/files")
             .setMethodCallHandler { call, result ->
@@ -125,6 +175,12 @@ class MainActivity : FlutterActivity() {
             }
         }
         result.success(files)
+    }
+
+    override fun onDestroy() {
+        mediaPlayer?.release()
+        mediaPlayer = null
+        super.onDestroy()
     }
 
     private fun displayName(uri: Uri): String {

@@ -247,7 +247,6 @@ class AppSettings {
         live2dDir,
         live2dModel,
         characterMode.wireName,
-        colorMode.wireName,
         agentEnabled,
       ].join('|');
 }
