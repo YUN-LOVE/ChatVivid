@@ -1,10 +1,11 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'package:flutter/material.dart';
 
 import '../../data/mcp_server.dart';
 import '../../theme/app_theme.dart';
 
 class McpServerEditorPage extends StatefulWidget {
-  const McpServerEditorPage({super.key, this.initial});
+  McpServerEditorPage({super.key, this.initial});
 
   final McpServer? initial;
 
@@ -57,40 +58,40 @@ class _McpServerEditorPageState extends State<McpServerEditorPage> {
         backgroundColor: Colors.transparent,
         title: Text(widget.initial == null ? '添加 MCP 服务器' : '编辑 MCP 服务器'),
         actions: [
-          TextButton(onPressed: _save, child: const Text('保存')),
+          TextButton(onPressed: _save, child: Text('保存')),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+        padding: EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
           TextField(
             controller: _name,
-            style: const TextStyle(color: AppColors.text),
-            decoration: const InputDecoration(
+            style: TextStyle(color: AppColors.text),
+            decoration: InputDecoration(
               labelText: '名称',
               hintText: '例如：本地文件系统',
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           TextField(
             controller: _url,
             keyboardType: TextInputType.url,
-            style: const TextStyle(color: AppColors.text),
-            decoration: const InputDecoration(
+            style: TextStyle(color: AppColors.text),
+            decoration: InputDecoration(
               labelText: 'Streamable HTTP URL',
               hintText: 'http://127.0.0.1:3000/mcp',
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           TextField(
             controller: _token,
             obscureText: true,
-            style: const TextStyle(color: AppColors.text),
-            decoration: const InputDecoration(
+            style: TextStyle(color: AppColors.text),
+            decoration: InputDecoration(
               labelText: 'Bearer Token（可选）',
             ),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           Text(
             '支持 MCP Streamable HTTP：initialize + tools/list。'
             'SSE 传输和工具调用循环在 Agent 模式中接入。',

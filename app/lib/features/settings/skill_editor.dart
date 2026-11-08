@@ -1,10 +1,11 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'package:flutter/material.dart';
 
 import '../../data/skill.dart';
 import '../../theme/app_theme.dart';
 
 class SkillEditorPage extends StatefulWidget {
-  const SkillEditorPage({super.key, this.initial});
+  SkillEditorPage({super.key, this.initial});
 
   final Skill? initial;
 
@@ -56,39 +57,39 @@ class _SkillEditorPageState extends State<SkillEditorPage> {
         backgroundColor: Colors.transparent,
         title: Text(widget.initial == null ? '新建技能' : '编辑技能'),
         actions: [
-          TextButton(onPressed: _save, child: const Text('保存')),
+          TextButton(onPressed: _save, child: Text('保存')),
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(18, 8, 18, 32),
+        padding: EdgeInsets.fromLTRB(18, 8, 18, 32),
         children: [
           TextField(
             controller: _name,
-            style: const TextStyle(color: AppColors.text),
-            decoration: const InputDecoration(
+            style: TextStyle(color: AppColors.text),
+            decoration: InputDecoration(
               labelText: '名称',
               hintText: '例如：代码审查',
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           TextField(
             controller: _description,
-            style: const TextStyle(color: AppColors.text),
-            decoration: const InputDecoration(
+            style: TextStyle(color: AppColors.text),
+            decoration: InputDecoration(
               labelText: '简介',
               hintText: '这个技能做什么',
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           TextField(
             controller: _instructions,
             maxLines: 12,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.text,
               fontSize: 13,
               height: 1.55,
             ),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: '指令 / 工作流',
               hintText: '启用后会被加入系统提示词…',
               alignLabelWithHint: true,

@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'package:flutter/material.dart';
 
 import '../data/app_settings.dart';
@@ -10,7 +11,7 @@ import '../theme/app_theme.dart';
 /// of Kazumi's startup gate: storage failure gets its own screen, first run
 /// goes through onboarding, and only then is the chat backend created.
 class StartupGate extends StatefulWidget {
-  const StartupGate({super.key});
+  StartupGate({super.key});
 
   @override
   State<StartupGate> createState() => _StartupGateState();
@@ -37,6 +38,8 @@ class _StartupGateState extends State<StartupGate> {
       final store = await SettingsStore.open();
       final settings = await store.load();
       if (!mounted) return;
+      await appThemeController.setMode(settings.colorMode);
+      if (!mounted) return;
       setState(() {
         _store = store;
         _settings = settings;
@@ -53,19 +56,21 @@ class _StartupGateState extends State<StartupGate> {
 
   Future<void> _completeOnboarding(AppSettings settings) async {
     await _store?.save(settings);
+    await appThemeController.setMode(settings.colorMode);
     if (!mounted) return;
     setState(() => _settings = settings);
   }
 
   Future<void> _saveSettings(AppSettings settings) async {
     await _store?.save(settings);
+    await appThemeController.setMode(settings.colorMode);
     if (!mounted) return;
     setState(() => _settings = settings);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const _GateLoading();
+    if (_loading) return _GateLoading();
     if (_error != null) {
       return _GateError(error: _error!, onRetry: _load);
     }
@@ -85,11 +90,11 @@ class _StartupGateState extends State<StartupGate> {
 }
 
 class _GateLoading extends StatelessWidget {
-  const _GateLoading();
+  _GateLoading();
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.backgroundTop,
       body: Center(
         child: SizedBox(
@@ -103,7 +108,7 @@ class _GateLoading extends StatelessWidget {
 }
 
 class _GateError extends StatelessWidget {
-  const _GateError({required this.error, required this.onRetry});
+  _GateError({required this.error, required this.onRetry});
 
   final Object error;
   final Future<void> Function() onRetry;
@@ -114,17 +119,17 @@ class _GateError extends StatelessWidget {
       backgroundColor: AppColors.backgroundTop,
       body: Center(
         child: Padding(
-          padding: const EdgeInsets.all(28),
+          padding: EdgeInsets.all(28),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.error_outline_rounded,
                 color: AppColors.coral,
                 size: 34,
               ),
-              const SizedBox(height: 12),
-              const Text(
+              SizedBox(height: 12),
+              Text(
                 '初始化失败',
                 style: TextStyle(
                   color: AppColors.text,
@@ -132,20 +137,20 @@ class _GateError extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 error.toString(),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.muted,
                   fontSize: 11,
                   height: 1.5,
                 ),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               FilledButton(
                 onPressed: () => onRetry(),
-                child: const Text('重试'),
+                child: Text('重试'),
               ),
             ],
           ),

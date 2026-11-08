@@ -5,10 +5,10 @@ import 'package:flutter/services.dart';
 
 import 'chat_attachment.dart';
 
-const MethodChannel _filesChannel = MethodChannel('chatvv/files');
+MethodChannel _filesChannel = MethodChannel('chatvv/files');
 
 class PickedModelFile {
-  const PickedModelFile({required this.name, required this.bytes});
+  PickedModelFile({required this.name, required this.bytes});
 
   final String name;
   final Uint8List bytes;
@@ -33,7 +33,7 @@ Future<PickedModelFile?> pickRiveFile() async {
   if (Platform.isLinux) {
     final which = await Process.run('sh', ['-c', 'command -v zenity']);
     if (which.exitCode != 0) {
-      throw const FileSystemException('缺少 zenity，无法打开文件选择器');
+      throw FileSystemException('缺少 zenity，无法打开文件选择器');
     }
     final result = await Process.run('zenity', [
       '--file-selection',
@@ -50,7 +50,7 @@ Future<PickedModelFile?> pickRiveFile() async {
   }
 
   if (Platform.isWindows) {
-    const script = r'''
+    final script = r'''
 Add-Type -AssemblyName System.Windows.Forms
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Filter = "Rive, SVG or Live2D zip|*.riv;*.svg;*.zip|All files|*.*"
@@ -72,10 +72,10 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     );
   }
 
-  throw const FileSystemException('当前平台暂不支持模型导入');
+  throw FileSystemException('当前平台暂不支持模型导入');
 }
-const int _maxFileBytes = 256 * 1024;
-const int _maxTotalBytes = 1024 * 1024;
+int _maxFileBytes = 256 * 1024;
+int _maxTotalBytes = 1024 * 1024;
 
 /// Native file selection without a plugin: Android uses ACTION_OPEN_DOCUMENT,
 /// Linux uses zenity, Windows uses the WinForms OpenFileDialog.
@@ -88,7 +88,7 @@ Future<List<ChatAttachment>> pickTextFiles() async {
   } else if (Platform.isWindows) {
     picked = await _pickWindows();
   } else {
-    throw const FileSystemException('当前平台暂不支持文件选择');
+    throw FileSystemException('当前平台暂不支持文件选择');
   }
 
   final result = <ChatAttachment>[];
@@ -121,7 +121,7 @@ Future<List<ChatAttachment>> _pickAndroid() async {
 Future<List<ChatAttachment>> _pickLinux() async {
   final which = await Process.run('sh', ['-c', 'command -v zenity']);
   if (which.exitCode != 0) {
-    throw const FileSystemException('缺少 zenity，无法打开文件选择器');
+    throw FileSystemException('缺少 zenity，无法打开文件选择器');
   }
   final result = await Process.run('zenity', [
     '--file-selection',
@@ -138,7 +138,7 @@ Future<List<ChatAttachment>> _pickLinux() async {
 }
 
 Future<List<ChatAttachment>> _pickWindows() async {
-  const script = r'''
+  final script = r'''
 Add-Type -AssemblyName System.Windows.Forms
 $dialog = New-Object System.Windows.Forms.OpenFileDialog
 $dialog.Multiselect = $true

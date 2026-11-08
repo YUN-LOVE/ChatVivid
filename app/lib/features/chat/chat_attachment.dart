@@ -1,5 +1,5 @@
 class ChatAttachment {
-  const ChatAttachment({
+  ChatAttachment({
     required this.name,
     required this.content,
     required this.bytes,
