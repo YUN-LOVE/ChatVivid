@@ -1,4 +1,0 @@
-/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/.cxx/Debug/602o6v2m/x86_64/CMakeFiles/CubismFramework.dir
-/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/.cxx/Debug/602o6v2m/x86_64/CMakeFiles/flutter_live2d.dir
-/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/.cxx/Debug/602o6v2m/x86_64/CMakeFiles/edit_cache.dir
-/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/.cxx/Debug/602o6v2m/x86_64/CMakeFiles/rebuild_cache.dir
