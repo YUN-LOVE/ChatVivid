@@ -145,8 +145,13 @@ class _Live2DStageState extends State<Live2DStage> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        if (!_loaded && widget.fallback != null) widget.fallback!,
-        Live2DView(controller: _controller),
+        // Keep the platform view at a stable index. Do not put a conditional
+        // fallback sibling in front of it: changing the child list after the
+        // model loads recreates/detaches the native view.
+        Live2DView(
+          key: const ValueKey('chatvv-live2d-view'),
+          controller: _controller,
+        ),
         if (!_loaded)
           Center(
             child: SizedBox(
