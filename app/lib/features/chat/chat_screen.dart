@@ -332,7 +332,9 @@ class _ChatScreenState extends State<ChatScreen>
       );
     }
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      // The stage must not resize when the soft keyboard opens. The composer
+      // is lifted manually below using MediaQuery.viewInsets.
+      resizeToAvoidBottomInset: false,
       backgroundColor: AppColors.backgroundTop,
       body: Stack(
         fit: StackFit.expand,
@@ -379,7 +381,7 @@ class _ChatScreenState extends State<ChatScreen>
             Positioned(
               left: 12,
               right: 12,
-              bottom: 0,
+              bottom: MediaQuery.of(context).viewInsets.bottom,
               child: SafeArea(
                 top: false,
                 child: Column(
