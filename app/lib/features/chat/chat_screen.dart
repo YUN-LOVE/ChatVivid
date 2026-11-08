@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:ui';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../data/app_settings.dart';
 import '../../data/backend_factory.dart';
@@ -30,7 +32,8 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
+class _ChatScreenState extends State<ChatScreen>
+    with TickerProviderStateMixin {
   ChatController? _chat;
   final TextEditingController _input = TextEditingController();
   final ScrollController _scroll = ScrollController();
@@ -40,10 +43,23 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _loading = true;
   String? _lastId;
   int _lastLength = 0;
+  late final AnimationController _drawer = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+  );
+  late final AnimationController _livePulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+  bool _historyOpen = false;
+  bool _captionCollapsed = false;
+  bool _liveMode = false;
+  bool _voiceActive = false;
 
   @override
   void initState() {
     super.initState();
+    HardwareKeyboard.instance.addHandler(_onHardwareKey);
     unawaited(_bootstrap());
   }
 
@@ -173,8 +189,83 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  bool _onHardwareKey(KeyEvent event) {
+    if (event.logicalKey == LogicalKeyboardKey.escape) {
+      if (_voiceActive) {
+        _stopVoice();
+        return true;
+      }
+      if (_liveMode) {
+        _setLive(false);
+        return true;
+      }
+      if (_historyOpen) {
+        _closeHistory();
+        return true;
+      }
+    }
+    if (event.logicalKey == LogicalKeyboardKey.enter &&
+        event is KeyDownEvent &&
+        !_focus.hasFocus &&
+        !_liveMode &&
+        !_voiceActive) {
+      _setLive(true);
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.space &&
+        event is KeyDownEvent &&
+        !_focus.hasFocus &&
+        !_liveMode &&
+        !_voiceActive) {
+      _startVoice();
+      return true;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.space &&
+        event is KeyUpEvent &&
+        _voiceActive) {
+      _stopVoice();
+      return true;
+    }
+    return false;
+  }
+
+  void _openHistory() {
+    if (_historyOpen) return;
+    setState(() => _historyOpen = true);
+    _drawer.forward();
+  }
+
+  Future<void> _closeHistory() async {
+    await _drawer.reverse();
+    if (mounted) setState(() => _historyOpen = false);
+  }
+
+  void _setLive(bool value) {
+    if (_liveMode == value) return;
+    setState(() => _liveMode = value);
+    if (value) {
+      _livePulse.repeat();
+    } else {
+      _livePulse.stop();
+    }
+  }
+
+  void _startVoice() {
+    if (_voiceActive || _liveMode) return;
+    setState(() => _voiceActive = true);
+    _showMessage('语音输入已开启：X-ASR / Whisper 模型接入中');
+  }
+
+  void _stopVoice() {
+    if (!_voiceActive) return;
+    setState(() => _voiceActive = false);
+  }
+
   @override
   void dispose() {
+    HardwareKeyboard.instance.removeHandler(_onHardwareKey);
+    _drawer.dispose();
+    _livePulse.dispose();
     final chat = _chat;
     if (chat != null) {
       chat.removeListener(_onChatChanged);
@@ -184,6 +275,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _scroll.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  String _latestLine() {
+    final chat = _chat;
+    if (chat == null) return '';
+    for (final message in chat.messages.reversed) {
+      if (message.isUser) continue;
+      final text = message.content
+          .replaceAll(RegExp(r'[*_`#>]'), '')
+          .replaceAll(RegExp(r'\s+'), ' ')
+          .trim();
+      if (text.isNotEmpty) return text;
+    }
+    return '大肥鱼正在等你开口。';
   }
 
   @override
@@ -196,56 +301,90 @@ class _ChatScreenState extends State<ChatScreen> {
         onRetry: _bootstrap,
       );
     }
-    final media = MediaQuery.of(context);
-    final keyboard = media.viewInsets.bottom > 0;
-    final stageHeight = keyboard
-        ? 0.0
-        : math.min(320.0, math.max(220.0, media.size.height * 0.30));
-
     return Scaffold(
       resizeToAvoidBottomInset: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.backgroundTop,
       body: Stack(
+        fit: StackFit.expand,
         children: [
-          const _DeepSeaBackground(),
-          SafeArea(
-            bottom: false,
-            child: Column(
-              children: [
-                _TopBar(chat: chat, onSettings: _openSettings),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  height: stageHeight,
-                  child: stageHeight > 0
-                      ? CharacterStage(
-                          customRivePath: widget.settings.characterRivePath,
-                          characterMode: widget.settings.characterMode,
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                Expanded(
-                  child: _ChatSurface(
-                    chat: chat,
-                    scroll: _scroll,
-                  ),
-                ),
-                AnimatedBuilder(
-                  animation: chat,
-                  builder: (context, _) => _Composer(
-                    chat: chat,
-                    controller: _input,
-                    focus: _focus,
-                    attachments: _attachments,
-                    onAttach: _pickFiles,
-                    onRemoveAttachment: _removeAttachment,
-                    onSend: _send,
-                    onStop: chat.stop,
-                  ),
-                ),
-              ],
+          Positioned.fill(
+            child: CharacterStage(
+              customRivePath: widget.settings.characterRivePath,
+              characterMode: widget.settings.characterMode,
             ),
           ),
+          if (!_historyOpen)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 0,
+              child: SafeArea(
+                bottom: false,
+                child: _StageTopBar(
+                  chat: chat,
+                  onSettings: _openSettings,
+                  onOpenHistory: _openHistory,
+                  onEyeTap: () => _showMessage('YOLO 视觉识别即将接入'),
+                ),
+              ),
+            ),
+          Positioned.fill(
+            child: IgnorePointer(
+              ignoring: !_historyOpen,
+              child: _HistoryDrawer(
+                animation: _drawer,
+                chat: chat,
+                scroll: _scroll,
+                onClose: _closeHistory,
+              ),
+            ),
+          ),
+          if (!_historyOpen)
+            Positioned(
+              left: 12,
+              right: 12,
+              bottom: 0,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedBuilder(
+                      animation: chat,
+                      builder: (context, _) => _DialogueCard(
+                        text: _latestLine(),
+                        collapsed: _captionCollapsed,
+                        onToggle: () => setState(
+                          () => _captionCollapsed = !_captionCollapsed,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    AnimatedBuilder(
+                      animation: chat,
+                      builder: (context, _) => _Composer(
+                        chat: chat,
+                        controller: _input,
+                        focus: _focus,
+                        attachments: _attachments,
+                        live: _liveMode,
+                        voice: _voiceActive,
+                        pulse: _livePulse,
+                        onAttach: _pickFiles,
+                        onRemoveAttachment: _removeAttachment,
+                        onSend: _send,
+                        onStop: chat.stop,
+                        onEnterLive: () => _setLive(true),
+                        onExitLive: () => _setLive(false),
+                        onVoiceStart: _startVoice,
+                        onVoiceEnd: _stopVoice,
+                        onLongPressSend: () => _setLive(true),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -327,76 +466,6 @@ class _BootstrapScreen extends StatelessWidget {
   }
 }
 
-class _TopBar extends StatelessWidget {
-  const _TopBar({required this.chat, required this.onSettings});
-
-  final ChatController chat;
-  final VoidCallback onSettings;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
-      child: GlassPanel(
-        radius: 24,
-        blur: 18,
-        padding: const EdgeInsets.fromLTRB(12, 8, 6, 8),
-        child: ListenableBuilder(
-          listenable: chat,
-          builder: (context, _) {
-            return Row(
-              children: [
-                CircleAvatar(
-                  radius: 18,
-                  backgroundColor: AppColors.surfaceHigh,
-                  backgroundImage:
-                      const AssetImage('assets/mascot/avatar.png'),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '大肥鱼',
-                        style: TextStyle(
-                          color: AppColors.text,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.4,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        chat.backendLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.muted.withValues(alpha: 0.72),
-                          fontSize: 9,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _StatusDot(online: chat.online),
-                const SizedBox(width: 4),
-                IconButton(
-                  onPressed: onSettings,
-                  tooltip: '连接设置',
-                  visualDensity: VisualDensity.compact,
-                  icon: const Icon(Icons.tune_rounded, size: 19),
-                ),
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
 class _StatusDot extends StatelessWidget {
   const _StatusDot({required this.online});
 
@@ -432,6 +501,294 @@ class _StatusDot extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _StageTopBar extends StatelessWidget {
+  const _StageTopBar({
+    required this.chat,
+    required this.onSettings,
+    required this.onOpenHistory,
+    required this.onEyeTap,
+  });
+
+  final ChatController chat;
+  final VoidCallback onSettings;
+  final VoidCallback onOpenHistory;
+  final VoidCallback onEyeTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragUpdate: (details) {
+        if (details.delta.dy > 2.5) onOpenHistory();
+      },
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            height: 66,
+            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+            decoration: BoxDecoration(
+              color: AppColors.glass.withValues(alpha: 0.78),
+              border: Border(
+                bottom: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
+              ),
+            ),
+            child: ListenableBuilder(
+              listenable: chat,
+              builder: (context, _) => Row(
+                children: [
+                  IconButton(
+                    onPressed: onEyeTap,
+                    tooltip: 'YOLO 视觉（即将接入）',
+                    icon: const Icon(Icons.visibility_outlined, size: 21),
+                  ),
+                  Expanded(
+                    child: GestureDetector(
+                      onVerticalDragUpdate: (details) {
+                        if (details.delta.dy > 2.5) onOpenHistory();
+                      },
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text(
+                            '大肥鱼',
+                            style: TextStyle(
+                              color: AppColors.text,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${chat.backendLabel}  ·  下拉查看记忆',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: AppColors.muted.withValues(alpha: 0.66),
+                              fontSize: 8,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  _StatusDot(online: chat.online),
+                  IconButton(
+                    onPressed: onSettings,
+                    tooltip: '设置',
+                    icon: const Icon(Icons.tune_rounded, size: 20),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryDrawer extends StatelessWidget {
+  const _HistoryDrawer({
+    required this.animation,
+    required this.chat,
+    required this.scroll,
+    required this.onClose,
+  });
+
+  final Animation<double> animation;
+  final ChatController chat;
+  final ScrollController scroll;
+  final Future<void> Function() onClose;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final t = Curves.easeOutCubic.transform(animation.value);
+        return Opacity(
+          opacity: t,
+          child: Transform.scale(
+            alignment: Alignment.topCenter,
+            scaleX: 0.93 + 0.07 * t,
+            scaleY: 0.86 + 0.14 * t,
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xF2101A30), Color(0xFA070D19)],
+          ),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 10, 10, 8),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.25),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Text(
+                      '历史对话',
+                      style: TextStyle(
+                        color: AppColors.text,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: onClose,
+                      tooltip: '关闭',
+                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(child: _ChatSurface(chat: chat, scroll: scroll)),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragUpdate: (details) {
+                  if (details.delta.dy < -3) onClose();
+                },
+                child: Container(
+                  height: 54,
+                  alignment: Alignment.center,
+                  color: Colors.black.withValues(alpha: 0.18),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.swipe_up_rounded,
+                        size: 16,
+                        color: AppColors.muted.withValues(alpha: 0.7),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '上滑关闭',
+                        style: TextStyle(
+                          color: AppColors.muted.withValues(alpha: 0.65),
+                          fontSize: 10,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogueCard extends StatelessWidget {
+  const _DialogueCard({
+    required this.text,
+    required this.collapsed,
+    required this.onToggle,
+  });
+
+  final String text;
+  final bool collapsed;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      height: collapsed ? 28 : 82,
+      child: GlassPanel(
+        radius: 16,
+        blur: 18,
+        padding: EdgeInsets.zero,
+        child: Column(
+          children: [
+            GestureDetector(
+              onTap: onToggle,
+              behavior: HitTestBehavior.opaque,
+              child: SizedBox(
+                height: 26,
+                child: Row(
+                  children: [
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 3,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '大肥鱼',
+                      style: TextStyle(
+                        color: AppColors.primary.withValues(alpha: 0.9),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const Spacer(),
+                    Icon(
+                      collapsed
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 17,
+                      color: AppColors.muted,
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                ),
+              ),
+            ),
+            if (!collapsed)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                  child: Align(
+                    alignment: Alignment.topLeft,
+                    child: Text(
+                      text,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.onPrimaryContainer,
+                        fontSize: 12.5,
+                        height: 1.55,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -681,139 +1038,357 @@ class _Composer extends StatelessWidget {
     required this.controller,
     required this.focus,
     required this.attachments,
+    required this.live,
+    required this.voice,
+    required this.pulse,
     required this.onAttach,
     required this.onRemoveAttachment,
     required this.onSend,
     required this.onStop,
+    required this.onEnterLive,
+    required this.onExitLive,
+    required this.onVoiceStart,
+    required this.onVoiceEnd,
+    required this.onLongPressSend,
   });
 
   final ChatController chat;
   final TextEditingController controller;
   final FocusNode focus;
   final List<ChatAttachment> attachments;
+  final bool live;
+  final bool voice;
+  final AnimationController pulse;
   final VoidCallback onAttach;
   final ValueChanged<int> onRemoveAttachment;
   final VoidCallback onSend;
   final VoidCallback onStop;
+  final VoidCallback onEnterLive;
+  final VoidCallback onExitLive;
+  final VoidCallback onVoiceStart;
+  final VoidCallback onVoiceEnd;
+  final VoidCallback onLongPressSend;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
-      child: SafeArea(
-        top: false,
-        child: GlassPanel(
-          radius: 28,
-          blur: 20,
-          padding: const EdgeInsets.fromLTRB(8, 6, 6, 2),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (attachments.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 2),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: AnimatedBuilder(
+          animation: pulse,
+          builder: (context, _) {
+            return Stack(
+              children: [
+                GlassPanel(
+                  radius: 28,
+                  blur: 24,
+                  padding: const EdgeInsets.fromLTRB(8, 6, 6, 2),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      for (var i = 0; i < attachments.length; i++)
-                        InputChip(
-                          label: Text(
-                            attachments[i].name,
-                            overflow: TextOverflow.ellipsis,
+                      if (!live && attachments.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                          child: Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              for (var i = 0; i < attachments.length; i++)
+                                InputChip(
+                                  label: Text(
+                                    attachments[i].name,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  onDeleted: () => onRemoveAttachment(i),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                            ],
                           ),
-                          onDeleted: () => onRemoveAttachment(i),
-                          visualDensity: VisualDensity.compact,
                         ),
+                      Row(
+                        children: [
+                          AnimatedRotation(
+                            turns: live ? 0.125 : 0,
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutBack,
+                            child: IconButton(
+                              onPressed: live ? onExitLive : onAttach,
+                              tooltip: live ? '退出 Live' : '添加文件',
+                              visualDensity: VisualDensity.compact,
+                              icon: const Icon(Icons.add_rounded, size: 20),
+                            ),
+                          ),
+                          Expanded(
+                            child: live
+                                ? _LiveBody(pulse: pulse)
+                                : voice
+                                    ? _VoiceBody(pulse: pulse)
+                                    : GestureDetector(
+                                        behavior: HitTestBehavior.translucent,
+                                        onLongPressStart: (_) => onVoiceStart(),
+                                        onLongPressEnd: (_) => onVoiceEnd(),
+                                        child: TextField(
+                                          controller: controller,
+                                          focusNode: focus,
+                                          minLines: 1,
+                                          maxLines: 5,
+                                          textInputAction: TextInputAction.send,
+                                          onSubmitted: (_) => onLongPressSend(),
+                                          style: const TextStyle(
+                                            color: AppColors.text,
+                                            fontSize: 14.5,
+                                            height: 1.45,
+                                          ),
+                                          decoration: const InputDecoration(
+                                            hintText: '说点什么…',
+                                            border: InputBorder.none,
+                                            isDense: true,
+                                            contentPadding: EdgeInsets.symmetric(
+                                              vertical: 10,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                          ),
+                          const SizedBox(width: 4),
+                          if (!live)
+                            ValueListenableBuilder<TextEditingValue>(
+                              valueListenable: controller,
+                              builder: (context, value, _) {
+                                final canSend =
+                                    (value.text.trim().isNotEmpty ||
+                                            attachments.isNotEmpty) &&
+                                        !chat.busy;
+                                return GestureDetector(
+                                  onLongPress: chat.busy ? null : onLongPressSend,
+                                  child: AnimatedSwitcher(
+                                    duration: const Duration(milliseconds: 160),
+                                    child: chat.busy
+                                        ? IconButton.filled(
+                                            key: const ValueKey('stop'),
+                                            onPressed: onStop,
+                                            tooltip: '停止',
+                                            icon: const Icon(
+                                              Icons.stop_rounded,
+                                              size: 20,
+                                            ),
+                                          )
+                                        : IconButton.filled(
+                                            key: const ValueKey('send'),
+                                            onPressed: canSend ? onSend : null,
+                                            tooltip: '发送 · 长按 Live',
+                                            icon: const Icon(
+                                              Icons.arrow_upward_rounded,
+                                              size: 20,
+                                            ),
+                                          ),
+                                  ),
+                                );
+                              },
+                            )
+                          else
+                            Padding(
+                              padding: const EdgeInsets.only(right: 10),
+                              child: Text(
+                                'LIVE',
+                                style: TextStyle(
+                                  color: AppColors.primary.withValues(alpha: 0.85),
+                                  fontSize: 9,
+                                  letterSpacing: 2,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: onAttach,
-                    tooltip: '添加文件',
-                    visualDensity: VisualDensity.compact,
-                    icon: const Icon(Icons.add_rounded, size: 20),
-                  ),
-                  Expanded(
-                    child: TextField(
-                      controller: controller,
-                      focusNode: focus,
-                      minLines: 1,
-                      maxLines: 5,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => onSend(),
-                      style: const TextStyle(
-                        color: AppColors.text,
-                        fontSize: 14.5,
-                        height: 1.45,
-                      ),
-                      decoration: const InputDecoration(
-                        hintText: '说点什么…',
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.symmetric(vertical: 10),
+                if (live)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: CustomPaint(
+                        painter: _LiveBeamPainter(progress: pulse.value),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: controller,
-                    builder: (context, value, _) {
-                      final canSend =
-                          (value.text.trim().isNotEmpty ||
-                                  attachments.isNotEmpty) &&
-                              !chat.busy;
-                      return AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 160),
-                        child: chat.busy
-                            ? IconButton.filled(
-                                key: const ValueKey('stop'),
-                                onPressed: onStop,
-                                tooltip: '停止',
-                                icon: const Icon(Icons.stop_rounded, size: 20),
-                              )
-                            : IconButton.filled(
-                                key: const ValueKey('send'),
-                                onPressed: canSend ? onSend : null,
-                                tooltip: '发送',
-                                icon: const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  size: 20,
-                                ),
-                              ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _DeepSeaBackground extends StatelessWidget {
-  const _DeepSeaBackground();
+class _LiveBody extends StatelessWidget {
+  const _LiveBody({required this.pulse});
+
+  final AnimationController pulse;
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppColors.backgroundTop,
-            AppColors.backgroundMid,
-            AppColors.surface,
-          ],
-          stops: [0, 0.52, 1],
+    return Row(
+      children: [
+        const SizedBox(width: 12),
+        _Waveform(pulse: pulse, bars: 13, color: AppColors.primary),
+        const SizedBox(width: 10),
+        Text(
+          '正在听…',
+          style: TextStyle(
+            color: AppColors.primary.withValues(alpha: 0.8),
+            fontSize: 11,
+            letterSpacing: 0.8,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VoiceBody extends StatelessWidget {
+  const _VoiceBody({required this.pulse});
+
+  final AnimationController pulse;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(width: 12),
+        Icon(Icons.mic_rounded, size: 17, color: AppColors.coral),
+        const SizedBox(width: 8),
+        _Waveform(pulse: pulse, bars: 11, color: AppColors.coral),
+        const SizedBox(width: 10),
+        Text(
+          '松开发送',
+          style: TextStyle(
+            color: AppColors.coral.withValues(alpha: 0.85),
+            fontSize: 10,
+            letterSpacing: 0.6,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _Waveform extends StatelessWidget {
+  const _Waveform({
+    required this.pulse,
+    required this.bars,
+    required this.color,
+  });
+
+  final AnimationController pulse;
+  final int bars;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: bars * 5.0,
+      height: 24,
+      child: CustomPaint(
+        painter: _WaveformPainter(
+          progress: pulse.value,
+          bars: bars,
+          color: color,
         ),
       ),
     );
   }
+}
+
+class _WaveformPainter extends CustomPainter {
+  const _WaveformPainter({
+    required this.progress,
+    required this.bars,
+    required this.color,
+  });
+
+  final double progress;
+  final int bars;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    for (var i = 0; i < bars; i++) {
+      final phase = progress * math.pi * 2 + i * 0.75;
+      final normalized = 0.25 + (math.sin(phase).abs() * 0.75);
+      final h = size.height * (0.18 + normalized * 0.7);
+      final x = i * (size.width / bars) + 2;
+      canvas.drawLine(
+        Offset(x, (size.height - h) / 2),
+        Offset(x, (size.height + h) / 2),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _WaveformPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.color != color;
+}
+
+class _LiveBeamPainter extends CustomPainter {
+  const _LiveBeamPainter({required this.progress});
+
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width * 0.42, size.height * 0.52);
+    final right = Offset(size.width - 30, size.height * 0.50);
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..shader = LinearGradient(
+        colors: [
+          AppColors.primary.withValues(alpha: 0),
+          AppColors.primary.withValues(alpha: 0.75),
+        ],
+      ).createShader(Rect.fromPoints(center, right));
+    for (final dy in [-9.0, 9.0]) {
+      final path = Path()
+        ..moveTo(right.dx, right.dy + dy)
+        ..quadraticBezierTo(
+          size.width * 0.74,
+          size.height * 0.5 + dy * 1.7,
+          center.dx,
+          center.dy,
+        );
+      canvas.drawPath(path, paint);
+    }
+    final ripple = (size.width * 0.68) * ((progress * 1.4) % 1.0);
+    final fade = (1 - ripple / (size.width * 0.68)).clamp(0.0, 1.0);
+    canvas.drawCircle(
+      center,
+      ripple,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            AppColors.primary.withValues(alpha: 0.16 * fade),
+            AppColors.primary.withValues(alpha: 0),
+          ],
+        ).createShader(Rect.fromCircle(center: center, radius: ripple)),
+    );
+    canvas.drawCircle(
+      center,
+      ripple,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = AppColors.primary.withValues(alpha: 0.45 * fade),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _LiveBeamPainter oldDelegate) =>
+      oldDelegate.progress != progress;
 }
