@@ -40,6 +40,7 @@ class DialogService {
 
  private:
   void run(std::string id, BuiltContext ctx, std::string model,
+           std::string user_text,
            std::shared_ptr<std::atomic<bool>> cancel);
 
   const Config& cfg_;

@@ -16,7 +16,6 @@ class MemoryArchivePane extends StatefulWidget {
 
 class _MemoryArchivePaneState extends State<MemoryArchivePane> {
   final TextEditingController _query = TextEditingController();
-  final TextEditingController _keepRecent = TextEditingController(text: '20');
   List<MemoryEntry> _memories = [];
   bool _loading = true;
   bool _busy = false;
@@ -31,7 +30,6 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
   @override
   void dispose() {
     _query.dispose();
-    _keepRecent.dispose();
     super.dispose();
   }
 
@@ -56,59 +54,6 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
         _error = error.toString();
         _loading = false;
       });
-    }
-  }
-
-  Future<void> _archive() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final keep = int.tryParse(_keepRecent.text) ?? 20;
-      final result = await widget.backend.archive(keepRecent: keep);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.memories.isNotEmpty
-                ? '已归档 ${result.archivedMessages} 条消息，生成 ${result.memories.length} 条记忆'
-                : '没有可归档的旧消息',
-          ),
-        ),
-      );
-      await _load();
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('归档失败：$error')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _saveContext() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      final result = await widget.backend.saveContext();
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            result.memories.isNotEmpty
-                ? '已存入 ${result.memories.length} 条记忆（${result.archivedMessages} 条消息），上下文已清空'
-                : '上下文已清空',
-          ),
-        ),
-      );
-      await _load();
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('保存上下文失败：$error')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
     }
   }
 
@@ -146,18 +91,6 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
       );
     } finally {
       if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _delete(MemoryEntry memory) async {
-    try {
-      await widget.backend.deleteMemory(memory.id);
-      await _load();
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('删除失败：$error')),
-      );
     }
   }
 
@@ -229,58 +162,25 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
         SizedBox(height: 12),
         Row(
           children: [
-            SizedBox(
-              width: 82,
-              child: TextField(
-                controller: _keepRecent,
-                keyboardType: TextInputType.number,
-                style: TextStyle(color: AppColors.text, fontSize: 12),
-                decoration: InputDecoration(
-                  labelText: '保留',
-                  labelStyle: TextStyle(
-                    color: AppColors.muted,
-                    fontSize: 10,
-                  ),
-                  isDense: true,
-                  filled: true,
-                  fillColor: AppColors.surfaceHigh.withValues(alpha: 0.4),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  contentPadding: EdgeInsets.fromLTRB(10, 8, 10, 8),
-                ),
-              ),
-            ),
-            SizedBox(width: 10),
             Text(
               '${_memories.length} 条记忆',
               style: TextStyle(color: AppColors.muted, fontSize: 11),
             ),
             Spacer(),
-            FilledButton.tonalIcon(
-              onPressed: _busy ? null : _archive,
-              icon: Icon(Icons.archive_outlined, size: 18),
-              label: Text(_busy ? '归档中…' : '归档'),
+            Text(
+              '每轮自动保存 · 只读',
+              style: TextStyle(
+                color: AppColors.primary.withValues(alpha: 0.75),
+                fontSize: 10,
+              ),
             ),
           ],
         ),
         SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _saveContext,
-              icon: Icon(Icons.move_to_inbox_outlined, size: 17),
-              label: Text('存入记忆并清空'),
-            ),
-            OutlinedButton.icon(
-              onPressed: _busy ? null : _clearContext,
-              icon: Icon(Icons.delete_sweep_outlined, size: 17),
-              label: Text('清除上下文'),
-            ),
-          ],
+        OutlinedButton.icon(
+          onPressed: _busy ? null : _clearContext,
+          icon: Icon(Icons.delete_sweep_outlined, size: 17),
+          label: Text('清除上下文'),
         ),
         SizedBox(height: 12),
         if (_loading)
@@ -350,10 +250,6 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
                             ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        onPressed: () => _delete(memory),
-                        icon: Icon(Icons.delete_outline_rounded, size: 18),
                       ),
                     ],
                   ),
