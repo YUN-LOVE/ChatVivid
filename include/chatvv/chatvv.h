@@ -81,6 +81,11 @@ CHATVV_API char* chatvv_history(chatvv_engine* engine, int32_t limit,
 CHATVV_API char* chatvv_capabilities(chatvv_engine* engine,
                                      char** error_json);
 
+/* Synthesize text to an MP3 file with Edge TTS. Returns 0 on success. */
+CHATVV_API int32_t chatvv_tts_synthesize(const char* text, const char* voice,
+                                          const char* output_path,
+                                          char** error_json);
+
 /* Memory archive. JSON arrays/objects; free with chatvv_free(). */
 CHATVV_API char* chatvv_memories(chatvv_engine* engine, int32_t limit,
                                  const char* query, char** error_json);

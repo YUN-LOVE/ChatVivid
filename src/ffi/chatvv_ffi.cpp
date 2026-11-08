@@ -23,6 +23,7 @@
 #include "dialog/response_hub.h"
 #include "llm/provider.h"
 #include "memory/embedding.h"
+#include "tts/edge_tts.h"
 #include "store/db.h"
 #include "util/log.h"
 
@@ -265,6 +266,23 @@ char* start_turn(chatvv_engine* engine, const char* text,
 }  // namespace
 
 extern "C" {
+
+CHATVV_API int32_t chatvv_tts_synthesize(const char* text, const char* voice,
+                                          const char* output_path,
+                                          char** error_json) {
+  if (!text || !*text || !output_path || !*output_path) {
+    set_error(error_json, "invalid_argument", "text/output_path is required");
+    return 1;
+  }
+  const auto result = chatvv::EdgeTtsSynthesize(
+      text, (voice && *voice) ? voice : "zh-CN-XiaoxiaoNeural", output_path);
+  if (!result.ok) {
+    set_error(error_json, "tts_failed", result.error);
+    return 1;
+  }
+  return 0;
+}
+
 
 chatvv_engine* chatvv_create(const char* config_json, char** error_json) {
   if (error_json) *error_json = nullptr;

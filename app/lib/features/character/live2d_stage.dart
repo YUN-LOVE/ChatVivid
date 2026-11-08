@@ -56,10 +56,12 @@ class _Live2DStageState extends State<Live2DStage> {
         // The platform view can attach before its GL surface has a size;
         // loadModel is deliberately rejected by the native side in that case.
         for (var attempt = 0; attempt < 6 && !ok; attempt++) {
-          ok = await _controller.loadModel(
-            modelDir: widget.modelDir,
-            modelFileName: widget.modelFile,
-          );
+          ok = await _controller
+              .loadModel(
+                modelDir: widget.modelDir,
+                modelFileName: widget.modelFile,
+              )
+              .timeout(const Duration(seconds: 6), onTimeout: () => false);
           if (!ok) {
             await Future<void>.delayed(Duration(milliseconds: 220));
           }
