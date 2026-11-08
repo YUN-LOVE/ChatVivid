@@ -40,6 +40,8 @@ class _Live2DStageState extends State<Live2DStage> {
   final Live2DViewController _controller = Live2DViewController();
   Timer? _blinkTimer;
   Timer? _mouthTimer;
+  Timer? _tailTimer;
+  Timer? _drawTimer;
   bool _loaded = false;
   bool _failed = false;
   bool _blinking = false;
@@ -71,6 +73,8 @@ class _Live2DStageState extends State<Live2DStage> {
           await _controller.startMotion(group: 'idle', priority: 1);
           _startBlink();
           _startMouth();
+          _startTail();
+          _syncSpeakingMotion();
         }
       } catch (error) {
         debugPrint('Live2D load failed: $error');
@@ -84,6 +88,7 @@ class _Live2DStageState extends State<Live2DStage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.speaking != widget.speaking && _loaded) {
       _startMouth();
+      _syncSpeakingMotion();
     }
   }
 
@@ -108,6 +113,43 @@ class _Live2DStageState extends State<Live2DStage> {
       } finally {
         _blinking = false;
       }
+    });
+  }
+
+  void _syncSpeakingMotion() {
+    _drawTimer?.cancel();
+    if (!_loaded) return;
+    if (widget.speaking) {
+      _controller
+          .startMotion(group: 'idle', priority: 2)
+          .catchError((_) {});
+      _drawTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+        if (!_loaded || !widget.speaking) return;
+        _controller
+            .startMotion(group: 'idle', priority: 2)
+            .catchError((_) {});
+      });
+    } else {
+      _controller.startMotion(group: 'idle', priority: 1).catchError((_) {});
+    }
+  }
+
+  void _startTail() {
+    _tailTimer?.cancel();
+    _tailTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+      if (!_loaded) return;
+      final phase = DateTime.now().millisecondsSinceEpoch / 850.0;
+      final sway = math.sin(phase);
+      // Tail_2 bends the whale tail; small values keep the idle silhouette.
+      _controller
+          .setParameter('Param10', 0.5 + sway * 0.22)
+          .catchError((_) {});
+      _controller
+          .setParameter('Param_Angle_Rotation_1_B_tail3', 0.5 + sway * 0.18)
+          .catchError((_) {});
+      _controller
+          .setParameter('Param_Angle_Rotation_2_B_tail3', 0.5 + sway * 0.14)
+          .catchError((_) {});
     });
   }
 
@@ -136,6 +178,8 @@ class _Live2DStageState extends State<Live2DStage> {
   void dispose() {
     _blinkTimer?.cancel();
     _mouthTimer?.cancel();
+    _tailTimer?.cancel();
+    _drawTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }

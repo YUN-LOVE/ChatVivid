@@ -786,14 +786,33 @@ class _DialogueCard extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(14, 0, 14, 10),
                   child: Align(
                     alignment: Alignment.topLeft,
-                    child: Text(
-                      text,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppColors.onPrimaryContainer,
-                        fontSize: 12.5,
-                        height: 1.55,
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (rect) => LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          AppColors.onPrimaryContainer.withValues(alpha: 0.18),
+                          AppColors.onPrimaryContainer,
+                          AppColors.onPrimaryContainer,
+                        ],
+                        stops: const [0.0, 0.16, 1.0],
+                      ).createShader(rect),
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: speaking ? 0.35 : 0.18,
+                          sigmaY: speaking ? 0.35 : 0.18,
+                        ),
+                        child: Text(
+                          text,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: AppColors.onPrimaryContainer,
+                            fontSize: 12.5,
+                            height: 1.55,
+                          ),
+                        ),
                       ),
                     ),
                   ),

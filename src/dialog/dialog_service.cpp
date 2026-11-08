@@ -5,6 +5,7 @@
 #include "app/config.h"
 #include "dialog/response_hub.h"
 #include "llm/provider.h"
+#include "memory/embedding.h"
 #include "store/db.h"
 #include "util/log.h"
 #include "util/ulid.h"
@@ -80,8 +81,10 @@ DialogService::StartResult DialogService::start(
     if (stopping_) throw std::runtime_error("dialog service is shutting down");
     cancels_[id] = cancel;
     threads_.emplace_back(
-        [this, id, ctx = std::move(ctx), model = cfg_.llm.model, cancel]() mutable {
-          run(std::move(id), std::move(ctx), std::move(model), std::move(cancel));
+        [this, id, ctx = std::move(ctx), model = cfg_.llm.model, cancel,
+         user_text = text]() mutable {
+          run(std::move(id), std::move(ctx), std::move(model),
+              std::move(user_text), std::move(cancel));
         });
   }
 
@@ -90,6 +93,7 @@ DialogService::StartResult DialogService::start(
 }
 
 void DialogService::run(std::string id, BuiltContext ctx, std::string model,
+                        std::string user_text,
                         std::shared_ptr<std::atomic<bool>> cancel) {
   int64_t seq = 0;
 
@@ -171,6 +175,27 @@ void DialogService::run(std::string id, BuiltContext ctx, std::string model,
     const std::string text = extract_text(result.output);
     if (!text.empty()) {
       db_.append_message("assistant", text, "", id);
+      // Every completed turn is written to long-term memory. This is not an
+      // optional archive action; the memory pane is read-only.
+      const std::string memory_text =
+          "用户: " + user_text + "\n助手: " + text;
+      try {
+        const Memory memory = db_.append_memory(memory_text, 0.65, 3);
+        if (embedding_ && embedding_->ready()) {
+          std::string embed_error;
+          const auto vector = embedding_->embed(memory_text, &embed_error);
+          if (!vector.empty()) db_.set_memory_embedding(memory.id, vector);
+          if (!embed_error.empty()) {
+            log_error("memory.embedding_failed",
+                      {{"memory_id", memory.id}, {"error", embed_error}});
+          }
+        }
+        log_info("memory.appended",
+                 {{"memory_id", memory.id}, {"turn_id", id}});
+      } catch (const std::exception& e) {
+        log_error("memory.append_failed",
+                  {{"turn_id", id}, {"error", e.what()}});
+      }
     }
     const std::string status =
         result.status == "incomplete" ? "incomplete" : "completed";
