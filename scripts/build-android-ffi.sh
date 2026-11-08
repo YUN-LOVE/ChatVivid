@@ -20,7 +20,7 @@ export ANDROID_NDK_ROOT="$NDK"
 
 if [[ ! -f "$ROOT/.vcpkg_installed/$TRIPLET/lib/libcurl.a" ]]; then
   (cd "$VCPKG" && ./vcpkg install --classic --triplet "$TRIPLET" \
-    --x-install-root="$ROOT/.vcpkg_installed" "curl[openssl]" sqlite3)
+    --x-install-root="$ROOT/.vcpkg_installed" "curl[openssl,websockets]" sqlite3)
 fi
 
 cmake --preset android-arm64
