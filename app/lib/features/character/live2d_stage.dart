@@ -195,9 +195,11 @@ class _Live2DStageState extends State<Live2DStage> {
         // Keep the platform view at a stable index. Do not put a conditional
         // fallback sibling in front of it: changing the child list after the
         // model loads recreates/detaches the native view.
-        Live2DView(
-          key: ValueKey('chatvv-live2d-view'),
-          controller: _controller,
+        IgnorePointer(
+          child: Live2DView(
+            key: ValueKey('chatvv-live2d-view'),
+            controller: _controller,
+          ),
         ),
         if (!_loaded)
           Center(
