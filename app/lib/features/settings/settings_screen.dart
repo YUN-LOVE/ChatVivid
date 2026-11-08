@@ -1044,7 +1044,9 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   Widget _appearance() {
-    final selected = _settings.colorMode;
+    // Use the live controller as the source of truth. The settings copy can
+    // lag behind while the async palette is being generated.
+    final selected = appThemeController.mode;
     return Column(
       children: [
         _SettingCard(

@@ -196,9 +196,13 @@ class _Live2DStageState extends State<Live2DStage> {
         // fallback sibling in front of it: changing the child list after the
         // model loads recreates/detaches the native view.
         IgnorePointer(
-          child: Live2DView(
-            key: ValueKey('chatvv-live2d-view'),
-            controller: _controller,
+          child: Transform.scale(
+            scale: 1.18,
+            alignment: Alignment.bottomCenter,
+            child: Live2DView(
+              key: ValueKey('chatvv-live2d-view'),
+              controller: _controller,
+            ),
           ),
         ),
         if (!_loaded)
