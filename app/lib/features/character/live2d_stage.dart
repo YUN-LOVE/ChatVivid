@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -18,7 +19,7 @@ bool get live2dSupported =>
 /// breathing and mouth motion. The Cubism core loads the .model3.json and all
 /// referenced moc3/texture/motion/physics files.
 class Live2DStage extends StatefulWidget {
-  const Live2DStage({
+  Live2DStage({
     super.key,
     this.modelDir = 'assets/live2d/whale-girl/',
     this.modelFile = 'c_0120.model3.json',
@@ -58,7 +59,7 @@ class _Live2DStageState extends State<Live2DStage> {
             modelFileName: widget.modelFile,
           );
           if (!ok) {
-            await Future<void>.delayed(const Duration(milliseconds: 220));
+            await Future<void>.delayed(Duration(milliseconds: 220));
           }
         }
         if (!mounted) return;
@@ -88,19 +89,19 @@ class _Live2DStageState extends State<Live2DStage> {
 
   void _startBlink() {
     _blinkTimer?.cancel();
-    _blinkTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
+    _blinkTimer = Timer.periodic(Duration(seconds: 4), (_) async {
       if (!_loaded || _blinking) return;
       _blinking = true;
       try {
         for (var i = 0; i < 4; i++) {
           await _controller.setParameter('ParamEyeLOpen', 0);
           await _controller.setParameter('ParamEyeROpen', 0);
-          await Future<void>.delayed(const Duration(milliseconds: 35));
+          await Future<void>.delayed(Duration(milliseconds: 35));
         }
         for (var i = 0; i < 4; i++) {
           await _controller.setParameter('ParamEyeLOpen', 1);
           await _controller.setParameter('ParamEyeROpen', 1);
-          await Future<void>.delayed(const Duration(milliseconds: 35));
+          await Future<void>.delayed(Duration(milliseconds: 35));
         }
       } catch (_) {
         // Cubism may not expose eye parameters on imported models.
@@ -116,7 +117,7 @@ class _Live2DStageState extends State<Live2DStage> {
       _setMouth(0);
       return;
     }
-    _mouthTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+    _mouthTimer = Timer.periodic(Duration(milliseconds: 90), (_) {
       if (!_loaded) return;
       _mouth = 0.15 + (math.sin(DateTime.now().millisecondsSinceEpoch / 95) + 1) * 0.36;
       _setMouth(_mouth);
@@ -141,7 +142,7 @@ class _Live2DStageState extends State<Live2DStage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_failed) return widget.fallback ?? const SizedBox.shrink();
+    if (_failed) return widget.fallback ?? SizedBox.shrink();
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -149,7 +150,7 @@ class _Live2DStageState extends State<Live2DStage> {
         // fallback sibling in front of it: changing the child list after the
         // model loads recreates/detaches the native view.
         Live2DView(
-          key: const ValueKey('chatvv-live2d-view'),
+          key: ValueKey('chatvv-live2d-view'),
           controller: _controller,
         ),
         if (!_loaded)

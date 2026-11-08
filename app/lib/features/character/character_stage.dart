@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'dart:io' as io;
 
 import 'package:flutter/material.dart';
@@ -12,7 +13,7 @@ import '../../theme/app_theme.dart';
 /// The top character stage. A local Rive animation occupies the character slot;
 /// the static mascot remains as the loading/fallback image.
 class CharacterStage extends StatefulWidget {
-  const CharacterStage({
+  CharacterStage({
     super.key,
     this.customRivePath = '',
     this.characterMode = CharacterMode.live2d,
@@ -148,7 +149,7 @@ class _CharacterStageState extends State<CharacterStage> {
       fileLoader: _riveLoader!,
       stateMachineSelector: widget.customRivePath.isEmpty
           ? StateMachineSelector.byName('State Machine 1')
-          : const StateMachineDefault(),
+          : StateMachineDefault(),
       onFailed: (error, stackTrace) {
         debugPrint('Rive load failed: $error');
       },
@@ -207,9 +208,9 @@ class _CharacterStageState extends State<CharacterStage> {
         children: [
           if (widget.characterMode != CharacterMode.live2d &&
               widget.characterMode != CharacterMode.live2dExternal)
-            const _StageBackdrop(),
+            _StageBackdrop(),
           Align(
-            alignment: const Alignment(0, 0.10),
+            alignment: Alignment(0, 0.10),
             child: Container(
               width: 230,
               height: 230,
@@ -217,7 +218,7 @@ class _CharacterStageState extends State<CharacterStage> {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF4D6BFE).withValues(alpha: 0.22),
+                    Color(0xFF4D6BFE).withValues(alpha: 0.22),
                     Colors.transparent,
                   ],
                 ),
@@ -276,11 +277,11 @@ class _CharacterStageState extends State<CharacterStage> {
 }
 
 class _StageBackdrop extends StatelessWidget {
-  const _StageBackdrop();
+  _StageBackdrop();
 
   @override
   Widget build(BuildContext context) {
-    return const DecoratedBox(
+    return DecoratedBox(
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -312,7 +313,7 @@ class _StageBackdrop extends StatelessWidget {
 }
 
 class _Glow extends StatelessWidget {
-  const _Glow({required this.color, required this.size});
+  _Glow({required this.color, required this.size});
 
   final Color color;
   final double size;
@@ -333,14 +334,14 @@ class _Glow extends StatelessWidget {
 }
 
 class _StageBadge extends StatelessWidget {
-  const _StageBadge({required this.taps});
+  _StageBadge({required this.taps});
 
   final int taps;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: AppColors.surface.withValues(alpha: 0.46),
         borderRadius: BorderRadius.circular(999),

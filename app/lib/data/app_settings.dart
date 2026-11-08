@@ -19,6 +19,22 @@ enum BackendMode {
   }
 }
 
+enum AppColorMode {
+  classic('classic'),
+  system('system'),
+  stage('stage');
+
+  const AppColorMode(this.wireName);
+
+  final String wireName;
+
+  static AppColorMode fromWire(String? value) =>
+      AppColorMode.values.firstWhere(
+        (mode) => mode.wireName == value,
+        orElse: () => AppColorMode.classic,
+      );
+}
+
 enum CharacterMode {
   rive('rive'),
   staticImage('static'),
@@ -55,6 +71,7 @@ class AppSettings {
     required this.live2dDir,
     required this.live2dModel,
     required this.characterMode,
+    required this.colorMode,
     required this.agentEnabled,
     required this.onboardingComplete,
   });
@@ -77,6 +94,7 @@ class AppSettings {
       live2dDir: '',
       live2dModel: '',
       characterMode: CharacterMode.live2d,
+      colorMode: AppColorMode.classic,
       agentEnabled: false,
       onboardingComplete: false,
     );
@@ -120,6 +138,7 @@ class AppSettings {
       characterMode: CharacterMode.fromWire(
         json['character_mode'] as String?,
       ),
+      colorMode: AppColorMode.fromWire(json['color_mode'] as String?),
       agentEnabled: (json['agent_enabled'] as bool?) ?? false,
       onboardingComplete: (json['onboarding_complete'] as bool?) ?? false,
     );
@@ -141,6 +160,7 @@ class AppSettings {
   final String live2dDir;
   final String live2dModel;
   final CharacterMode characterMode;
+  final AppColorMode colorMode;
   final bool agentEnabled;
   final bool onboardingComplete;
 
@@ -161,6 +181,7 @@ class AppSettings {
         'live2d_dir': live2dDir,
         'live2d_model': live2dModel,
         'character_mode': characterMode.wireName,
+        'color_mode': colorMode.wireName,
         'agent_enabled': agentEnabled,
         'onboarding_complete': onboardingComplete,
       };
@@ -182,6 +203,7 @@ class AppSettings {
     String? live2dDir,
     String? live2dModel,
     CharacterMode? characterMode,
+    AppColorMode? colorMode,
     bool? agentEnabled,
     bool? onboardingComplete,
   }) {
@@ -202,6 +224,7 @@ class AppSettings {
       live2dDir: live2dDir ?? this.live2dDir,
       live2dModel: live2dModel ?? this.live2dModel,
       characterMode: characterMode ?? this.characterMode,
+      colorMode: colorMode ?? this.colorMode,
       agentEnabled: agentEnabled ?? this.agentEnabled,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
     );
@@ -224,6 +247,7 @@ class AppSettings {
         live2dDir,
         live2dModel,
         characterMode.wireName,
+        colorMode.wireName,
         agentEnabled,
       ].join('|');
 }

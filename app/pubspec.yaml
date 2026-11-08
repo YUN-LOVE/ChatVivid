@@ -16,6 +16,9 @@ dependencies:
   rive: ^0.14.11
   live2d_flutter: ^1.0.3
   archive: ^4.6.0
+  dynamic_color: ^2.1.0
+  palette_generator: ^0.3.3+7
+  flutter_tts: ^4.2.5
 dev_dependencies:
   flutter_test:
     sdk: flutter

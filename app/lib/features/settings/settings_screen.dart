@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 
@@ -18,7 +19,7 @@ import 'mcp_pane.dart';
 import 'skill_editor.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({
+  SettingsScreen({
     super.key,
     required this.settings,
     required this.backend,
@@ -32,7 +33,7 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class SettingsCategory {
-  const SettingsCategory({
+  SettingsCategory({
     required this.title,
     required this.description,
     required this.icon,
@@ -43,7 +44,7 @@ class SettingsCategory {
   final IconData icon;
 }
 
-const _categories = [
+final _categories = [
   SettingsCategory(
     title: '连接与后端',
     description: 'Full / Only client、模型与 API Key',
@@ -113,7 +114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Scaffold(
         backgroundColor: AppColors.backgroundTop,
         body: DecoratedBox(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
@@ -179,21 +180,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 }
 
 class _SettingsBar extends StatelessWidget {
-  const _SettingsBar({required this.onBack});
+  _SettingsBar({required this.onBack});
 
   final VoidCallback onBack;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 16, 0),
+      padding: EdgeInsets.fromLTRB(8, 4, 16, 0),
       child: Row(
         children: [
           IconButton(
             onPressed: onBack,
-            icon: const Icon(Icons.arrow_back_rounded),
+            icon: Icon(Icons.arrow_back_rounded),
           ),
-          const Text(
+          Text(
             '设置',
             style: TextStyle(
               color: AppColors.text,
@@ -209,7 +210,7 @@ class _SettingsBar extends StatelessWidget {
 }
 
 class _CategoryRail extends StatelessWidget {
-  const _CategoryRail({required this.selected, required this.onSelect});
+  _CategoryRail({required this.selected, required this.onSelect});
 
   final int selected;
   final ValueChanged<int> onSelect;
@@ -217,11 +218,11 @@ class _CategoryRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(12, 12, 4, 20),
+      padding: EdgeInsets.fromLTRB(12, 12, 4, 20),
       children: [
         for (var i = 0; i < _categories.length; i++)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
+            padding: EdgeInsets.symmetric(vertical: 2),
             child: Material(
               color: selected == i
                   ? AppColors.primaryContainer.withValues(alpha: 0.55)
@@ -231,7 +232,7 @@ class _CategoryRail extends StatelessWidget {
               child: InkWell(
                 onTap: () => onSelect(i),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
+                  padding: EdgeInsets.symmetric(
                     horizontal: 14,
                     vertical: 12,
                   ),
@@ -244,7 +245,7 @@ class _CategoryRail extends StatelessWidget {
                             ? AppColors.primary
                             : AppColors.muted,
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           _categories[i].title,
@@ -268,7 +269,7 @@ class _CategoryRail extends StatelessWidget {
 }
 
 class _CategoryList extends StatelessWidget {
-  const _CategoryList({required this.settings, required this.onOpen});
+  _CategoryList({required this.settings, required this.onOpen});
 
   final AppSettings settings;
   final ValueChanged<int> onOpen;
@@ -276,16 +277,16 @@ class _CategoryList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 24),
       children: [
         _SummaryCard(settings: settings),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         for (var i = 0; i < _categories.length; i++) ...[
           _CategoryTile(
             category: _categories[i],
             onTap: () => onOpen(i),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
         ],
       ],
     );
@@ -293,7 +294,7 @@ class _CategoryList extends StatelessWidget {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.settings});
+  _SummaryCard({required this.settings});
 
   final AppSettings settings;
 
@@ -304,16 +305,16 @@ class _SummaryCard extends StatelessWidget {
         : 'Only client';
     return GlassPanel(
       radius: 24,
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.all(16),
       child: Row(
         children: [
           Image.asset('assets/mascot/avatar.png', width: 52, height: 52),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   '大肥鱼',
                   style: TextStyle(
                     color: AppColors.text,
@@ -321,10 +322,10 @@ class _SummaryCard extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   '$label · ${settings.model}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.muted,
                     fontSize: 10,
                     letterSpacing: 0.4,
@@ -340,7 +341,7 @@ class _SummaryCard extends StatelessWidget {
 }
 
 class _CategoryTile extends StatelessWidget {
-  const _CategoryTile({required this.category, required this.onTap});
+  _CategoryTile({required this.category, required this.onTap});
 
   final SettingsCategory category;
   final VoidCallback onTap;
@@ -354,24 +355,24 @@ class _CategoryTile extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          padding: EdgeInsets.fromLTRB(14, 12, 10, 12),
           child: Row(
             children: [
               Icon(category.icon, size: 21, color: AppColors.primary),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       category.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.text,
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    SizedBox(height: 3),
                     Text(
                       category.description,
                       style: TextStyle(
@@ -382,7 +383,7 @@ class _CategoryTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(
+              Icon(
                 Icons.chevron_right_rounded,
                 color: AppColors.muted,
                 size: 20,
@@ -396,7 +397,7 @@ class _CategoryTile extends StatelessWidget {
 }
 
 class SettingsDetailPage extends StatefulWidget {
-  const SettingsDetailPage({
+  SettingsDetailPage({
     super.key,
     required this.category,
     required this.settings,
@@ -443,7 +444,7 @@ class _SettingsDetailPageState extends State<SettingsDetailPage> {
 }
 
 class SettingsDetail extends StatefulWidget {
-  const SettingsDetail({
+  SettingsDetail({
     super.key,
     required this.category,
     required this.settings,
@@ -533,10 +534,10 @@ class _SettingsDetailState extends State<SettingsDetail> {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      padding: EdgeInsets.fromLTRB(20, 16, 20, 32),
       children: [
         _Header(category: widget.category),
-        const SizedBox(height: 18),
+        SizedBox(height: 18),
         if (widget.category.title == '连接与后端') _connection(),
         if (widget.category.title == '提示词与注入') _prompts(),
         if (widget.category.title == '技能') _skills(),
@@ -546,11 +547,11 @@ class _SettingsDetailState extends State<SettingsDetail> {
         if (widget.category.title == '外观') _appearance(),
         if (widget.category.title == '数据与存储') _data(),
         if (widget.category.title == '关于') _about(),
-        const SizedBox(height: 22),
+        SizedBox(height: 22),
         if (widget.category.title == '连接与后端')
           FilledButton(
             onPressed: _save,
-            child: const Text('保存连接设置'),
+            child: Text('保存连接设置'),
           ),
       ],
     );
@@ -562,7 +563,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         SegmentedButton<BackendMode>(
-          segments: const [
+          segments: [
             ButtonSegment(
               value: BackendMode.full,
               label: Text('Full'),
@@ -580,10 +581,10 @@ class _SettingsDetailState extends State<SettingsDetail> {
             _emit();
           },
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         if (full) ...[
           SegmentedButton<String>(
-            segments: const [
+            segments: [
               ButtonSegment(value: 'deepseek', label: Text('DeepSeek')),
               ButtonSegment(value: 'mock', label: Text('Mock')),
             ],
@@ -593,16 +594,16 @@ class _SettingsDetailState extends State<SettingsDetail> {
               _emit();
             },
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           _Field(
             controller: _apiKey,
             label: 'API Key',
             hint: 'sk-…',
             obscure: true,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _Field(controller: _model, label: '模型', hint: 'deepseek-chat'),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _Field(
             controller: _fullBase,
             label: 'Base URL',
@@ -614,7 +615,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
             label: '服务器地址',
             hint: 'https://server:8080',
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _Field(
             controller: _clientToken,
             label: 'Server Token',
@@ -622,7 +623,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
             obscure: true,
           ),
         ],
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Text(
           full
               ? 'Full 使用 libchatvv_ffi.so；不需要 127.0.0.1 或 adb reverse。'
@@ -645,12 +646,12 @@ class _SettingsDetailState extends State<SettingsDetail> {
           controller: _systemPrompt,
           minLines: 5,
           maxLines: 10,
-          style: const TextStyle(color: AppColors.text, fontSize: 13),
+          style: TextStyle(color: AppColors.text, fontSize: 13),
           decoration: InputDecoration(
             labelText: '系统提示词',
             hintText: '留空使用默认人格',
             alignLabelWithHint: true,
-            labelStyle: const TextStyle(color: AppColors.muted, fontSize: 11),
+            labelStyle: TextStyle(color: AppColors.muted, fontSize: 11),
             hintStyle: TextStyle(
               color: AppColors.muted.withValues(alpha: 0.45),
               fontSize: 12,
@@ -661,13 +662,13 @@ class _SettingsDetailState extends State<SettingsDetail> {
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            contentPadding: EdgeInsets.fromLTRB(14, 12, 14, 12),
           ),
         ),
-        const SizedBox(height: 18),
+        SizedBox(height: 18),
         Row(
           children: [
-            const Text(
+            Text(
               '上下文注入',
               style: TextStyle(
                 color: AppColors.text,
@@ -675,17 +676,17 @@ class _SettingsDetailState extends State<SettingsDetail> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const Spacer(),
+            Spacer(),
             TextButton.icon(
               onPressed: _editInjection,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('新建'),
+              icon: Icon(Icons.add_rounded, size: 18),
+              label: Text('新建'),
             ),
           ],
         ),
         if (_settings.injections.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: EdgeInsets.symmetric(vertical: 10),
             child: Text(
               '暂无注入。文件附件也会以注入形式进入上下文。',
               style: TextStyle(
@@ -709,7 +710,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
                 _emit();
               },
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
           ],
       ],
     );
@@ -766,7 +767,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               '已安装技能',
               style: TextStyle(
                 color: AppColors.text,
@@ -774,17 +775,17 @@ class _SettingsDetailState extends State<SettingsDetail> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const Spacer(),
+            Spacer(),
             TextButton.icon(
               onPressed: () => _editSkill(),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('新建'),
+              icon: Icon(Icons.add_rounded, size: 18),
+              label: Text('新建'),
             ),
           ],
         ),
         if (_settings.skills.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            padding: EdgeInsets.symmetric(vertical: 12),
             child: Text(
               '暂无技能。技能是启用后自动加入系统提示词的工作流。',
               style: TextStyle(
@@ -796,7 +797,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         else
           for (var i = 0; i < _settings.skills.length; i++) ...[
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+              padding: EdgeInsets.fromLTRB(12, 10, 4, 10),
               decoration: BoxDecoration(
                 color: AppColors.surfaceHigh.withValues(alpha: 0.38),
                 borderRadius: BorderRadius.circular(16),
@@ -809,19 +810,19 @@ class _SettingsDetailState extends State<SettingsDetail> {
                       children: [
                         Text(
                           _settings.skills[i].name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.text,
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
                         if (_settings.skills[i].description.isNotEmpty) ...[
-                          const SizedBox(height: 3),
+                          SizedBox(height: 3),
                           Text(
                             _settings.skills[i].description,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               color: AppColors.muted,
                               fontSize: 10,
                             ),
@@ -843,15 +844,15 @@ class _SettingsDetailState extends State<SettingsDetail> {
                   ),
                   IconButton(
                     onPressed: () => _removeSkill(i),
-                    icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                    icon: Icon(Icons.delete_outline_rounded, size: 18),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
           ],
-        const SizedBox(height: 12),
-        const _SettingCard(
+        SizedBox(height: 12),
+        _SettingCard(
           icon: Icons.smart_toy_outlined,
           title: 'Agent 模式',
           subtitle: '系统提示词已预留，MCP 工具循环下一步接入',
@@ -904,7 +905,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           }
         }
         if (modelFile == null) {
-          throw const FormatException('ZIP 中没有 .model3.json');
+          throw FormatException('ZIP 中没有 .model3.json');
         }
         setState(() {
           _settings = _settings.copyWith(
@@ -955,6 +956,12 @@ class _SettingsDetailState extends State<SettingsDetail> {
     _emit();
   }
 
+  void _setColorMode(AppColorMode mode) {
+    setState(() => _settings = _settings.copyWith(colorMode: mode));
+    appThemeController.setMode(mode);
+    _emit();
+  }
+
   Widget _character() {
     return Column(
       children: [
@@ -963,53 +970,53 @@ class _SettingsDetailState extends State<SettingsDetail> {
           title: 'Live2D · DS 鲸鱼娘',
           subtitle: '眨眼 · 呼吸 · 口形追踪',
           trailing: _settings.characterMode == CharacterMode.live2d
-              ? const Icon(Icons.check_rounded, color: AppColors.success)
-              : const Icon(Icons.chevron_right_rounded),
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
           onTap: () => _setCharacterMode(CharacterMode.live2d),
         ),
         if (_settings.live2dDir.isNotEmpty) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           _SettingCard(
             icon: Icons.folder_special_outlined,
             title: 'Live2D · 外部模型',
             subtitle: _settings.live2dModel,
             trailing: _settings.characterMode == CharacterMode.live2dExternal
-                ? const Icon(Icons.check_rounded, color: AppColors.success)
-                : const Icon(Icons.chevron_right_rounded),
+                ? Icon(Icons.check_rounded, color: AppColors.success)
+                : Icon(Icons.chevron_right_rounded),
             onTap: () => _setCharacterMode(CharacterMode.live2dExternal),
           ),
         ],
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _SettingCard(
           icon: Icons.image_rounded,
           title: '立绘 · 女仆装',
           subtitle: '正面全身 · 默认',
           trailing: _settings.characterMode == CharacterMode.staticImage
-              ? const Icon(Icons.check_rounded, color: AppColors.success)
-              : const Icon(Icons.chevron_right_rounded),
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
           onTap: () => _setCharacterMode(CharacterMode.staticImage),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _SettingCard(
           icon: Icons.image_rounded,
           title: '立绘 · 蓝色女仆',
           subtitle: '替换服装立绘',
           trailing: _settings.characterMode == CharacterMode.altImage
-              ? const Icon(Icons.check_rounded, color: AppColors.success)
-              : const Icon(Icons.chevron_right_rounded),
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
           onTap: () => _setCharacterMode(CharacterMode.altImage),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _SettingCard(
           icon: Icons.view_in_ar_rounded,
           title: 'Rive 角色',
           subtitle: '内置 walking.riv · 待机动画',
           trailing: _settings.characterMode == CharacterMode.rive
-              ? const Icon(Icons.check_rounded, color: AppColors.success)
-              : const Icon(Icons.chevron_right_rounded),
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
           onTap: () => _setCharacterMode(CharacterMode.rive),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _SettingCard(
           icon: Icons.download_rounded,
           title: '导入外部模型',
@@ -1017,18 +1024,18 @@ class _SettingsDetailState extends State<SettingsDetail> {
               ? '支持 Rive .riv / SVG / Live2D .zip'
               : '当前：${_settings.characterRivePath.split('/').last} · 点击重新导入',
           trailing: _settings.characterMode == CharacterMode.custom
-              ? const Icon(Icons.check_rounded, color: AppColors.success)
-              : const Icon(Icons.chevron_right_rounded),
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
           onTap: _importRive,
         ),
         if (_settings.characterRivePath.isNotEmpty) ...[
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
             child: TextButton.icon(
               onPressed: _clearRive,
-              icon: const Icon(Icons.restore_rounded, size: 16),
-              label: const Text('恢复内置角色'),
+              icon: Icon(Icons.restore_rounded, size: 16),
+              label: Text('恢复内置角色'),
             ),
           ),
         ],
@@ -1037,25 +1044,48 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   Widget _appearance() {
+    final selected = _settings.colorMode;
     return Column(
       children: [
         _SettingCard(
           icon: Icons.water_rounded,
-          title: 'Deep Sea Glass',
-          subtitle: '当前主题',
-          trailing: const Icon(Icons.check_rounded, color: AppColors.success),
-          onTap: () {},
+          title: '深海玻璃',
+          subtitle: '经典配色',
+          trailing: selected == AppColorMode.classic
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
+          onTap: () => _setColorMode(AppColorMode.classic),
         ),
-        const SizedBox(height: 10),
-        const _SettingCard(
+        SizedBox(height: 10),
+        _SettingCard(
+          icon: Icons.auto_awesome_rounded,
+          title: '系统动态颜色',
+          subtitle: 'Material You · 跟随系统壁纸',
+          trailing: selected == AppColorMode.system
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
+          onTap: () => _setColorMode(AppColorMode.system),
+        ),
+        SizedBox(height: 10),
+        _SettingCard(
+          icon: Icons.colorize_rounded,
+          title: '从舞台取色',
+          subtitle: '提取 DS 鲸鱼娘立绘主色',
+          trailing: selected == AppColorMode.stage
+              ? Icon(Icons.check_rounded, color: AppColors.success)
+              : Icon(Icons.chevron_right_rounded),
+          onTap: () => _setColorMode(AppColorMode.stage),
+        ),
+        SizedBox(height: 10),
+        _SettingCard(
           icon: Icons.blur_on_rounded,
           title: '玻璃强度',
           subtitle: 'BackdropFilter · 2–3 个表面',
           trailing: Icon(Icons.chevron_right_rounded),
           onTap: null,
         ),
-        const SizedBox(height: 10),
-        const _SettingCard(
+        SizedBox(height: 10),
+        _SettingCard(
           icon: Icons.animation_rounded,
           title: '动效',
           subtitle: '跟随系统 Reduce Motion',
@@ -1077,25 +1107,25 @@ class _SettingsDetailState extends State<SettingsDetail> {
               '本地目录',
               style: TextStyle(color: AppColors.muted.withValues(alpha: 0.7), fontSize: 10),
             ),
-            const SizedBox(height: 6),
+            SizedBox(height: 6),
             SelectableText(
               snapshot.data?.path ?? '加载中…',
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.text,
                 fontSize: 11,
                 fontFamily: 'monospace',
               ),
             ),
-            const SizedBox(height: 16),
-            const _SettingCard(
+            SizedBox(height: 16),
+            _SettingCard(
               icon: Icons.ios_share_rounded,
               title: '导出记忆库',
               subtitle: 'SQLite 导出（下一步）',
               trailing: Icon(Icons.lock_outline, size: 16),
               onTap: null,
             ),
-            const SizedBox(height: 10),
-            const _SettingCard(
+            SizedBox(height: 10),
+            _SettingCard(
               icon: Icons.delete_outline_rounded,
               title: '清空对话',
               subtitle: '保留设置，清空 SQLite 消息',
@@ -1115,32 +1145,32 @@ class _SettingsDetailState extends State<SettingsDetail> {
           icon: Icons.info_outline_rounded,
           title: 'ChatVivid',
           subtitle: '$buildLabel · commit $commitLabel · Flutter 3.44',
-          trailing: const SizedBox.shrink(),
+          trailing: SizedBox.shrink(),
           onTap: null,
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _SettingCard(
           icon: Icons.article_outlined,
           title: '开源许可',
           subtitle: 'Flutter、Rive、llama.cpp 等第三方许可',
-          trailing: const Icon(Icons.chevron_right_rounded),
+          trailing: Icon(Icons.chevron_right_rounded),
           onTap: () => showLicensePage(
             context: context,
             applicationName: 'ChatVivid',
             applicationVersion: buildLabel,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _SettingCard(
           icon: Icons.face_rounded,
           title: '角色与资产署名',
           subtitle: 'Live2D 模型 / 大肥鱼角色 / Rive / BGE',
-          trailing: const Icon(Icons.chevron_right_rounded),
+          trailing: Icon(Icons.chevron_right_rounded),
           onTap: () => showDialog<void>(
             context: context,
             builder: (context) => AlertDialog(
-              title: const Text('角色与资产署名'),
-              content: const SingleChildScrollView(
+              title: Text('角色与资产署名'),
+              content: SingleChildScrollView(
                 child: Text(
                   'Live2D「DS 鲸鱼娘」：上善无形 / ZipZipPipe / 氵六青\n'
                   '模型素材 CC BY-NC-SA 4.0（非商业、署名、相同方式共享）\n'
@@ -1153,21 +1183,21 @@ class _SettingsDetailState extends State<SettingsDetail> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context),
-                  child: const Text('关闭'),
+                  child: Text('关闭'),
                 ),
               ],
             ),
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         _SettingCard(
           icon: Icons.code_rounded,
           title: '源代码',
           subtitle: 'github.com/YUN-LOVE/ChatVivid',
-          trailing: const Icon(Icons.copy_rounded, size: 16),
+          trailing: Icon(Icons.copy_rounded, size: 16),
           onTap: () {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
+              SnackBar(
                 content: Text('https://github.com/YUN-LOVE/ChatVivid'),
               ),
             );
@@ -1179,7 +1209,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
 }
 
 class _InjectionTile extends StatelessWidget {
-  const _InjectionTile({
+  _InjectionTile({
     required this.injection,
     required this.onEdit,
     required this.onDelete,
@@ -1194,7 +1224,7 @@ class _InjectionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      padding: EdgeInsets.fromLTRB(12, 8, 4, 8),
       decoration: BoxDecoration(
         color: AppColors.surfaceHigh.withValues(alpha: 0.38),
         borderRadius: BorderRadius.circular(16),
@@ -1205,19 +1235,19 @@ class _InjectionTile extends StatelessWidget {
             value: injection.enabled,
             onChanged: onToggle,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   injection.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     color: AppColors.text,
                     fontSize: 12,
                   ),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   '${injection.position} · ${injection.mode} · ${injection.trust}',
                   style: TextStyle(
@@ -1230,11 +1260,11 @@ class _InjectionTile extends StatelessWidget {
           ),
           IconButton(
             onPressed: onEdit,
-            icon: const Icon(Icons.edit_outlined, size: 18),
+            icon: Icon(Icons.edit_outlined, size: 18),
           ),
           IconButton(
             onPressed: onDelete,
-            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            icon: Icon(Icons.delete_outline_rounded, size: 18),
           ),
         ],
       ),
@@ -1243,7 +1273,7 @@ class _InjectionTile extends StatelessWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.category});
+  _Header({required this.category});
 
   final SettingsCategory category;
 
@@ -1252,13 +1282,13 @@ class _Header extends StatelessWidget {
     return Row(
       children: [
         Icon(category.icon, color: AppColors.primary, size: 24),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
               category.title,
-              style: const TextStyle(
+              style: TextStyle(
                 color: AppColors.text,
                 fontSize: 17,
                 fontWeight: FontWeight.w600,
@@ -1266,7 +1296,7 @@ class _Header extends StatelessWidget {
             ),
             Text(
               category.description,
-              style: const TextStyle(color: AppColors.muted, fontSize: 10),
+              style: TextStyle(color: AppColors.muted, fontSize: 10),
             ),
           ],
         ),
@@ -1276,7 +1306,7 @@ class _Header extends StatelessWidget {
 }
 
 class _Field extends StatelessWidget {
-  const _Field({
+  _Field({
     required this.controller,
     required this.label,
     required this.hint,
@@ -1293,11 +1323,11 @@ class _Field extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscure,
-      style: const TextStyle(color: AppColors.text, fontSize: 13),
+      style: TextStyle(color: AppColors.text, fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: const TextStyle(color: AppColors.muted, fontSize: 11),
+        labelStyle: TextStyle(color: AppColors.muted, fontSize: 11),
         hintStyle: TextStyle(
           color: AppColors.muted.withValues(alpha: 0.45),
           fontSize: 12,
@@ -1308,14 +1338,14 @@ class _Field extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        contentPadding: EdgeInsets.fromLTRB(14, 12, 14, 12),
       ),
     );
   }
 }
 
 class _SettingCard extends StatelessWidget {
-  const _SettingCard({
+  _SettingCard({
     required this.icon,
     required this.title,
     required this.subtitle,
@@ -1338,23 +1368,23 @@ class _SettingCard extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+          padding: EdgeInsets.fromLTRB(14, 12, 12, 12),
           child: Row(
             children: [
               Icon(icon, color: AppColors.primary, size: 20),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.text,
                         fontSize: 13,
                       ),
                     ),
-                    const SizedBox(height: 3),
+                    SizedBox(height: 3),
                     Text(
                       subtitle,
                       style: TextStyle(

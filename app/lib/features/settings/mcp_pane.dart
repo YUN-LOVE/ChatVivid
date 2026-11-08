@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'package:flutter/material.dart';
 
 import '../../data/app_settings.dart';
@@ -7,7 +8,7 @@ import '../../theme/app_theme.dart';
 import 'mcp_editor.dart';
 
 class McpPane extends StatefulWidget {
-  const McpPane({
+  McpPane({
     super.key,
     required this.settings,
     required this.onChanged,
@@ -73,7 +74,7 @@ class _McpPaneState extends State<McpPane> {
       children: [
         Row(
           children: [
-            const Text(
+            Text(
               'MCP 服务器',
               style: TextStyle(
                 color: AppColors.text,
@@ -81,17 +82,17 @@ class _McpPaneState extends State<McpPane> {
                 fontWeight: FontWeight.w600,
               ),
             ),
-            const Spacer(),
+            Spacer(),
             TextButton.icon(
               onPressed: () => _edit(),
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('添加'),
+              icon: Icon(Icons.add_rounded, size: 18),
+              label: Text('添加'),
             ),
           ],
         ),
         if (servers.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
+            padding: EdgeInsets.symmetric(vertical: 10),
             child: Text(
               '暂无 MCP 服务器。Agent 模式下这些工具会注入模型工具列表。',
               style: TextStyle(
@@ -103,7 +104,7 @@ class _McpPaneState extends State<McpPane> {
         else
           for (var i = 0; i < servers.length; i++) ...[
             Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+              padding: EdgeInsets.fromLTRB(12, 10, 4, 10),
               decoration: BoxDecoration(
                 color: AppColors.surfaceHigh.withValues(alpha: 0.38),
                 borderRadius: BorderRadius.circular(16),
@@ -119,18 +120,18 @@ class _McpPaneState extends State<McpPane> {
                           children: [
                             Text(
                               servers[i].name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.text,
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 3),
+                            SizedBox(height: 3),
                             Text(
                               servers[i].url,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.muted,
                                 fontSize: 10,
                               ),
@@ -150,7 +151,7 @@ class _McpPaneState extends State<McpPane> {
                       ),
                       IconButton(
                         onPressed: () => _remove(i),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.delete_outline_rounded,
                           size: 18,
                         ),
@@ -163,12 +164,12 @@ class _McpPaneState extends State<McpPane> {
                         onPressed: _testing.contains(servers[i].id)
                             ? null
                             : () => _test(servers[i]),
-                        child: const Text('测试连接'),
+                        child: Text('测试连接'),
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4),
                       IconButton(
                         onPressed: () => _edit(servers[i]),
-                        icon: const Icon(Icons.edit_outlined, size: 16),
+                        icon: Icon(Icons.edit_outlined, size: 16),
                       ),
                       if (_status[servers[i].id] != null)
                         Expanded(
@@ -189,18 +190,18 @@ class _McpPaneState extends State<McpPane> {
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
           ],
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Container(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: AppColors.surfaceHigh.withValues(alpha: 0.25),
             borderRadius: BorderRadius.circular(16),
           ),
           child: Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [

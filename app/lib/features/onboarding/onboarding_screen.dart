@@ -1,10 +1,11 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'package:flutter/material.dart';
 
 import '../../data/app_settings.dart';
 import '../../theme/app_theme.dart';
 
 class OnboardingScreen extends StatefulWidget {
-  const OnboardingScreen({
+  OnboardingScreen({
     super.key,
     required this.initial,
     required this.onComplete,
@@ -18,7 +19,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  static const _steps = ['欢迎', '运行方式', '连接', '就绪'];
+  static final _steps = ['欢迎', '运行方式', '连接', '就绪'];
 
   final PageController _pages = PageController();
   late final TextEditingController _apiKey;
@@ -65,7 +66,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
     await _pages.animateToPage(
       _index + 1,
-      duration: const Duration(milliseconds: 380),
+      duration: Duration(milliseconds: 380),
       curve: Curves.easeInOutCubicEmphasized,
     );
   }
@@ -74,7 +75,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     if (_index == 0 || _saving) return;
     await _pages.animateToPage(
       _index - 1,
-      duration: const Duration(milliseconds: 300),
+      duration: Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
     );
   }
@@ -104,7 +105,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundTop,
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -123,7 +124,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: PageView(
                   controller: _pages,
                   physics: _saving
-                      ? const NeverScrollableScrollPhysics()
+                      ? NeverScrollableScrollPhysics()
                       : null,
                   onPageChanged: (value) => setState(() => _index = value),
                   children: [
@@ -167,7 +168,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 }
 
 class _Progress extends StatelessWidget {
-  const _Progress({required this.labels, required this.index});
+  _Progress({required this.labels, required this.index});
 
   final List<String> labels;
   final int index;
@@ -175,35 +176,35 @@ class _Progress extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
+      padding: EdgeInsets.fromLTRB(20, 12, 20, 8),
       child: Column(
         children: [
           Row(
             children: [
               Text(
                 labels[index],
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.primary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.8,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               Text(
                 '${index + 1} / ${labels.length}',
-                style: const TextStyle(color: AppColors.muted, fontSize: 11),
+                style: TextStyle(color: AppColors.muted, fontSize: 11),
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(
             children: [
               for (var i = 0; i < labels.length; i++) ...[
-                if (i > 0) const SizedBox(width: 6),
+                if (i > 0) SizedBox(width: 6),
                 Expanded(
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 260),
+                    duration: Duration(milliseconds: 260),
                     height: 5,
                     decoration: BoxDecoration(
                       color: i <= index
@@ -223,20 +224,20 @@ class _Progress extends StatelessWidget {
 }
 
 class _WelcomePage extends StatelessWidget {
-  const _WelcomePage({required this.mode});
+  _WelcomePage({required this.mode});
 
   final BackendMode mode;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+      padding: EdgeInsets.fromLTRB(24, 28, 24, 20),
       children: [
         Center(
           child: Image.asset('assets/mascot/avatar.png', width: 150),
         ),
-        const SizedBox(height: 18),
-        const Text(
+        SizedBox(height: 18),
+        Text(
           '把记忆\n留在自己手里',
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -247,7 +248,7 @@ class _WelcomePage extends StatelessWidget {
             letterSpacing: 1,
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Text(
           '单对话、长期记忆，默认只在本机。',
           textAlign: TextAlign.center,
@@ -263,7 +264,7 @@ class _WelcomePage extends StatelessWidget {
 }
 
 class _ModePage extends StatelessWidget {
-  const _ModePage({required this.mode, required this.onChanged});
+  _ModePage({required this.mode, required this.onChanged});
 
   final BackendMode mode;
   final ValueChanged<BackendMode> onChanged;
@@ -271,9 +272,9 @@ class _ModePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
       children: [
-        const Text(
+        Text(
           '选择运行方式',
           style: TextStyle(
             color: AppColors.text,
@@ -281,7 +282,7 @@ class _ModePage extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Text(
           '可随时切换，共用同一套聊天界面。',
           style: TextStyle(
@@ -290,7 +291,7 @@ class _ModePage extends StatelessWidget {
             height: 1.5,
           ),
         ),
-        const SizedBox(height: 22),
+        SizedBox(height: 22),
         _ModeCard(
           selected: mode == BackendMode.full,
           icon: Icons.memory_rounded,
@@ -299,7 +300,7 @@ class _ModePage extends StatelessWidget {
           body: 'C++ core 在 App 内，无端口、无回环。',
           onTap: () => onChanged(BackendMode.full),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         _ModeCard(
           selected: mode == BackendMode.client,
           icon: Icons.cloud_outlined,
@@ -314,7 +315,7 @@ class _ModePage extends StatelessWidget {
 }
 
 class _ModeCard extends StatelessWidget {
-  const _ModeCard({
+  _ModeCard({
     required this.selected,
     required this.icon,
     required this.title,
@@ -338,8 +339,8 @@ class _ModeCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(24),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.all(18),
+          duration: Duration(milliseconds: 180),
+          padding: EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: selected
                 ? AppColors.primaryContainer.withValues(alpha: 0.55)
@@ -355,7 +356,7 @@ class _ModeCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Icon(icon, color: AppColors.primary, size: 24),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,13 +365,13 @@ class _ModeCard extends StatelessWidget {
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             color: AppColors.text,
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Text(
                           subtitle,
                           style: TextStyle(
@@ -381,7 +382,7 @@ class _ModeCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 7),
+                    SizedBox(height: 7),
                     Text(
                       body,
                       style: TextStyle(
@@ -409,7 +410,7 @@ class _ModeCard extends StatelessWidget {
 }
 
 class _ConnectionPage extends StatelessWidget {
-  const _ConnectionPage({
+  _ConnectionPage({
     required this.mode,
     required this.provider,
     required this.onProviderChanged,
@@ -432,37 +433,37 @@ class _ConnectionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+      padding: EdgeInsets.fromLTRB(24, 24, 24, 20),
       children: [
         Text(
           mode == BackendMode.full ? '连接模型' : '连接服务器',
-          style: const TextStyle(
+          style: TextStyle(
             color: AppColors.text,
             fontSize: 24,
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
-        const SizedBox(height: 18),
+        SizedBox(height: 8),
+        SizedBox(height: 18),
         if (mode == BackendMode.full) ...[
           SegmentedButton<String>(
-            segments: const [
+            segments: [
               ButtonSegment(value: 'deepseek', label: Text('DeepSeek')),
               ButtonSegment(value: 'mock', label: Text('Mock')),
             ],
             selected: {provider},
             onSelectionChanged: (value) => onProviderChanged(value.first),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _Field(
             controller: apiKey,
             label: 'API Key',
             hint: 'sk-…（留空先用 mock）',
             obscure: true,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _Field(controller: model, label: '模型', hint: 'deepseek-chat'),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _Field(
             controller: fullBase,
             label: 'Base URL',
@@ -474,7 +475,7 @@ class _ConnectionPage extends StatelessWidget {
             label: '服务器地址',
             hint: 'https://your-server:8080',
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _Field(
             controller: clientToken,
             label: 'Server Token（可选）',
@@ -488,7 +489,7 @@ class _ConnectionPage extends StatelessWidget {
 }
 
 class _Field extends StatelessWidget {
-  const _Field({
+  _Field({
     required this.controller,
     required this.label,
     required this.hint,
@@ -505,11 +506,11 @@ class _Field extends StatelessWidget {
     return TextField(
       controller: controller,
       obscureText: obscure,
-      style: const TextStyle(color: AppColors.text, fontSize: 13),
+      style: TextStyle(color: AppColors.text, fontSize: 13),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        labelStyle: const TextStyle(color: AppColors.muted, fontSize: 11),
+        labelStyle: TextStyle(color: AppColors.muted, fontSize: 11),
         hintStyle: TextStyle(
           color: AppColors.muted.withValues(alpha: 0.45),
           fontSize: 12,
@@ -520,14 +521,14 @@ class _Field extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide.none,
         ),
-        contentPadding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        contentPadding: EdgeInsets.fromLTRB(14, 12, 14, 12),
       ),
     );
   }
 }
 
 class _ReadyPage extends StatelessWidget {
-  const _ReadyPage({
+  _ReadyPage({
     required this.mode,
     required this.provider,
     required this.hasApiKey,
@@ -543,17 +544,17 @@ class _ReadyPage extends StatelessWidget {
         ? 'mock'
         : provider;
     return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 28, 24, 20),
+      padding: EdgeInsets.fromLTRB(24, 28, 24, 20),
       children: [
-        const Center(
+        Center(
           child: Icon(
             Icons.check_circle_rounded,
             color: AppColors.success,
             size: 54,
           ),
         ),
-        const SizedBox(height: 18),
-        const Text(
+        SizedBox(height: 18),
+        Text(
           '记忆体已就绪',
           textAlign: TextAlign.center,
           style: TextStyle(
@@ -562,7 +563,7 @@ class _ReadyPage extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Text(
           '${mode.label}\nProvider: $effectiveProvider',
           textAlign: TextAlign.center,
@@ -578,7 +579,7 @@ class _ReadyPage extends StatelessWidget {
 }
 
 class _BottomBar extends StatelessWidget {
-  const _BottomBar({
+  _BottomBar({
     required this.index,
     required this.saving,
     required this.isLast,
@@ -595,17 +596,17 @@ class _BottomBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      padding: EdgeInsets.fromLTRB(20, 8, 20, 16),
       child: Row(
         children: [
           if (index > 0)
             TextButton(
               onPressed: saving ? null : onBack,
-              child: const Text('上一步'),
+              child: Text('上一步'),
             )
           else
-            const SizedBox(width: 64),
-          const Spacer(),
+            SizedBox(width: 64),
+          Spacer(),
           FilledButton.icon(
             onPressed: saving ? null : onNext,
             icon: Icon(

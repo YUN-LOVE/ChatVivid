@@ -3,6 +3,8 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  dynamic_color
+  flutter_tts
   live2d_flutter
   rive_native
 )

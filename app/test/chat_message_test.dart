@@ -17,11 +17,11 @@ void main() {
   });
 
   test('stream events carry typed payloads', () {
-    const delta = ChatStreamEvent.delta('hi');
+    final delta = ChatStreamEvent.delta('hi');
     expect(delta.type, ChatStreamEventType.delta);
     expect(delta.delta, 'hi');
 
-    const failed = ChatStreamEvent.failed('boom');
+    final failed = ChatStreamEvent.failed('boom');
     expect(failed.type, ChatStreamEventType.failed);
     expect(failed.error, 'boom');
   });

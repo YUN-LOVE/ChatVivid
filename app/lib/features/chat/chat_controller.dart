@@ -155,7 +155,7 @@ class ChatController extends ChangeNotifier {
 
   void _scheduleNotify() {
     if (_notifyTimer?.isActive ?? false) return;
-    _notifyTimer = Timer(const Duration(milliseconds: 33), () {
+    _notifyTimer = Timer(Duration(milliseconds: 33), () {
       _notifyTimer = null;
       if (!_disposed) notifyListeners();
     });

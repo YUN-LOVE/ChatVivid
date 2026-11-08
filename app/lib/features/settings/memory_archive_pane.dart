@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'package:flutter/material.dart';
 
 import '../../data/chat_backend.dart';
@@ -5,7 +6,7 @@ import '../../data/memory_entry.dart';
 import '../../theme/app_theme.dart';
 
 class MemoryArchivePane extends StatefulWidget {
-  const MemoryArchivePane({super.key, required this.backend});
+  MemoryArchivePane({super.key, required this.backend});
 
   final ChatBackend backend;
 
@@ -16,7 +17,7 @@ class MemoryArchivePane extends StatefulWidget {
 class _MemoryArchivePaneState extends State<MemoryArchivePane> {
   final TextEditingController _query = TextEditingController();
   final TextEditingController _keepRecent = TextEditingController(text: '20');
-  List<MemoryEntry> _memories = const [];
+  List<MemoryEntry> _memories = [];
   bool _loading = true;
   bool _busy = false;
   String? _error;
@@ -115,16 +116,16 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('清除上下文？'),
-        content: const Text('当前对话消息会被删除，已归档的记忆会保留。'),
+        title: Text('清除上下文？'),
+        content: Text('当前对话消息会被删除，已归档的记忆会保留。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text('取消'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('清除'),
+            child: Text('清除'),
           ),
         ],
       ),
@@ -135,7 +136,7 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
       await widget.backend.clearContext();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('上下文已清除，记忆库保留')),
+        SnackBar(content: Text('上下文已清除，记忆库保留')),
       );
       await _load();
     } catch (error) {
@@ -170,8 +171,8 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
         initialChildSize: 0.7,
         maxChildSize: 0.92,
         builder: (context, controller) => Container(
-          margin: const EdgeInsets.all(12),
-          padding: const EdgeInsets.all(18),
+          margin: EdgeInsets.all(12),
+          padding: EdgeInsets.all(18),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(24),
@@ -181,12 +182,12 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
             children: [
               Text(
                 _date(memory.createdAt),
-                style: const TextStyle(color: AppColors.muted, fontSize: 10),
+                style: TextStyle(color: AppColors.muted, fontSize: 10),
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               SelectableText(
                 memory.text,
-                style: const TextStyle(
+                style: TextStyle(
                   color: AppColors.text,
                   fontSize: 13,
                   height: 1.6,
@@ -208,13 +209,13 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
           controller: _query,
           textInputAction: TextInputAction.search,
           onSubmitted: (_) => _load(),
-          style: const TextStyle(color: AppColors.text, fontSize: 13),
+          style: TextStyle(color: AppColors.text, fontSize: 13),
           decoration: InputDecoration(
             hintText: '搜索归档记忆…',
-            prefixIcon: const Icon(Icons.search_rounded, size: 19),
+            prefixIcon: Icon(Icons.search_rounded, size: 19),
             suffixIcon: IconButton(
               onPressed: _load,
-              icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+              icon: Icon(Icons.arrow_forward_rounded, size: 18),
             ),
             filled: true,
             fillColor: AppColors.surfaceHigh.withValues(alpha: 0.4),
@@ -222,10 +223,10 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
               borderRadius: BorderRadius.circular(16),
               borderSide: BorderSide.none,
             ),
-            contentPadding: const EdgeInsets.symmetric(vertical: 12),
+            contentPadding: EdgeInsets.symmetric(vertical: 12),
           ),
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Row(
           children: [
             SizedBox(
@@ -233,10 +234,10 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
               child: TextField(
                 controller: _keepRecent,
                 keyboardType: TextInputType.number,
-                style: const TextStyle(color: AppColors.text, fontSize: 12),
+                style: TextStyle(color: AppColors.text, fontSize: 12),
                 decoration: InputDecoration(
                   labelText: '保留',
-                  labelStyle: const TextStyle(
+                  labelStyle: TextStyle(
                     color: AppColors.muted,
                     fontSize: 10,
                   ),
@@ -247,43 +248,43 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+                  contentPadding: EdgeInsets.fromLTRB(10, 8, 10, 8),
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Text(
               '${_memories.length} 条记忆',
-              style: const TextStyle(color: AppColors.muted, fontSize: 11),
+              style: TextStyle(color: AppColors.muted, fontSize: 11),
             ),
-            const Spacer(),
+            Spacer(),
             FilledButton.tonalIcon(
               onPressed: _busy ? null : _archive,
-              icon: const Icon(Icons.archive_outlined, size: 18),
+              icon: Icon(Icons.archive_outlined, size: 18),
               label: Text(_busy ? '归档中…' : '归档'),
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
           children: [
             OutlinedButton.icon(
               onPressed: _busy ? null : _saveContext,
-              icon: const Icon(Icons.move_to_inbox_outlined, size: 17),
-              label: const Text('存入记忆并清空'),
+              icon: Icon(Icons.move_to_inbox_outlined, size: 17),
+              label: Text('存入记忆并清空'),
             ),
             OutlinedButton.icon(
               onPressed: _busy ? null : _clearContext,
-              icon: const Icon(Icons.delete_sweep_outlined, size: 17),
-              label: const Text('清除上下文'),
+              icon: Icon(Icons.delete_sweep_outlined, size: 17),
+              label: Text('清除上下文'),
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         if (_loading)
-          const Center(
+          Center(
             child: Padding(
               padding: EdgeInsets.all(20),
               child: CircularProgressIndicator(strokeWidth: 1.5),
@@ -292,11 +293,11 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
         else if (_error != null)
           Text(
             _error!,
-            style: const TextStyle(color: AppColors.coral, fontSize: 11),
+            style: TextStyle(color: AppColors.coral, fontSize: 11),
           )
         else if (_memories.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: EdgeInsets.symmetric(vertical: 16),
             child: Text(
               '暂无归档。归档后旧消息会压缩成长期记忆，并从后续上下文中移除。',
               style: TextStyle(
@@ -315,16 +316,16 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
               child: InkWell(
                 onTap: () => _show(memory),
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+                  padding: EdgeInsets.fromLTRB(12, 10, 4, 10),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
+                      Icon(
                         Icons.memory_rounded,
                         color: AppColors.primary,
                         size: 18,
                       ),
-                      const SizedBox(width: 10),
+                      SizedBox(width: 10),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -333,13 +334,13 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
                               memory.text,
                               maxLines: 3,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 color: AppColors.text,
                                 fontSize: 12,
                                 height: 1.5,
                               ),
                             ),
-                            const SizedBox(height: 5),
+                            SizedBox(height: 5),
                             Text(
                               '${_date(memory.createdAt)} · 使用 ${memory.useCount} 次',
                               style: TextStyle(
@@ -352,14 +353,14 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
                       ),
                       IconButton(
                         onPressed: () => _delete(memory),
-                        icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                        icon: Icon(Icons.delete_outline_rounded, size: 18),
                       ),
                     ],
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
           ],
       ],
     );

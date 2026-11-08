@@ -1,3 +1,4 @@
+// ignore_for_file: prefer_const_constructors_in_immutables
 import 'dart:async';
 import 'dart:ui';
 import 'dart:math' as math;
@@ -17,9 +18,10 @@ import 'markdown_message.dart';
 import 'file_upload_service.dart';
 import 'chat_controller.dart';
 import 'chat_models.dart';
+import 'tts_service.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({
+  ChatScreen({
     super.key,
     required this.settings,
     required this.onSettingsChanged,
@@ -45,21 +47,24 @@ class _ChatScreenState extends State<ChatScreen>
   int _lastLength = 0;
   late final AnimationController _drawer = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 460),
+    duration: Duration(milliseconds: 460),
   );
   late final AnimationController _livePulse = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1500),
+    duration: Duration(milliseconds: 1500),
   );
   bool _historyOpen = false;
   bool _captionCollapsed = false;
   bool _liveMode = false;
   bool _voiceActive = false;
+  final TtsService _tts = TtsService();
 
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
+    _tts.speaking.addListener(_onTtsChanged);
+    unawaited(_tts.init());
     unawaited(_bootstrap());
   }
 
@@ -112,7 +117,7 @@ class _ChatScreenState extends State<ChatScreen>
         if (!_scroll.hasClients) return;
         _scroll.animateTo(
           _scroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 180),
+          duration: Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
         );
       });
@@ -264,8 +269,10 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   void dispose() {
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
+    _tts.speaking.removeListener(_onTtsChanged);
     _drawer.dispose();
     _livePulse.dispose();
+    unawaited(_tts.dispose());
     final chat = _chat;
     if (chat != null) {
       chat.removeListener(_onChatChanged);
@@ -275,6 +282,29 @@ class _ChatScreenState extends State<ChatScreen>
     _scroll.dispose();
     _focus.dispose();
     super.dispose();
+  }
+
+  void _onTtsChanged() {
+    if (mounted) setState(() {});
+  }
+
+  String _latestRaw() {
+    final chat = _chat;
+    if (chat == null) return '';
+    for (final message in chat.messages.reversed) {
+      if (message.isUser) continue;
+      if (message.content.trim().isNotEmpty) return message.content.trim();
+    }
+    return '';
+  }
+
+  Future<void> _toggleSpeech() async {
+    if (_tts.speaking.value) {
+      await _tts.stop();
+    } else {
+      await _tts.speak(_latestRaw());
+    }
+    if (mounted) setState(() {});
   }
 
   String _latestLine() {
@@ -313,7 +343,7 @@ class _ChatScreenState extends State<ChatScreen>
               builder: (context, _) => CharacterStage(
                 customRivePath: widget.settings.characterRivePath,
                 characterMode: widget.settings.characterMode,
-                speaking: chat.busy,
+                speaking: chat.busy || _tts.speaking.value,
                 live2dDir: widget.settings.live2dDir,
                 live2dModel: widget.settings.live2dModel,
               ),
@@ -360,12 +390,14 @@ class _ChatScreenState extends State<ChatScreen>
                       builder: (context, _) => _DialogueCard(
                         text: _latestLine(),
                         collapsed: _captionCollapsed,
+                        speaking: _tts.speaking.value,
+                        onSpeak: _toggleSpeech,
                         onToggle: () => setState(
                           () => _captionCollapsed = !_captionCollapsed,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     AnimatedBuilder(
                       animation: chat,
                       builder: (context, _) => _Composer(
@@ -398,7 +430,7 @@ class _ChatScreenState extends State<ChatScreen>
 }
 
 class _BootstrapScreen extends StatelessWidget {
-  const _BootstrapScreen({
+  _BootstrapScreen({
     required this.loading,
     required this.error,
     required this.onRetry,
@@ -413,7 +445,7 @@ class _BootstrapScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundTop,
       body: DecoratedBox(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -422,7 +454,7 @@ class _BootstrapScreen extends StatelessWidget {
         ),
         child: Center(
           child: Padding(
-            padding: const EdgeInsets.all(32),
+            padding: EdgeInsets.all(32),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -431,14 +463,14 @@ class _BootstrapScreen extends StatelessWidget {
                   width: 96,
                   height: 96,
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
                 if (loading) ...[
-                  const SizedBox(
+                  SizedBox(
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 1.5),
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   Text(
                     '正在初始化记忆体…',
                     style: TextStyle(
@@ -451,16 +483,16 @@ class _BootstrapScreen extends StatelessWidget {
                   Text(
                     error ?? '初始化失败',
                     textAlign: TextAlign.center,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: AppColors.coral,
                       fontSize: 12,
                       height: 1.5,
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  SizedBox(height: 18),
                   FilledButton(
                     onPressed: () => onRetry(),
-                    child: const Text('重试'),
+                    child: Text('重试'),
                   ),
                 ],
               ],
@@ -473,7 +505,7 @@ class _BootstrapScreen extends StatelessWidget {
 }
 
 class _StageTopBar extends StatelessWidget {
-  const _StageTopBar({
+  _StageTopBar({
     required this.chat,
     required this.onSettings,
     required this.onOpenHistory,
@@ -493,12 +525,12 @@ class _StageTopBar extends StatelessWidget {
         if (details.delta.dy > 2.5) onOpenHistory();
       },
       child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             height: 66,
-            padding: const EdgeInsets.fromLTRB(8, 6, 8, 8),
+            padding: EdgeInsets.fromLTRB(8, 6, 8, 8),
             decoration: BoxDecoration(
               color: AppColors.glass.withValues(alpha: 0.78),
               border: Border(
@@ -512,7 +544,7 @@ class _StageTopBar extends StatelessWidget {
                   IconButton(
                     onPressed: onEyeTap,
                     tooltip: 'YOLO 视觉（即将接入）',
-                    icon: const Icon(Icons.visibility_outlined, size: 21),
+                    icon: Icon(Icons.visibility_outlined, size: 21),
                   ),
                   Expanded(
                     child: GestureDetector(
@@ -522,7 +554,7 @@ class _StageTopBar extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
+                          Text(
                             '大肥鱼',
                             style: TextStyle(
                               color: AppColors.text,
@@ -531,7 +563,7 @@ class _StageTopBar extends StatelessWidget {
                               letterSpacing: 0.8,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          SizedBox(height: 2),
                           Text(
                             '${chat.backendLabel}  ·  下拉查看记忆',
                             maxLines: 1,
@@ -549,7 +581,7 @@ class _StageTopBar extends StatelessWidget {
                   IconButton(
                     onPressed: onSettings,
                     tooltip: '设置',
-                    icon: const Icon(Icons.tune_rounded, size: 20),
+                    icon: Icon(Icons.tune_rounded, size: 20),
                   ),
                 ],
               ),
@@ -562,7 +594,7 @@ class _StageTopBar extends StatelessWidget {
 }
 
 class _HistoryDrawer extends StatelessWidget {
-  const _HistoryDrawer({
+  _HistoryDrawer({
     required this.animation,
     required this.chat,
     required this.scroll,
@@ -591,7 +623,7 @@ class _HistoryDrawer extends StatelessWidget {
         );
       },
       child: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
@@ -603,7 +635,7 @@ class _HistoryDrawer extends StatelessWidget {
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(18, 10, 10, 8),
+                padding: EdgeInsets.fromLTRB(18, 10, 10, 8),
                 child: Row(
                   children: [
                     Container(
@@ -614,8 +646,8 @@ class _HistoryDrawer extends StatelessWidget {
                         borderRadius: BorderRadius.circular(99),
                       ),
                     ),
-                    const SizedBox(width: 14),
-                    const Text(
+                    SizedBox(width: 14),
+                    Text(
                       '历史对话',
                       style: TextStyle(
                         color: AppColors.text,
@@ -623,11 +655,11 @@ class _HistoryDrawer extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const Spacer(),
+                    Spacer(),
                     IconButton(
                       onPressed: onClose,
                       tooltip: '关闭',
-                      icon: const Icon(Icons.keyboard_arrow_up_rounded),
+                      icon: Icon(Icons.keyboard_arrow_up_rounded),
                     ),
                   ],
                 ),
@@ -650,7 +682,7 @@ class _HistoryDrawer extends StatelessWidget {
                         size: 16,
                         color: AppColors.muted.withValues(alpha: 0.7),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         '上滑关闭',
                         style: TextStyle(
@@ -672,20 +704,24 @@ class _HistoryDrawer extends StatelessWidget {
 }
 
 class _DialogueCard extends StatelessWidget {
-  const _DialogueCard({
+  _DialogueCard({
     required this.text,
     required this.collapsed,
+    required this.speaking,
+    required this.onSpeak,
     required this.onToggle,
   });
 
   final String text;
   final bool collapsed;
+  final bool speaking;
+  final VoidCallback onSpeak;
   final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 260),
+      duration: Duration(milliseconds: 260),
       curve: Curves.easeOutCubic,
       height: collapsed ? 28 : 82,
       child: GlassPanel(
@@ -701,7 +737,7 @@ class _DialogueCard extends StatelessWidget {
                 height: 26,
                 child: Row(
                   children: [
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Container(
                       width: 3,
                       height: 12,
@@ -710,7 +746,7 @@ class _DialogueCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
                       '大肥鱼',
                       style: TextStyle(
@@ -720,7 +756,18 @@ class _DialogueCard extends StatelessWidget {
                         letterSpacing: 0.8,
                       ),
                     ),
-                    const Spacer(),
+                    Spacer(),
+                    GestureDetector(
+                      onTap: onSpeak,
+                      child: Icon(
+                        speaking
+                            ? Icons.stop_circle_outlined
+                            : Icons.volume_up_rounded,
+                        size: 17,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    SizedBox(width: 10),
                     Icon(
                       collapsed
                           ? Icons.keyboard_arrow_up_rounded
@@ -728,7 +775,7 @@ class _DialogueCard extends StatelessWidget {
                       size: 17,
                       color: AppColors.muted,
                     ),
-                    const SizedBox(width: 10),
+                    SizedBox(width: 10),
                   ],
                 ),
               ),
@@ -736,14 +783,14 @@ class _DialogueCard extends StatelessWidget {
             if (!collapsed)
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
+                  padding: EdgeInsets.fromLTRB(14, 0, 14, 10),
                   child: Align(
                     alignment: Alignment.topLeft,
                     child: Text(
                       text,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         color: AppColors.onPrimaryContainer,
                         fontSize: 12.5,
                         height: 1.55,
@@ -760,7 +807,7 @@ class _DialogueCard extends StatelessWidget {
 }
 
 class _ChatSurface extends StatelessWidget {
-  const _ChatSurface({required this.chat, required this.scroll});
+  _ChatSurface({required this.chat, required this.scroll});
 
   final ChatController chat;
   final ScrollController scroll;
@@ -771,7 +818,7 @@ class _ChatSurface extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         border: Border(
           top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
         ),
@@ -779,7 +826,7 @@ class _ChatSurface extends StatelessWidget {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.18),
             blurRadius: 24,
-            offset: const Offset(0, -8),
+            offset: Offset(0, -8),
           ),
         ],
       ),
@@ -791,11 +838,11 @@ class _ChatSurface extends StatelessWidget {
               builder: (context, _) {
                 final messages = chat.messages;
                 if (messages.isEmpty) {
-                  return const _EmptyChat();
+                  return _EmptyChat();
                 }
                 return ListView.builder(
                   controller: scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 18, 16, 18),
+                  padding: EdgeInsets.fromLTRB(16, 18, 16, 18),
                   itemCount: messages.length,
                   itemBuilder: (context, index) => _MessageTile(
                     message: messages[index],
@@ -811,10 +858,10 @@ class _ChatSurface extends StatelessWidget {
             child: ListenableBuilder(
               listenable: chat,
               builder: (context, _) => AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
+                duration: Duration(milliseconds: 220),
                 child: chat.online
-                    ? const SizedBox.shrink()
-                    : const _OfflinePill(),
+                    ? SizedBox.shrink()
+                    : _OfflinePill(),
               ),
             ),
           ),
@@ -825,7 +872,7 @@ class _ChatSurface extends StatelessWidget {
 }
 
 class _MessageTile extends StatelessWidget {
-  const _MessageTile({required this.message});
+  _MessageTile({required this.message});
 
   final ChatMessage message;
 
@@ -838,11 +885,11 @@ class _MessageTile extends StatelessWidget {
           constraints: BoxConstraints(
             maxWidth: MediaQuery.sizeOf(context).width * 0.78,
           ),
-          margin: const EdgeInsets.only(bottom: 14, left: 36),
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+          margin: EdgeInsets.only(bottom: 14, left: 36),
+          padding: EdgeInsets.fromLTRB(14, 10, 14, 10),
           decoration: BoxDecoration(
             color: AppColors.primaryContainer.withValues(alpha: 0.82),
-            borderRadius: const BorderRadius.only(
+            borderRadius: BorderRadius.only(
               topLeft: Radius.circular(22),
               topRight: Radius.circular(22),
               bottomLeft: Radius.circular(22),
@@ -854,7 +901,7 @@ class _MessageTile extends StatelessWidget {
           ),
           child: SelectableText(
             message.content,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.onPrimaryContainer,
               fontSize: 14.5,
               height: 1.55,
@@ -866,23 +913,23 @@ class _MessageTile extends StatelessWidget {
 
     final body = message.content.trim();
     return Padding(
-      padding: const EdgeInsets.only(bottom: 18),
+      padding: EdgeInsets.only(bottom: 18),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           CircleAvatar(
             radius: 16,
             backgroundColor: AppColors.surfaceHigh,
-            backgroundImage: const AssetImage('assets/mascot/avatar.png'),
+            backgroundImage: AssetImage('assets/mascot/avatar.png'),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    const Text(
+                    Text(
                       '大肥鱼',
                       style: TextStyle(
                         color: AppColors.text,
@@ -891,7 +938,7 @@ class _MessageTile extends StatelessWidget {
                         letterSpacing: 0.4,
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
                       'MEMORY ENTITY',
                       style: TextStyle(
@@ -902,9 +949,9 @@ class _MessageTile extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 5),
+                SizedBox(height: 5),
                 if (body.isEmpty && message.streaming)
-                  const _ThinkingLine()
+                  _ThinkingLine()
                 else
                   MarkdownMessage(
                     data: body,
@@ -920,7 +967,7 @@ class _MessageTile extends StatelessWidget {
 }
 
 class _ThinkingLine extends StatelessWidget {
-  const _ThinkingLine();
+  _ThinkingLine();
 
   @override
   Widget build(BuildContext context) {
@@ -934,7 +981,7 @@ class _ThinkingLine extends StatelessWidget {
             color: AppColors.primary.withValues(alpha: 0.7),
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         Text(
           '思考中…',
           style: TextStyle(
@@ -948,19 +995,19 @@ class _ThinkingLine extends StatelessWidget {
 }
 
 class _OfflinePill extends StatelessWidget {
-  const _OfflinePill();
+  _OfflinePill();
 
   @override
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: AppColors.surfaceHigh.withValues(alpha: 0.86),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(color: AppColors.coral.withValues(alpha: 0.26)),
         ),
-        child: const Text(
+        child: Text(
           'OFFLINE · 检查后端 / adb reverse',
           style: TextStyle(
             color: AppColors.coral,
@@ -974,7 +1021,7 @@ class _OfflinePill extends StatelessWidget {
 }
 
 class _EmptyChat extends StatelessWidget {
-  const _EmptyChat();
+  _EmptyChat();
 
   @override
   Widget build(BuildContext context) {
@@ -983,7 +1030,7 @@ class _EmptyChat extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Image.asset('assets/mascot/avatar.png', width: 88, height: 88),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Text(
             '记忆体已就绪',
             style: TextStyle(
@@ -999,7 +1046,7 @@ class _EmptyChat extends StatelessWidget {
 }
 
 class _Composer extends StatelessWidget {
-  const _Composer({
+  _Composer({
     required this.chat,
     required this.controller,
     required this.focus,
@@ -1038,11 +1085,11 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSize(
-      duration: const Duration(milliseconds: 220),
+      duration: Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(0, 0, 0, 2),
+        padding: EdgeInsets.fromLTRB(0, 0, 0, 2),
         child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: AnimatedBuilder(
@@ -1053,13 +1100,13 @@ class _Composer extends StatelessWidget {
                 GlassPanel(
                   radius: 28,
                   blur: 24,
-                  padding: const EdgeInsets.fromLTRB(8, 6, 6, 2),
+                  padding: EdgeInsets.fromLTRB(8, 6, 6, 2),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       if (!live && attachments.isNotEmpty)
                         Padding(
-                          padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+                          padding: EdgeInsets.fromLTRB(4, 0, 4, 6),
                           child: Wrap(
                             spacing: 6,
                             runSpacing: 6,
@@ -1080,13 +1127,13 @@ class _Composer extends StatelessWidget {
                         children: [
                           AnimatedRotation(
                             turns: live ? 0.125 : 0,
-                            duration: const Duration(milliseconds: 220),
+                            duration: Duration(milliseconds: 220),
                             curve: Curves.easeOutBack,
                             child: IconButton(
                               onPressed: live ? onExitLive : onAttach,
                               tooltip: live ? '退出 Live' : '添加文件',
                               visualDensity: VisualDensity.compact,
-                              icon: const Icon(Icons.add_rounded, size: 20),
+                              icon: Icon(Icons.add_rounded, size: 20),
                             ),
                           ),
                           Expanded(
@@ -1099,7 +1146,7 @@ class _Composer extends StatelessWidget {
                                         onLongPressStart: (_) => onVoiceStart(),
                                         onLongPressEnd: (_) => onVoiceEnd(),
                                         child: ConstrainedBox(
-                                          constraints: const BoxConstraints(
+                                          constraints: BoxConstraints(
                                             maxHeight: 168,
                                           ),
                                           child: TextField(
@@ -1110,12 +1157,12 @@ class _Composer extends StatelessWidget {
                                           keyboardType: TextInputType.multiline,
                                           textInputAction: TextInputAction.send,
                                           onSubmitted: (_) => onLongPressSend(),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: AppColors.text,
                                             fontSize: 14.5,
                                             height: 1.45,
                                           ),
-                                          decoration: const InputDecoration(
+                                          decoration: InputDecoration(
                                             hintText: '说点什么…',
                                             border: InputBorder.none,
                                             isDense: true,
@@ -1127,7 +1174,7 @@ class _Composer extends StatelessWidget {
                                         ),
                                       ),
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: 4),
                           if (!live)
                             ValueListenableBuilder<TextEditingValue>(
                               valueListenable: controller,
@@ -1139,22 +1186,22 @@ class _Composer extends StatelessWidget {
                                 return GestureDetector(
                                   onLongPress: chat.busy ? null : onLongPressSend,
                                   child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 160),
+                                    duration: Duration(milliseconds: 160),
                                     child: chat.busy
                                         ? IconButton.filled(
-                                            key: const ValueKey('stop'),
+                                            key: ValueKey('stop'),
                                             onPressed: onStop,
                                             tooltip: '停止',
-                                            icon: const Icon(
+                                            icon: Icon(
                                               Icons.stop_rounded,
                                               size: 20,
                                             ),
                                           )
                                         : IconButton.filled(
-                                            key: const ValueKey('send'),
+                                            key: ValueKey('send'),
                                             onPressed: canSend ? onSend : null,
                                             tooltip: '发送 · 长按 Live',
-                                            icon: const Icon(
+                                            icon: Icon(
                                               Icons.arrow_upward_rounded,
                                               size: 20,
                                             ),
@@ -1165,7 +1212,7 @@ class _Composer extends StatelessWidget {
                             )
                           else
                             Padding(
-                              padding: const EdgeInsets.only(right: 10),
+                              padding: EdgeInsets.only(right: 10),
                               child: Text(
                                 'LIVE',
                                 style: TextStyle(
@@ -1200,7 +1247,7 @@ class _Composer extends StatelessWidget {
 }
 
 class _LiveBody extends StatelessWidget {
-  const _LiveBody({required this.pulse});
+  _LiveBody({required this.pulse});
 
   final AnimationController pulse;
 
@@ -1208,9 +1255,9 @@ class _LiveBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         _Waveform(pulse: pulse, bars: 13, color: AppColors.primary),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Text(
           '正在听…',
           style: TextStyle(
@@ -1225,7 +1272,7 @@ class _LiveBody extends StatelessWidget {
 }
 
 class _VoiceBody extends StatelessWidget {
-  const _VoiceBody({required this.pulse});
+  _VoiceBody({required this.pulse});
 
   final AnimationController pulse;
 
@@ -1233,11 +1280,11 @@ class _VoiceBody extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Icon(Icons.mic_rounded, size: 17, color: AppColors.coral),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         _Waveform(pulse: pulse, bars: 11, color: AppColors.coral),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Text(
           '松开发送',
           style: TextStyle(
@@ -1252,7 +1299,7 @@ class _VoiceBody extends StatelessWidget {
 }
 
 class _Waveform extends StatelessWidget {
-  const _Waveform({
+  _Waveform({
     required this.pulse,
     required this.bars,
     required this.color,
@@ -1279,7 +1326,7 @@ class _Waveform extends StatelessWidget {
 }
 
 class _WaveformPainter extends CustomPainter {
-  const _WaveformPainter({
+  _WaveformPainter({
     required this.progress,
     required this.bars,
     required this.color,
@@ -1314,7 +1361,7 @@ class _WaveformPainter extends CustomPainter {
 }
 
 class _LiveBeamPainter extends CustomPainter {
-  const _LiveBeamPainter({required this.progress});
+  _LiveBeamPainter({required this.progress});
 
   final double progress;
 
