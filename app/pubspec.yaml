@@ -14,6 +14,8 @@ dependencies:
   flutter_markdown_plus: ^1.0.12
   flutter_svg: 2.2.4
   rive: ^0.14.11
+  live2d_flutter: ^1.0.3
+  archive: ^4.6.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -30,3 +32,7 @@ flutter:
     - assets/live2d/whale-girl/c_0120.2048/
     - assets/live2d/whale-girl/motions/
     - assets/live2d/whale-girl/expressions/
+
+dependency_overrides:
+  live2d_flutter:
+    path: ../third_party/live2d_flutter

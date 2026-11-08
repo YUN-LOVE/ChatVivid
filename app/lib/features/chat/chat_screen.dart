@@ -308,9 +308,15 @@ class _ChatScreenState extends State<ChatScreen>
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-            child: CharacterStage(
-              customRivePath: widget.settings.characterRivePath,
-              characterMode: widget.settings.characterMode,
+            child: ListenableBuilder(
+              listenable: chat,
+              builder: (context, _) => CharacterStage(
+                customRivePath: widget.settings.characterRivePath,
+                characterMode: widget.settings.characterMode,
+                speaking: chat.busy,
+                live2dDir: widget.settings.live2dDir,
+                live2dModel: widget.settings.live2dModel,
+              ),
             ),
           ),
           if (!_historyOpen)
@@ -466,45 +472,6 @@ class _BootstrapScreen extends StatelessWidget {
   }
 }
 
-class _StatusDot extends StatelessWidget {
-  const _StatusDot({required this.online});
-
-  final bool online;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 6,
-          height: 6,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: online ? AppColors.success : AppColors.coral,
-            boxShadow: [
-              if (online)
-                BoxShadow(
-                  color: AppColors.success.withValues(alpha: 0.5),
-                  blurRadius: 6,
-                ),
-            ],
-          ),
-        ),
-        const SizedBox(width: 5),
-        Text(
-          online ? 'LINKED' : 'OFFLINE',
-          style: TextStyle(
-            color: AppColors.muted.withValues(alpha: 0.6),
-            fontSize: 7,
-            letterSpacing: 1.2,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _StageTopBar extends StatelessWidget {
   const _StageTopBar({
     required this.chat,
@@ -579,7 +546,6 @@ class _StageTopBar extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _StatusDot(online: chat.online),
                   IconButton(
                     onPressed: onSettings,
                     tooltip: '设置',

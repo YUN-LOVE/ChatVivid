@@ -1,0 +1,44 @@
+{
+  "buildFiles": [
+    "/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/YUN-LOVE/Downloads/chatvv/.android-sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/.cxx/Debug/602o6v2m/arm64-v8a",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/YUN-LOVE/Downloads/chatvv/.android-sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/.cxx/Debug/602o6v2m/arm64-v8a",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "CubismFramework::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "CubismFramework",
+      "output": "/home/YUN-LOVE/Downloads/chatvv/third_party/live2d_flutter/android/.cxx/Debug/602o6v2m/arm64-v8a/libCubismFramework.a"
+    },
+    "flutter_live2d::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "arm64-v8a",
+      "artifactName": "flutter_live2d",
+      "output": "/home/YUN-LOVE/Downloads/chatvv/app/build/live2d_flutter/intermediates/cxx/Debug/602o6v2m/obj/arm64-v8a/libflutter_live2d.so",
+      "runtimeFiles": []
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/home/YUN-LOVE/Downloads/chatvv/.android-sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/home/YUN-LOVE/Downloads/chatvv/.android-sdk/ndk/27.2.12479018/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}
