@@ -1037,9 +1037,13 @@ class _Composer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 0, 0, 2),
-      child: ClipRRect(
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 0, 0, 2),
+        child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: AnimatedBuilder(
           animation: pulse,
@@ -1094,11 +1098,16 @@ class _Composer extends StatelessWidget {
                                         behavior: HitTestBehavior.translucent,
                                         onLongPressStart: (_) => onVoiceStart(),
                                         onLongPressEnd: (_) => onVoiceEnd(),
-                                        child: TextField(
+                                        child: ConstrainedBox(
+                                          constraints: const BoxConstraints(
+                                            maxHeight: 168,
+                                          ),
+                                          child: TextField(
                                           controller: controller,
                                           focusNode: focus,
                                           minLines: 1,
-                                          maxLines: 5,
+                                          maxLines: null,
+                                          keyboardType: TextInputType.multiline,
                                           textInputAction: TextInputAction.send,
                                           onSubmitted: (_) => onLongPressSend(),
                                           style: const TextStyle(
@@ -1113,6 +1122,7 @@ class _Composer extends StatelessWidget {
                                             contentPadding: EdgeInsets.symmetric(
                                               vertical: 10,
                                             ),
+                                          ),
                                           ),
                                         ),
                                       ),
@@ -1183,6 +1193,7 @@ class _Composer extends StatelessWidget {
             );
           },
         ),
+      ),
       ),
     );
   }

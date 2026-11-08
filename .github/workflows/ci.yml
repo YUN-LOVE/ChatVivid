@@ -279,6 +279,10 @@ jobs:
             --dart-define=APP_VERSION="$VERSION" \
             --dart-define=BUILD_NUMBER="$COUNT" \
             --dart-define=BUILD_COMMIT="$SHA"
+      - name: Verify Android 16 KB page size and signature
+        shell: bash
+        run: |
+          ./scripts/verify-android-apk.sh             app/build/app/outputs/flutter-apk/app-debug.apk
       - uses: actions/upload-artifact@v4
         with:
           name: chatvv-app-android

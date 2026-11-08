@@ -49,10 +49,18 @@ class _Live2DStageState extends State<Live2DStage> {
     super.initState();
     _controller.whenAttached.then((_) async {
       try {
-        final ok = await _controller.loadModel(
-          modelDir: widget.modelDir,
-          modelFileName: widget.modelFile,
-        );
+        var ok = false;
+        // The platform view can attach before its GL surface has a size;
+        // loadModel is deliberately rejected by the native side in that case.
+        for (var attempt = 0; attempt < 6 && !ok; attempt++) {
+          ok = await _controller.loadModel(
+            modelDir: widget.modelDir,
+            modelFileName: widget.modelFile,
+          );
+          if (!ok) {
+            await Future<void>.delayed(const Duration(milliseconds: 220));
+          }
+        }
         if (!mounted) return;
         setState(() {
           _loaded = ok;
@@ -137,6 +145,7 @@ class _Live2DStageState extends State<Live2DStage> {
     return Stack(
       fit: StackFit.expand,
       children: [
+        if (!_loaded && widget.fallback != null) widget.fallback!,
         Live2DView(controller: _controller),
         if (!_loaded)
           Center(

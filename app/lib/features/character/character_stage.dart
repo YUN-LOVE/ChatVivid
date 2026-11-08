@@ -180,11 +180,34 @@ class _CharacterStageState extends State<CharacterStage> {
 
   @override
   Widget build(BuildContext context) {
+    final mode = widget.characterMode;
+    if ((mode == CharacterMode.live2d ||
+            mode == CharacterMode.live2dExternal) &&
+        live2dSupported) {
+      // Platform views must not be wrapped in a Flutter ClipRect/Stack on
+      // Android; the native GL surface can otherwise be clipped away.
+      return Live2DStage(
+        modelDir: mode == CharacterMode.live2dExternal
+            ? widget.live2dDir
+            : 'assets/live2d/whale-girl/',
+        modelFile: mode == CharacterMode.live2dExternal
+            ? widget.live2dModel
+            : 'c_0120.model3.json',
+        speaking: widget.speaking,
+        fallback: Image.asset(
+          'assets/mascot/dafeiyu-front.png',
+          fit: BoxFit.contain,
+          filterQuality: FilterQuality.medium,
+        ),
+      );
+    }
     return ClipRect(
       child: Stack(
         fit: StackFit.expand,
         children: [
-          const _StageBackdrop(),
+          if (widget.characterMode != CharacterMode.live2d &&
+              widget.characterMode != CharacterMode.live2dExternal)
+            const _StageBackdrop(),
           Align(
             alignment: const Alignment(0, 0.10),
             child: Container(
@@ -211,6 +234,7 @@ class _CharacterStageState extends State<CharacterStage> {
                   child: GestureDetector(
                     onTap: () => setState(() => _taps++),
                     child: SizedBox(
+                      width: constraints.maxWidth,
                       height: height * 0.94,
                       child: _stageChild(),
                     ),
@@ -325,15 +349,6 @@ class _StageBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 5,
-            height: 5,
-            decoration: const BoxDecoration(
-              color: AppColors.success,
-              shape: BoxShape.circle,
-            ),
-          ),
-          const SizedBox(width: 7),
           Text(
             '鲸鱼娘 · ${taps == 0 ? '待机' : '已互动 $taps'}',
             style: TextStyle(

@@ -1,0 +1,4 @@
+storeFile=../chatvivid-release.jks
+storePassword=change-me
+keyAlias=chatvivid
+keyPassword=change-me

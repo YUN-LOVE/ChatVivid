@@ -113,6 +113,12 @@ target_include_directories(chatvv_ffi
   PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
   PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(chatvv_ffi PRIVATE chatvv_core)
+if(ANDROID)
+  # Android 15+/17 requires 16 KB page-compatible ELF load segments.
+  target_link_options(chatvv_ffi PRIVATE
+    "-Wl,-z,max-page-size=16384"
+    "-Wl,-z,common-page-size=16384")
+endif()
 target_compile_definitions(chatvv_ffi PRIVATE CHATVV_FFI_BUILD)
 set_target_properties(chatvv_ffi PROPERTIES
   CXX_VISIBILITY_PRESET hidden
