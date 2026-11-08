@@ -5,6 +5,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:rive/rive.dart';
 
 import '../../data/app_settings.dart';
+import 'live2d_stage.dart';
 
 import '../../theme/app_theme.dart';
 
@@ -14,11 +15,17 @@ class CharacterStage extends StatefulWidget {
   const CharacterStage({
     super.key,
     this.customRivePath = '',
-    this.characterMode = CharacterMode.rive,
+    this.characterMode = CharacterMode.live2d,
+    this.speaking = false,
+    this.live2dDir = '',
+    this.live2dModel = '',
   });
 
   final String customRivePath;
   final CharacterMode characterMode;
+  final bool speaking;
+  final String live2dDir;
+  final String live2dModel;
 
   @override
   State<CharacterStage> createState() => _CharacterStageState();
@@ -82,6 +89,28 @@ class _CharacterStageState extends State<CharacterStage> {
   Widget _stageChild() {
     final mode = widget.characterMode;
     final isSvg = widget.customRivePath.toLowerCase().endsWith('.svg');
+
+    if (mode == CharacterMode.live2d ||
+        mode == CharacterMode.live2dExternal) {
+      final fallback = Image.asset(
+        'assets/mascot/dafeiyu-front.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+      );
+      if (live2dSupported) {
+        return Live2DStage(
+          modelDir: mode == CharacterMode.live2dExternal
+              ? widget.live2dDir
+              : 'assets/live2d/whale-girl/',
+          modelFile: mode == CharacterMode.live2dExternal
+              ? widget.live2dModel
+              : 'c_0120.model3.json',
+          speaking: widget.speaking,
+          fallback: fallback,
+        );
+      }
+      return fallback;
+    }
 
     if (mode == CharacterMode.staticImage) {
       return Image.asset(

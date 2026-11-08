@@ -23,6 +23,8 @@ enum CharacterMode {
   rive('rive'),
   staticImage('static'),
   altImage('alt'),
+  live2d('live2d'),
+  live2dExternal('live2dExternal'),
   custom('custom');
 
   const CharacterMode(this.wireName);
@@ -31,7 +33,7 @@ enum CharacterMode {
 
   static CharacterMode fromWire(String? value) => CharacterMode.values.firstWhere(
         (mode) => mode.wireName == value,
-        orElse: () => CharacterMode.staticImage,
+        orElse: () => CharacterMode.live2d,
       );
 }
 
@@ -50,6 +52,8 @@ class AppSettings {
     required this.skills,
     required this.mcpServers,
     required this.characterRivePath,
+    required this.live2dDir,
+    required this.live2dModel,
     required this.characterMode,
     required this.agentEnabled,
     required this.onboardingComplete,
@@ -70,7 +74,9 @@ class AppSettings {
       skills: const [],
       mcpServers: const [],
       characterRivePath: '',
-      characterMode: CharacterMode.staticImage,
+      live2dDir: '',
+      live2dModel: '',
+      characterMode: CharacterMode.live2d,
       agentEnabled: false,
       onboardingComplete: false,
     );
@@ -109,6 +115,8 @@ class AppSettings {
               .toList() ??
           const [],
       characterRivePath: (json['character_rive_path'] as String?) ?? '',
+      live2dDir: (json['live2d_dir'] as String?) ?? '',
+      live2dModel: (json['live2d_model'] as String?) ?? '',
       characterMode: CharacterMode.fromWire(
         json['character_mode'] as String?,
       ),
@@ -130,6 +138,8 @@ class AppSettings {
   final List<Skill> skills;
   final List<McpServer> mcpServers;
   final String characterRivePath;
+  final String live2dDir;
+  final String live2dModel;
   final CharacterMode characterMode;
   final bool agentEnabled;
   final bool onboardingComplete;
@@ -148,6 +158,8 @@ class AppSettings {
         'skills': skills.map((item) => item.toJson()).toList(),
         'mcp_servers': mcpServers.map((item) => item.toJson()).toList(),
         'character_rive_path': characterRivePath,
+        'live2d_dir': live2dDir,
+        'live2d_model': live2dModel,
         'character_mode': characterMode.wireName,
         'agent_enabled': agentEnabled,
         'onboarding_complete': onboardingComplete,
@@ -167,6 +179,8 @@ class AppSettings {
     List<Skill>? skills,
     List<McpServer>? mcpServers,
     String? characterRivePath,
+    String? live2dDir,
+    String? live2dModel,
     CharacterMode? characterMode,
     bool? agentEnabled,
     bool? onboardingComplete,
@@ -185,6 +199,8 @@ class AppSettings {
       skills: skills ?? this.skills,
       mcpServers: mcpServers ?? this.mcpServers,
       characterRivePath: characterRivePath ?? this.characterRivePath,
+      live2dDir: live2dDir ?? this.live2dDir,
+      live2dModel: live2dModel ?? this.live2dModel,
       characterMode: characterMode ?? this.characterMode,
       agentEnabled: agentEnabled ?? this.agentEnabled,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
@@ -205,6 +221,8 @@ class AppSettings {
         skills.map((item) => item.toJson().toString()).join(';'),
         mcpServers.map((item) => item.toJson().toString()).join(';'),
         characterRivePath,
+        live2dDir,
+        live2dModel,
         characterMode.wireName,
         agentEnabled,
       ].join('|');

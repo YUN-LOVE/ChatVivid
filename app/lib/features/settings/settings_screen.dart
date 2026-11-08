@@ -1,3 +1,4 @@
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/build_info.dart';
@@ -883,15 +884,47 @@ class _SettingsDetailState extends State<SettingsDetail> {
       final dir = Directory('${support.path}/character');
       await dir.create(recursive: true);
       final lower = picked.name.toLowerCase();
-      final extension = lower.endsWith('.svg') ? 'svg' : 'riv';
-      final file = File('${dir.path}/imported.$extension');
-      await file.writeAsBytes(picked.bytes, flush: true);
-      setState(() {
-        _settings = _settings.copyWith(
-          characterRivePath: file.path,
-          characterMode: CharacterMode.custom,
-        );
-      });
+      if (lower.endsWith('.zip')) {
+        final archive = ZipDecoder().decodeBytes(picked.bytes);
+        final modelDir = Directory('${dir.path}/live2d_imported');
+        if (await modelDir.exists()) {
+          await modelDir.delete(recursive: true);
+        }
+        await modelDir.create(recursive: true);
+        String? modelFile;
+        for (final entry in archive) {
+          if (!entry.isFile) continue;
+          final name = entry.name.replaceAll('\\', '/');
+          if (name.contains('..') || name.startsWith('/')) continue;
+          final target = File('${modelDir.path}/$name');
+          await target.parent.create(recursive: true);
+          await target.writeAsBytes(entry.content as List<int>, flush: true);
+          if (name.endsWith('.model3.json') && modelFile == null) {
+            modelFile = name;
+          }
+        }
+        if (modelFile == null) {
+          throw const FormatException('ZIP 中没有 .model3.json');
+        }
+        setState(() {
+          _settings = _settings.copyWith(
+            characterMode: CharacterMode.live2dExternal,
+            live2dDir: modelDir.path,
+            live2dModel: modelFile,
+            characterRivePath: '',
+          );
+        });
+      } else {
+        final extension = lower.endsWith('.svg') ? 'svg' : 'riv';
+        final file = File('${dir.path}/imported.$extension');
+        await file.writeAsBytes(picked.bytes, flush: true);
+        setState(() {
+          _settings = _settings.copyWith(
+            characterRivePath: file.path,
+            characterMode: CharacterMode.custom,
+          );
+        });
+      }
       _emit();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -909,6 +942,8 @@ class _SettingsDetailState extends State<SettingsDetail> {
     setState(() {
       _settings = _settings.copyWith(
         characterRivePath: '',
+        live2dDir: '',
+        live2dModel: '',
         characterMode: CharacterMode.rive,
       );
     });
@@ -923,6 +958,28 @@ class _SettingsDetailState extends State<SettingsDetail> {
   Widget _character() {
     return Column(
       children: [
+        _SettingCard(
+          icon: Icons.view_in_ar_rounded,
+          title: 'Live2D · DS 鲸鱼娘',
+          subtitle: '眨眼 · 呼吸 · 口形追踪',
+          trailing: _settings.characterMode == CharacterMode.live2d
+              ? const Icon(Icons.check_rounded, color: AppColors.success)
+              : const Icon(Icons.chevron_right_rounded),
+          onTap: () => _setCharacterMode(CharacterMode.live2d),
+        ),
+        if (_settings.live2dDir.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          _SettingCard(
+            icon: Icons.folder_special_outlined,
+            title: 'Live2D · 外部模型',
+            subtitle: _settings.live2dModel,
+            trailing: _settings.characterMode == CharacterMode.live2dExternal
+                ? const Icon(Icons.check_rounded, color: AppColors.success)
+                : const Icon(Icons.chevron_right_rounded),
+            onTap: () => _setCharacterMode(CharacterMode.live2dExternal),
+          ),
+        ],
+        const SizedBox(height: 10),
         _SettingCard(
           icon: Icons.image_rounded,
           title: '立绘 · 女仆装',
@@ -957,7 +1014,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           icon: Icons.download_rounded,
           title: '导入外部模型',
           subtitle: _settings.characterRivePath.isEmpty
-              ? '支持 Rive .riv / SVG；导入后启用'
+              ? '支持 Rive .riv / SVG / Live2D .zip'
               : '当前：${_settings.characterRivePath.split('/').last} · 点击重新导入',
           trailing: _settings.characterMode == CharacterMode.custom
               ? const Icon(Icons.check_rounded, color: AppColors.success)
@@ -1077,7 +1134,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         _SettingCard(
           icon: Icons.face_rounded,
           title: '角色与资产署名',
-          subtitle: '大肥鱼角色 / Rive sample / BGE 模型',
+          subtitle: 'Live2D 模型 / 大肥鱼角色 / Rive / BGE',
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: () => showDialog<void>(
             context: context,
@@ -1085,7 +1142,9 @@ class _SettingsDetailState extends State<SettingsDetail> {
               title: const Text('角色与资产署名'),
               content: const SingleChildScrollView(
                 child: Text(
-                  '大肥鱼角色设定：上善无形 / ZipZipPipe / 氵六青\n\n'
+                  'Live2D「DS 鲸鱼娘」：上善无形 / ZipZipPipe / 氵六青\n'
+                  '模型素材 CC BY-NC-SA 4.0（非商业、署名、相同方式共享）\n'
+                  'Live2D Cubism Core 版权归 Live2D Inc.，按其 SDK 条款使用\n\n'
                   '默认 Rive 动画：Rive Flutter 示例资产 walking.riv\n'
                   'RAG embedding：BAAI bge-small-zh-v1.5 (MIT)，经 llama.cpp 加载\n\n'
                   'Rive runtime 为 MIT 许可；示例资产请按原仓库许可使用。',
