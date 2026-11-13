@@ -108,6 +108,10 @@ add_library(chatvv_core STATIC
   src/dialog/dialog_service.cpp
   src/tts/synthesize.cpp
   src/asr/asr.cpp)
+if(ANDROID)
+  # __android_log_print() used by the native logging bridge.
+  target_link_libraries(chatvv_core PUBLIC log)
+endif()
 target_include_directories(chatvv_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(chatvv_core SYSTEM PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/include)
