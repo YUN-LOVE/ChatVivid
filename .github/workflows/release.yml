@@ -337,8 +337,16 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
         run: ./platforms/android/setup-signing.sh --required
-      - name: Build and package
-        shell: ${{ matrix.shell }}
+      - name: Build and package (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          CHATVV_VULKAN: ${{ matrix.vulkan }}
+          ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+        run: ${{ matrix.command }}
+      - name: Build and package (pwsh)
+        if: runner.os == 'Windows'
+        shell: pwsh
         env:
           CHATVV_VULKAN: ${{ matrix.vulkan }}
           ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}

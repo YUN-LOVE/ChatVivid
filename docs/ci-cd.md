@@ -232,7 +232,9 @@ cmake --preset dev && cmake --build --preset dev && ctest --preset dev
 
 - `python3`（标准库 `json`）本地模拟 `detect-changes.py` / `parse-tag.py` 的路径与 tag 分类；
 - YAML 语法与结构校验（PyYAML/js-yaml 解析、唯一 key、action 版本固定、needs 输出引用、脚本路径存在）；
-- `bash -n` 全部 shell 脚本、`py_compile` 全部 CI python 脚本。
+- `bash -n` 全部 shell 脚本、`py_compile` 全部 CI python 脚本；
+- **actionlint**（CI lint job 也会跑）：能发现 `shell: ${{ matrix.x }}` 这类 GitHub
+  不接受的表达式位置（PyYAML 看不出来）。
 
 **未在 GitHub 上实际运行过**。首次 push 后可能出现的问题列在第 14 节，按提示修正即可。
 

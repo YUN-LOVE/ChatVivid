@@ -164,35 +164,30 @@ def _artifact_name(platform: str, mode: str) -> str:
 APP_RUNNERS: dict[str, dict[str, str]] = {
     "android": {
         "runner": "ubuntu-latest",
-        "shell": "bash",
         "timeout": 90,
         "rust_targets": "aarch64-linux-android,armv7-linux-androideabi",
         "vulkan": "ON",
     },
     "ios": {
         "runner": "macos-14",
-        "shell": "bash",
         "timeout": 60,
         "rust_targets": "aarch64-apple-ios",
         "vulkan": "OFF",
     },
     "linux": {
         "runner": "ubuntu-latest",
-        "shell": "bash",
         "timeout": 90,
         "rust_targets": "x86_64-unknown-linux-gnu",
         "vulkan": "ON",
     },
     "macos": {
         "runner": "macos-14",
-        "shell": "bash",
         "timeout": 60,
         "rust_targets": "aarch64-apple-darwin,x86_64-apple-darwin",
         "vulkan": "OFF",
     },
     "windows": {
         "runner": "windows-2022",
-        "shell": "pwsh",
         "timeout": 120,
         "rust_targets": "x86_64-pc-windows-msvc",
         "vulkan": "ON",

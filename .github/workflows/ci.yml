@@ -101,6 +101,10 @@ jobs:
         run: python3 -m pip install --quiet pyyaml
       - name: Validate workflows and scripts
         run: python3 platforms/common/ci/lint-workflows.py
+      - name: Install actionlint
+        run: python3 -m pip install --quiet actionlint-py
+      - name: actionlint (workflow expressions)
+        run: actionlint .github/workflows/*.yml
 
   # ---------------------------------------------------------------------------
   # C++ backend: Linux x64 + arm64 (native runners).
@@ -382,8 +386,16 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
           ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
         run: ./platforms/android/setup-signing.sh --required
-      - name: Build and package
-        shell: ${{ matrix.shell }}
+      - name: Build and package (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          CHATVV_VULKAN: ${{ matrix.vulkan }}
+          ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+        run: ${{ matrix.command }}
+      - name: Build and package (pwsh)
+        if: runner.os == 'Windows'
+        shell: pwsh
         env:
           CHATVV_VULKAN: ${{ matrix.vulkan }}
           ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
