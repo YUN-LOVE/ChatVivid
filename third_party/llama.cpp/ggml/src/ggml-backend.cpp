@@ -38,6 +38,14 @@ const char * ggml_backend_buft_name(ggml_backend_buffer_type_t buft) {
 
 ggml_backend_buffer_t ggml_backend_buft_alloc_buffer(ggml_backend_buffer_type_t buft, size_t size) {
     GGML_ASSERT(buft);
+    // chatvv debug: a partially initialised buffer type (seen on Android with
+    // ggml-vulkan) would otherwise jump through a NULL function pointer.
+    if (buft->iface.alloc_buffer == NULL) {
+        GGML_LOG_ERROR("%s: buffer type %p (device %p, get_name %p) has no alloc_buffer; refusing to call it\n",
+                       __func__, (const void *) buft, (const void *) buft->device,
+                       (const void *) buft->iface.get_name);
+        return NULL;
+    }
     if (size == 0) {
         // return a dummy buffer for zero-sized allocations
         return ggml_backend_buffer_init(buft, {}, NULL, 0);
@@ -171,6 +179,13 @@ static size_t ggml_backend_buft_get_alloc_size_n_default(ggml_backend_buffer_typ
 
 ggml_backend_buffer_t ggml_backend_buft_alloc_buffer_n(ggml_backend_buffer_type_t buft, struct ggml_tensor ** tensors, int n_tensors) {
     GGML_ASSERT(buft);
+    // chatvv debug: see ggml_backend_buft_alloc_buffer above.
+    if (buft->iface.alloc_buffer_n == NULL && buft->iface.alloc_buffer == NULL) {
+        GGML_LOG_ERROR("%s: buffer type %p (device %p, get_name %p) has no alloc_buffer; refusing to call it\n",
+                       __func__, (const void *) buft, (const void *) buft->device,
+                       (const void *) buft->iface.get_name);
+        return NULL;
+    }
     if (buft->iface.alloc_buffer_n) {
         return buft->iface.alloc_buffer_n(buft, tensors, n_tensors);
     }
