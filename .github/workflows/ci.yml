@@ -281,9 +281,15 @@ jobs:
             }
             Write-Host "$dll -> $hit"
           }
-          if (Test-Path "$env:VULKAN_SDK\Bin\vulkan-1.dll") {
-            Copy-Item "$env:VULKAN_SDK\Bin\vulkan-1.dll" $exeDir -Force
-            Write-Host "copied vulkan-1.dll next to chatvv_tests.exe"
+          # Locate vulkan-1.dll anywhere in the SDK (layout differs between SDK
+          # versions), then put it next to the test exe so ctest can load it.
+          $vk = Get-ChildItem "$env:VULKAN_SDK" -Recurse -Filter "vulkan-1.dll" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if ($vk) {
+            Copy-Item $vk.FullName $exeDir -Force
+            Write-Host "copied $($vk.FullName) next to chatvv_tests.exe"
+          } else {
+            Write-Warning "vulkan-1.dll not found under $env:VULKAN_SDK"
           }
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           if (Test-Path $vswhere) {

@@ -20,12 +20,18 @@
 #                              configure picks up host x86_64 Vulkan libs, e.g.
 #                              -DVulkan_LIBRARY=<ndk-sysroot>/libvulkan.so
 #                              -DVulkan_INCLUDE_DIR=<ndk-sysroot>/usr/include
+#   CHATVV_ANDROID_BUILD_TYPE  CMake build type (default Release: no -g, the
+#                              static llama/whisper/vulkan .so gets very large
+#                              with debug info and stresses the CI linker/disk)
 #   CHATVV_SKIP_READ_ALOUD=1   skip read-aloud staging (local experiments only)
 #
 # Rust: read-aloud builds through CMake (see cmake/readaloud.cmake). This script
 # exports the NDK linker/CC/AR env vars cargo needs, and the 16 KB page-size
 # linker flags for the Rust cdylib (verify-apk.sh checks every bundled ELF).
 set -euo pipefail
+
+# Make failures diagnosable in CI: an error trap reports the exact command/line.
+trap 'rc=$?; echo "build-ffi.sh FAILED (rc=$rc) at line $LINENO: $BASH_COMMAND" >&2' ERR
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=../common/build-lib.sh
@@ -163,7 +169,9 @@ if [[ "$VULKAN_MODE" != "OFF" ]]; then
   fi
 fi
 
+ANDROID_BUILD_TYPE="${CHATVV_ANDROID_BUILD_TYPE:-Release}"
 cmake --preset android-arm64 \
+  "-DCMAKE_BUILD_TYPE=$ANDROID_BUILD_TYPE" \
   "-DCHATVV_VULKAN=$VULKAN_MODE" \
   "-DCHATVV_READ_ALOUD_LINKAGE=${CHATVV_READ_ALOUD_LINKAGE:-shared}" \
   ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
