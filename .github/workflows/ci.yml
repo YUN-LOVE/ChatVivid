@@ -245,7 +245,13 @@ jobs:
             exit 1
           }
       - name: Build
-        run: cmake --build --preset windows-x64
+        shell: pwsh
+        run: |
+          cmake --build --preset windows-x64 2>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content build.log -Tail 25 | ForEach-Object { Write-Output "::error::$_" }
+            exit 1
+          }
       - name: Test
         run: ctest --preset windows-x64
 
@@ -262,6 +268,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.44.2'   # keep in sync with docs/install-arch.md
           channel: stable
           cache: true
       - name: Pub get
@@ -269,7 +276,16 @@ jobs:
         run: flutter pub get
       - name: Analyze
         working-directory: app
-        run: flutter analyze
+        shell: bash
+        run: |
+          set +e
+          flutter analyze 2>&1 | tee /tmp/flutter-analyze.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::flutter analyze failed; first diagnostics:"
+            grep -E '^ *(error|warning|info) ' /tmp/flutter-analyze.log | head -n 15 | sed 's/^/::error::/'
+            exit "$rc"
+          fi
       - name: Test
         working-directory: app
         shell: bash
@@ -306,6 +322,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.44.2'   # keep in sync with docs/install-arch.md
           channel: stable
           cache: true
       - name: Rust toolchain (read-aloud)
@@ -375,7 +392,14 @@ jobs:
             ANDROID_VULKAN_CMAKE_ARGS="$ANDROID_VULKAN_CMAKE_ARGS -DVulkan_GLSLC_EXECUTABLE=$(command -v glslc)"
           fi
           export ANDROID_VULKAN_CMAKE_ARGS
-          ./platforms/android/build-ffi.sh
+          set +e
+          ./platforms/android/build-ffi.sh 2>&1 | tee /tmp/build-ffi.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::build-ffi.sh failed (exit $rc); last log lines:"
+            tail -n 25 /tmp/build-ffi.log | sed 's/^/::error::/'
+            exit "$rc"
+          fi
       - name: Configure Android signing (unified key)
         if: matrix.platform == 'android'
         shell: bash
@@ -399,7 +423,12 @@ jobs:
         env:
           CHATVV_VULKAN: ${{ matrix.vulkan }}
           ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
-        run: ${{ matrix.command }}
+        run: |
+          & ${{ matrix.command }} 2>&1 | Tee-Object -FilePath package.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content package.log -Tail 25 | ForEach-Object { Write-Output "::error::$_" }
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
