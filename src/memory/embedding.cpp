@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <mutex>
 
+#include <ggml-backend.h>
 #include <llama.h>
 
 #include "util/log.h"
@@ -52,6 +53,23 @@ bool EmbeddingEngine::load(const std::string& model_path, int threads,
 
   llama_model_params model_params = llama_model_default_params();
   model_params.n_gpu_layers = 0;
+
+  // Keep RAG embeddings on the CPU on every platform.
+  //
+  // The embedding model is tiny (bge-small, ~26 MB), so a GPU backend buys
+  // nothing measurable, but ggml's Vulkan backend crashes while loading the
+  // model on some Android devices (SIGSEGV with a NULL buffer-type iface inside
+  // ggml_backend_buft_alloc_buffer_n, reported from llama_model_load_from_file
+  // on a Pixel 6a/Adreno). A NULL-terminated CPU-only device list makes llama
+  // allocate the weights through the CPU buffer types; llama_backend_init()
+  // still registers the Vulkan backend for the ASR/LLM paths.
+  static ggml_backend_dev_t cpu_devices[2] = {nullptr, nullptr};
+  cpu_devices[0] = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+  if (cpu_devices[0] != nullptr) {
+    model_params.devices = cpu_devices;
+    log_info("embedding.devices", {{"selected", "cpu"}});
+  }
+
   model_ = llama_model_load_from_file(model_path.c_str(), model_params);
   if (!model_) {
     if (error) *error = "llama_model_load_from_file failed";
