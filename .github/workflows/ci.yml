@@ -229,11 +229,13 @@ jobs:
             git clone --depth 1 https://github.com/microsoft/vcpkg C:\vcpkg
           }
           C:\vcpkg\bootstrap-vcpkg.bat
-          C:\vcpkg\vcpkg.exe install --classic --triplet x64-windows curl sqlite3
+          # Static triplet: the test binary and chatvvd.exe stay self-contained
+          # (no libcurl/sqlite3 DLL lookup at ctest time).
+          C:\vcpkg\vcpkg.exe install --classic --triplet x64-windows-static curl sqlite3
       - name: Configure
         shell: pwsh
         run: |
-          cmake --preset windows-x64 -DCHATVV_VULKAN=ON *>&1 | Tee-Object -FilePath configure.log
+          cmake --preset windows-x64 -DCHATVV_VULKAN=ON -DVCPKG_TARGET_TRIPLET=x64-windows-static *>&1 | Tee-Object -FilePath configure.log
           if ($LASTEXITCODE -ne 0) {
             $lines = Get-Content configure.log
             $idx = ($lines | Select-String -Pattern "CMake Error|error:|Error" | Select-Object -First 1).LineNumber
@@ -263,9 +265,12 @@ jobs:
       - name: Test
         shell: pwsh
         run: |
-          # vcpkg uses the dynamic x64-windows triplet here, so libcurl/sqlite3
-          # DLLs must be discoverable by chatvv_tests.exe (0xc0000135 otherwise).
-          $env:PATH = "C:\vcpkg\installed\x64-windows\bin;$env:PATH"
+          # Static vcpkg triplet, so the only non-system runtime dependency is
+          # vulkan-1.dll from the Vulkan SDK; make it and vcpkg bin discoverable.
+          $env:PATH = "C:\vcpkg\installed\x64-windows-static\bin;$env:VULKAN_SDK\Bin;$env:PATH"
+          if (Get-Command dumpbin -ErrorAction SilentlyContinue) {
+            dumpbin /dependents build\windows-x64\Release\chatvv_tests.exe
+          }
           ctest --preset windows-x64
 
   # ---------------------------------------------------------------------------

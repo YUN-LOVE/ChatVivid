@@ -133,6 +133,10 @@ if [[ "$VULKAN_MODE" != "OFF" ]]; then
         VULKAN_HOST_INCLUDE="$ROOT/build/android-vulkan-headers"
         mkdir -p "$VULKAN_HOST_INCLUDE"
         ln -sfn /usr/include/vulkan "$VULKAN_HOST_INCLUDE/vulkan"
+        # vulkan_core.h includes vk_video/vulkan_video_codec_*.h
+        if [[ -d /usr/include/vk_video ]]; then
+          ln -sfn /usr/include/vk_video "$VULKAN_HOST_INCLUDE/vk_video"
+        fi
       fi
       CMAKE_EXTRA_ARGS+=("-DVulkan_INCLUDE_DIR=$VULKAN_HOST_INCLUDE")
       CMAKE_EXTRA_ARGS+=("-DVulkan_LIBRARY=$VULKAN_TARGET_LIB")
