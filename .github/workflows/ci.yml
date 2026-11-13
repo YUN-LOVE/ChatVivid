@@ -268,8 +268,14 @@ jobs:
           # Static vcpkg triplet, so the only non-system runtime dependency is
           # vulkan-1.dll from the Vulkan SDK; make it and vcpkg bin discoverable.
           $env:PATH = "C:\vcpkg\installed\x64-windows-static\bin;$env:VULKAN_SDK\Bin;$env:PATH"
-          if (Get-Command dumpbin -ErrorAction SilentlyContinue) {
-            dumpbin /dependents build\windows-x64\Release\chatvv_tests.exe
+          Write-Host "VULKAN_SDK=$env:VULKAN_SDK"
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $vs = & $vswhere -latest -property installationPath
+            $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+            if ($dumpbin) {
+              & $dumpbin.FullName /dependents build\windows-x64\Release\chatvv_tests.exe
+            }
           }
           ctest --preset windows-x64
 

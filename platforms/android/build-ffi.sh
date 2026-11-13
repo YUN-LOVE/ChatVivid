@@ -137,6 +137,10 @@ if [[ "$VULKAN_MODE" != "OFF" ]]; then
         if [[ -d /usr/include/vk_video ]]; then
           ln -sfn /usr/include/vk_video "$VULKAN_HOST_INCLUDE/vk_video"
         fi
+        # ggml-vulkan-types.h includes spirv/unified1/spirv.hpp
+        if [[ -d /usr/include/spirv ]]; then
+          ln -sfn /usr/include/spirv "$VULKAN_HOST_INCLUDE/spirv"
+        fi
       fi
       CMAKE_EXTRA_ARGS+=("-DVulkan_INCLUDE_DIR=$VULKAN_HOST_INCLUDE")
       CMAKE_EXTRA_ARGS+=("-DVulkan_LIBRARY=$VULKAN_TARGET_LIB")
