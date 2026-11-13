@@ -63,6 +63,11 @@ debug 与 release、本机与 CI 全部用**同一张证书**，否则手机上�
   （CI 在 Linux runner 用 apt `glslc` + `libvulkan-dev` + `spirv-headers`）。
 - CI 传 `-DCHATVV_VULKAN=ON`（缺 SDK 会 FATAL，让 CI 暴露依赖缺失）；本地默认 `AUTO`，
   没有 SDK 时回退 CPU。
+- **交叉编译的两半 SDK**（脚本已自动处理）：
+  - 目标侧：NDK sysroot 提供 `vulkan/vulkan.h` + `libvulkan.so`（arm64）；
+  - 头文件侧：ggml 的 Vulkan 后端要用 C++ 绑定 `vulkan/vulkan.hpp`，**NDK 不自带**，
+    所以 `build-ffi.sh` 默认用 host 的 `/usr/include`（`libvulkan-dev` 含 vulkan.hpp）
+    并显式 `-DVulkan_LIBRARY=<NDK sysroot>/libvulkan.so`，可通过 `ANDROID_VULKAN_INCLUDE_DIR` 覆盖。
 - 已知风险：Android 交叉 configure 时 `FindVulkan` 可能错误找到 host x86_64 的 libvulkan/headers。
   若 CI 报这个错，用 `ANDROID_VULKAN_CMAKE_ARGS` 显式覆盖（脚本已支持）：
 

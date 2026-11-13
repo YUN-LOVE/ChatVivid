@@ -14,6 +14,8 @@
 #   VCPKG_ROOT               vcpkg checkout (default: <repo>/.vcpkg)
 #   CHATVV_VULKAN            AUTO (default), ON (CI), OFF
 #   CHATVV_READ_ALOUD_LINKAGE  shared (default: required for jniLibs)
+#   ANDROID_VULKAN_INCLUDE_DIR Vulkan headers dir (default /usr/include: the host
+#                              libvulkan-dev has vulkan.hpp, the NDK does not)
 #   ANDROID_VULKAN_CMAKE_ARGS  extra configure args; use if Android cross
 #                              configure picks up host x86_64 Vulkan libs, e.g.
 #                              -DVulkan_LIBRARY=<ndk-sysroot>/libvulkan.so
@@ -108,6 +110,27 @@ fi
 CMAKE_EXTRA_ARGS=()
 if [[ -n "${ANDROID_VULKAN_CMAKE_ARGS:-}" ]]; then
   read -r -a CMAKE_EXTRA_ARGS <<< "$ANDROID_VULKAN_CMAKE_ARGS"
+fi
+
+# Vulkan cross-compile needs both sides of the SDK:
+#   * the NDK sysroot provides target vulkan.h + libvulkan.so for arm64;
+#   * but ggml's Vulkan backend also uses C++ bindings (vulkan/vulkan.hpp),
+#     which the NDK does not ship. Use the host SDK headers (API-compatible)
+#     and link the target NDK libvulkan.so explicitly.
+if [[ "$VULKAN_MODE" != "OFF" ]]; then
+  VULKAN_TARGET_LIB="$NDK/toolchains/llvm/prebuilt/$NDK_HOST_TAG/sysroot/usr/lib/aarch64-linux-android/${API_LEVEL}/libvulkan.so"
+  if [[ -f "$VULKAN_TARGET_LIB" ]]; then
+    has_vulkan_lib_arg=0
+    for arg in ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"}; do
+      case "$arg" in -DVulkan_LIBRARY=*) has_vulkan_lib_arg=1 ;; esac
+    done
+    if [[ "$has_vulkan_lib_arg" == "0" ]]; then
+      CMAKE_EXTRA_ARGS+=("-DVulkan_INCLUDE_DIR=${ANDROID_VULKAN_INCLUDE_DIR:-/usr/include}")
+      CMAKE_EXTRA_ARGS+=("-DVulkan_LIBRARY=$VULKAN_TARGET_LIB")
+    fi
+  else
+    echo "warning: target libvulkan.so not found at $VULKAN_TARGET_LIB; relying on ggml FindVulkan defaults." >&2
+  fi
 fi
 
 cmake --preset android-arm64 \
