@@ -176,7 +176,19 @@ cmake --preset android-arm64 \
   "-DCHATVV_READ_ALOUD_LINKAGE=${CHATVV_READ_ALOUD_LINKAGE:-shared}" \
   ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"} \
   "$@"
-cmake --build build/android-arm64 --target chatvv_ffi -j"$(nproc)"
+echo "== android build start: $(df -h "$ROOT" | tail -1) | $(free -h | awk '/Mem:/{print "mem-free=" $7}') =="
+set -x
+build_rc=0
+cmake --build build/android-arm64 --target chatvv_ffi -j"${CHATVV_ANDROID_JOBS:-$(nproc)}" || build_rc=$?
+set +x
+if [[ "$build_rc" -ne 0 ]]; then
+  echo "== cmake --build failed rc=$build_rc ==" >&2
+  echo "== disk: $(df -h "$ROOT" | tail -1)" >&2
+  echo "== memory: $(free -h | awk '/Mem:/{print "total=" $2 " used=" $3 " avail=" $7}')" >&2
+  (dmesg 2>/dev/null | tail -5 >&2) || true
+  exit "$build_rc"
+fi
+echo "== android build done =="
 
 BUILD_DIR="$ROOT/build/android-arm64"
 DEST="$ROOT/app/android/app/src/main/jniLibs/arm64-v8a"
