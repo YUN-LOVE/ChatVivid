@@ -425,6 +425,8 @@ jobs:
         env:
           CHATVV_VULKAN: ${{ matrix.vulkan }}
           CHATVV_READ_ALOUD_LINKAGE: shared
+          # Temporary: keep native symbols so device tombstones resolve frames.
+          CHATVV_ANDROID_KEEP_SYMBOLS: '1'
         # Android target Vulkan headers/libs come from the NDK sysroot; the host
         # glslc + SPIRV-Headers come from the apt packages above. Pin both so a
         # cross-configure cannot pick up host x86_64 Vulkan libraries (known risk,

@@ -199,7 +199,13 @@ READELF="$TOOLCHAIN/bin/llvm-readelf"
 mkdir -p "$DEST"
 
 cp "$BUILD_DIR/libchatvv_ffi.so" "$DEST/libchatvv_ffi.so"
-"$STRIP" --strip-unneeded "$DEST/libchatvv_ffi.so"
+if [[ "${CHATVV_ANDROID_KEEP_SYMBOLS:-0}" == "1" ]]; then
+  # Debugging aid: keep .symtab so on-device tombstones resolve local C++
+  # symbols (larger APK, never ship this).
+  echo "CHATVV_ANDROID_KEEP_SYMBOLS=1: not stripping libchatvv_ffi.so" >&2
+else
+  "$STRIP" --strip-unneeded "$DEST/libchatvv_ffi.so"
+fi
 cp "$TOOLCHAIN/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so" \
   "$DEST/libc++_shared.so"
 
