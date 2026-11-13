@@ -125,7 +125,16 @@ if [[ "$VULKAN_MODE" != "OFF" ]]; then
       case "$arg" in -DVulkan_LIBRARY=*) has_vulkan_lib_arg=1 ;; esac
     done
     if [[ "$has_vulkan_lib_arg" == "0" ]]; then
-      CMAKE_EXTRA_ARGS+=("-DVulkan_INCLUDE_DIR=${ANDROID_VULKAN_INCLUDE_DIR:-/usr/include}")
+      # Do NOT pass /usr/include directly: CMake drops it as an "implicit" dir,
+      # and with --sysroot it is not searched, so vulkan.hpp would be missing.
+      # Use a tiny staging dir that only contains the vulkan/ headers.
+      VULKAN_HOST_INCLUDE="${ANDROID_VULKAN_INCLUDE_DIR:-}"
+      if [[ -z "$VULKAN_HOST_INCLUDE" ]]; then
+        VULKAN_HOST_INCLUDE="$ROOT/build/android-vulkan-headers"
+        mkdir -p "$VULKAN_HOST_INCLUDE"
+        ln -sfn /usr/include/vulkan "$VULKAN_HOST_INCLUDE/vulkan"
+      fi
+      CMAKE_EXTRA_ARGS+=("-DVulkan_INCLUDE_DIR=$VULKAN_HOST_INCLUDE")
       CMAKE_EXTRA_ARGS+=("-DVulkan_LIBRARY=$VULKAN_TARGET_LIB")
     fi
   else
