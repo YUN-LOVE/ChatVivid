@@ -63,7 +63,11 @@ chatvv_find_read_aloud() {
 # Usage: chatvv_elf_load_align <elf> <llvm-readelf>
 chatvv_elf_load_align() {
   local elf="$1" readelf="$2"
-  "$readelf" -l "$elf" 2>/dev/null | awk '/LOAD/{print $NF; exit}'
+  # Consume the whole readelf output instead of exiting awk early: with
+  # `set -o pipefail` an early awk exit makes readelf die with SIGPIPE and the
+  # pipeline fails even though the alignment was read (CI saw exit 74 here).
+  "$readelf" -l "$elf" 2>/dev/null \
+    | awk '/LOAD/ && !align {align=$NF} END {if (align == "") exit 1; print align}'
 }
 
 # Verify an ELF is 16 KB page-size compatible (Android 15+/17 requirement).

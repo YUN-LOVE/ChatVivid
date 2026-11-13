@@ -191,7 +191,6 @@ fi
 echo "== android build done =="
 
 echo "== staging Android libs =="
-set -x
 set -E  # let the ERR trap fire for failures inside the helper functions too
 BUILD_DIR="$ROOT/build/android-arm64"
 DEST="$ROOT/app/android/app/src/main/jniLibs/arm64-v8a"
