@@ -56,7 +56,9 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 unzip -q "$APK" 'lib/arm64-v8a/*.so' -d "$TMP"
 for so in "$TMP"/lib/arm64-v8a/*.so; do
-  align="$("$READELF" -l "$so" | awk '/LOAD/{print $NF; exit}')"
+  # No early awk exit: with `set -o pipefail` readelf would die with SIGPIPE.
+  align="$("$READELF" -l "$so" \
+    | awk '/LOAD/ && !align {align=$NF} END {if (align == "") exit 1; print align}')"
   printf '%-32s LOAD align %s\n' "$(basename "$so")" "$align"
   case "$align" in
     0x4000|0x10000) ;;
