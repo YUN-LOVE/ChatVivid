@@ -53,6 +53,15 @@ cd "$ROOT/app"
 flutter pub get
 dart run rive_native:setup --verbose -p android
 
+# rive_native's Android debug artifacts ship the Khronos Vulkan validation layer
+# (~15 MB). The app never requests it, but the loader registers it as a global
+# layer and it bloats the APK. Drop it from the build tree before Gradle runs.
+while IFS= read -r layer; do
+  echo "removing bundled Vulkan validation layer: $layer"
+  rm -f "$layer"
+done < <(find "$ROOT/app/build" "$HOME/.pub-cache/hosted" \
+  -name 'libVkLayer_khronos_validation.so' 2>/dev/null || true)
+
 APK_DIR="build/app/outputs/flutter-apk"
 ARTIFACTS="$ROOT/artifacts"
 mkdir -p "$ARTIFACTS"
