@@ -269,6 +269,22 @@ jobs:
           # vulkan-1.dll from the Vulkan SDK; make it and vcpkg bin discoverable.
           $env:PATH = "C:\vcpkg\installed\x64-windows-static\bin;$env:VULKAN_SDK\Bin;$env:PATH"
           Write-Host "VULKAN_SDK=$env:VULKAN_SDK"
+          $exeDir = "build\windows-x64\Release"
+          foreach ($dll in @("vulkan-1.dll", "MSVCP140.dll", "VCRUNTIME140.dll", "VCRUNTIME140_1.dll")) {
+            $hit = $null
+            foreach ($dir in $env:PATH.Split(';')) {
+              if ($dir -and (Test-Path (Join-Path $dir $dll))) { $hit = Join-Path $dir $dll; break }
+            }
+            if (-not $hit) {
+              $hit = (Get-ChildItem "C:\Windows\System32\$dll" -ErrorAction SilentlyContinue |
+                Select-Object -First 1 -ExpandProperty FullName)
+            }
+            Write-Host "$dll -> $hit"
+          }
+          if (Test-Path "$env:VULKAN_SDK\Bin\vulkan-1.dll") {
+            Copy-Item "$env:VULKAN_SDK\Bin\vulkan-1.dll" $exeDir -Force
+            Write-Host "copied vulkan-1.dll next to chatvv_tests.exe"
+          }
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           if (Test-Path $vswhere) {
             $vs = & $vswhere -latest -property installationPath

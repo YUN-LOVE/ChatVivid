@@ -118,7 +118,20 @@ fi
 #     which the NDK does not ship. Use the host SDK headers (API-compatible)
 #     and link the target NDK libvulkan.so explicitly.
 if [[ "$VULKAN_MODE" != "OFF" ]]; then
-  VULKAN_TARGET_LIB="$NDK/toolchains/llvm/prebuilt/$NDK_HOST_TAG/sysroot/usr/lib/aarch64-linux-android/${API_LEVEL}/libvulkan.so"
+  VULKAN_SYSROOT_LIB="$NDK/toolchains/llvm/prebuilt/$NDK_HOST_TAG/sysroot/usr/lib/aarch64-linux-android"
+  VULKAN_TARGET_LIB=""
+  # Prefer a stub that exports Vulkan 1.1 entry points (ggml uses
+  # vkGetPhysicalDeviceFeatures2): the API-24 stub only has Vulkan 1.0 symbols.
+  for cand in "$VULKAN_SYSROOT_LIB/libvulkan.so" $(ls -d "$VULKAN_SYSROOT_LIB"/[0-9]*/libvulkan.so 2>/dev/null | sort -rV); do
+    [[ -f "$cand" ]] || continue
+    if "$TOOLCHAIN/bin/llvm-nm" -D --defined-only "$cand" 2>/dev/null | grep -q " vkGetPhysicalDeviceFeatures2$"; then
+      VULKAN_TARGET_LIB="$cand"
+      break
+    fi
+  done
+  if [[ -z "$VULKAN_TARGET_LIB" ]]; then
+    VULKAN_TARGET_LIB="$VULKAN_SYSROOT_LIB/${API_LEVEL}/libvulkan.so"
+  fi
   if [[ -f "$VULKAN_TARGET_LIB" ]]; then
     has_vulkan_lib_arg=0
     for arg in ${CMAKE_EXTRA_ARGS[@]+"${CMAKE_EXTRA_ARGS[@]}"}; do
