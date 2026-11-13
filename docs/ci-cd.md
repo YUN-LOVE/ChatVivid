@@ -194,6 +194,11 @@ CMake 构建中调用 cargo；CI 只负责装 Rust 工具链和传环境。
 ## 8. 缓存、超时、成本
 
 - 缓存：Flutter（`subosito/flutter-action` cache）、cargo（`~/.cargo`）、vcpkg 由 action/脚本自管理。
+- 版本固定：**Flutter `3.44.2`**（所有 `subosito/flutter-action` 步骤的 `flutter-version`），
+  与本地工具链和 `docs/install-arch.md` 一致；stable 频道升级导致的新 analyzer 规则不会
+  突然把分支变红。升级时必须同步改 workflow + 文档，并本地跑 `flutter analyze/test`。
+- 失败可观测性：`Analyze`、Android FFI 构建、Windows 构建/打包步骤会把失败日志尾部以
+  `::error::` 注解输出（公开的 run 页面即可看到），避免只看到 `exit code N`。
 - 超时：`detect`/`lint` 10 分钟；backend Linux 90、macOS 60、Windows 90；app android/linux 90、macOS 60、Windows 120。
 - **macOS 成本**：托管 macOS runner 按 10 倍计费，`ENABLE_MACOS_RUNNERS` 未设时：
   - 共享路径改动**不自动**构建 macOS；

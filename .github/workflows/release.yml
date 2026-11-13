@@ -331,8 +331,13 @@ jobs:
           ./platforms/android/build-ffi.sh 2>&1 | tee /tmp/build-ffi.log
           rc=${PIPESTATUS[0]}
           if [ "$rc" -ne 0 ]; then
-            echo "::error::build-ffi.sh failed (exit $rc); last log lines:"
-            tail -n 25 /tmp/build-ffi.log | sed 's/^/::error::/'
+            msg="$(tail -n 40 /tmp/build-ffi.log \
+              | sed -r 's/\x1B\[[0-9;]*[mK]//g' \
+              | tr -d '\r' \
+              | sed 's/%/%25/g' \
+              | awk 'BEGIN{ORS="%0A"} {print}' \
+              | head -c 7000)"
+            echo "::error::build-ffi.sh failed (exit $rc):%0A${msg}"
             exit "$rc"
           fi
       - name: Configure Android signing (unified key)
@@ -359,9 +364,17 @@ jobs:
           CHATVV_VULKAN: ${{ matrix.vulkan }}
           ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
         run: |
-          & ${{ matrix.command }} 2>&1 | Tee-Object -FilePath package.log
-          if ($LASTEXITCODE -ne 0) {
-            Get-Content package.log -Tail 25 | ForEach-Object { Write-Output "::error::$_" }
+          $rc = 0
+          try {
+            & ${{ matrix.command }} 2>&1 | Tee-Object -FilePath package.log
+            $rc = $LASTEXITCODE
+          } catch {
+            $rc = 1
+            ($_ | Out-String) | Tee-Object -FilePath package.log -Append
+          }
+          if ($rc -ne 0) {
+            $lines = (Get-Content package.log -Tail 25) | ForEach-Object { $_ -replace '%', '%25' -replace "`r", '' }
+            Write-Output "::error::package failed (exit $rc):%0A$($lines -join '%0A')"
             exit 1
           }
       - uses: actions/upload-artifact@v4
