@@ -10,7 +10,7 @@ Android 15+（含 Android 17）要求 16 KB page-size 兼容。
 - 检查 APK 内所有 arm64 ELF 的 LOAD align：
   - `libchatvv_ffi.so` / `libc++_shared.so` / `libflutter_live2d.so` / `librive_native.so` = `0x4000`
   - `libflutter.so` = `0x10000`
-- `scripts/verify-android-apk.sh` 同时验证：
+- `platforms/android/verify-apk.sh` 同时验证：
   - `zipalign -c -P 16 -v 4`
   - `apksigner verify --print-certs`
   - 每个 native ELF 的 LOAD 对齐

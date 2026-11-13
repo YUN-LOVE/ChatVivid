@@ -13,7 +13,7 @@
 Android 先生成并打包内嵌 core：
 
 ```bash
-./scripts/build-android-ffi.sh
+./platforms/android/build-ffi.sh
 cd app
 flutter build apk --debug --target-platform android-arm64
 ```
@@ -82,7 +82,7 @@ assets/
 ## 依赖
 
 - `dio`：HTTP/SSE。
-- `flutter_live2d`：**尚未加入**；下一步接入 Android/iOS 舞台。
+- `live2d_flutter`（vendored）：Android/iOS/macOS/Windows/Web 原生 GL；Linux 回退静态立绘。
 - 暂无 Riverpod/Drift/secure storage；先用 `ChangeNotifier` + 内存历史。
 
 ## 验证

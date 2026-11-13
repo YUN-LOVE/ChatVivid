@@ -1,0 +1,5 @@
+# Upstream ignores Cargo.lock, but chatvv vendors and pins it so CI can run
+# `cargo build --locked` reproducibly (see VENDORED.chatvv.md).
+/target
+venv/
+smoke_output.mp3

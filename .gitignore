@@ -68,3 +68,7 @@ app/android/app/src/main/jniLibs/
 artifacts/
 
 .ccache/
+
+# python tooling (CI helper scripts)
+__pycache__/
+*.pyc

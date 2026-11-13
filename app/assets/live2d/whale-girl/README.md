@@ -1,6 +1,6 @@
 # 鲸鱼娘 Live2D (Cubism 4)
 
-运行时模型目录。Flutter 侧用 `flutter_live2d` 加载：
+运行时模型目录。Flutter 侧用 `live2d_flutter` 加载：
 
 ```dart
 final ctrl = Live2DViewController();
@@ -27,7 +27,7 @@ ctrl.startMotion(group: 'idle');
 - 口型：TTS 音频 RMS → `ctrl.setParameter('ParamMouthOpenY', 0..1)`（约 30–60Hz，节流）。
 - 动作：`startMotion(group: 'idle')`；点击/思考/完成可切 `selfie` 等。
 - 表情：`setExpression(index)`；index 对应 `model3.json` 的 `Expressions` 顺序（与 `manifest.json` 一致）。
-- 触控：`flutter_live2d` 自带触摸跟踪，眼睛/头会跟手。
+- 触控：`live2d_flutter` 自带触摸跟踪，眼睛/头会跟手。
 - 不可见/后台：`setRenderingPaused(true)`，回前台恢复。
 
 ## 许可（必须保留）

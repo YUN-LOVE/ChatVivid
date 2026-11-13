@@ -8,6 +8,13 @@ import 'package:live2d_flutter/live2d_flutter.dart';
 
 import '../../theme/app_theme.dart';
 
+/// Platforms where `live2d_flutter` ships a renderer.
+///
+/// The vendored plugin implements Android, iOS, macOS, Windows and Web. It has
+/// no Linux implementation, and this app does not fake one: on Linux (and any
+/// other unsupported target) [CharacterStage] renders the static mascot image
+/// instead of a [Live2DStage]. Web is listed because the plugin declares it,
+/// even though the app currently has no web build target.
 bool get live2dSupported =>
     kIsWeb ||
     defaultTargetPlatform == TargetPlatform.android ||

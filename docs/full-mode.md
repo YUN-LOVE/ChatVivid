@@ -87,7 +87,7 @@ ctest --test-dir build/dev --output-on-failure
 ```bash
 export ANDROID_NDK_HOME=$HOME/Android/Sdk/ndk/27.2.12479018
 export VCPKG_ROOT=$PWD/.vcpkg
-./scripts/build-android-ffi.sh
+./platforms/android/build-ffi.sh
 cd app
 flutter build apk --debug --target-platform android-arm64
 ```

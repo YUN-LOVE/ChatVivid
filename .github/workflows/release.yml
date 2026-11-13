@@ -1,9 +1,22 @@
 name: Release
 
+# Tag scheme (see docs/ci-cd.md):
+#   vX.Y.Z                          build + publish every enabled platform
+#   vX.Y.Z-<platform>[-<platform>]  only the listed platforms
+#   vX.Y.Z-<unknown>                fail with a clear message
+# workflow_dispatch only builds artifacts for the selected platforms; it never
+# publishes a GitHub Release (tag pushes do).
 on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      platforms:
+        description: '逗号分隔平台子集（android,ios,linux,macos,windows）；留空=全部启用平台'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -13,86 +26,136 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  backend-linux-x64:
-    name: package / linux x64
+  # ---------------------------------------------------------------------------
+  # Parse the tag / manual platform list into a build matrix.
+  # ---------------------------------------------------------------------------
+  parse-tag:
+    name: parse tag
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
+    outputs:
+      source: ${{ steps.parse.outputs.source }}
+      tag: ${{ steps.parse.outputs.tag }}
+      version: ${{ steps.parse.outputs.version }}
+      platforms_label: ${{ steps.parse.outputs.platforms_label }}
+      platforms: ${{ steps.parse.outputs.platforms }}
+      backend_platforms: ${{ steps.parse.outputs.backend_platforms }}
+      app_platforms: ${{ steps.parse.outputs.app_platforms }}
+      app_matrix: ${{ steps.parse.outputs.app_matrix }}
+      run_backend: ${{ steps.parse.outputs.run_backend }}
+      run_app: ${{ steps.parse.outputs.run_app }}
+      publish: ${{ steps.parse.outputs.publish }}
+      prerelease: ${{ steps.parse.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
+      - name: Parse tag
+        id: parse
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TAG_NAME: ${{ github.ref_name }}
+          DISPATCH_PLATFORMS: ${{ inputs.platforms }}
+        run: python3 platforms/common/ci/parse-tag.py
+      - name: Write job summary
+        if: always()
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build \
-            libsqlite3-dev libcurl4-openssl-dev libssl-dev
-      - name: Configure
-        run: cmake --preset release
-      - name: Build
-        run: cmake --build --preset release
-      - name: Test
-        run: ctest --test-dir build/release --output-on-failure
-      - name: Package
-        run: |
-          mkdir -p package
-          cmake --install build/release --prefix "$PWD/package/chatvv"
-          cp README.md package/chatvv/README.md
-          tar -C package -czf chatvv-server-linux-x64.tar.gz chatvv
-          sha256sum chatvv-server-linux-x64.tar.gz > chatvv-server-linux-x64.tar.gz.sha256
-      - uses: actions/upload-artifact@v4
-        with:
-          name: chatvv-server-linux-x64
-          path: |
-            chatvv-server-linux-x64.tar.gz
-            chatvv-server-linux-x64.tar.gz.sha256
-          if-no-files-found: error
+          {
+            echo "### Release plan"
+            echo ""
+            echo "| key | value |"
+            echo "|---|---|"
+            echo "| source | \`${{ steps.parse.outputs.source }}\` |"
+            echo "| version | \`${{ steps.parse.outputs.version }}\` |"
+            echo "| publish | \`${{ steps.parse.outputs.publish }}\` |"
+            echo "| platforms | \`${{ steps.parse.outputs.platforms }}\` |"
+            echo "| backend | \`${{ steps.parse.outputs.backend_platforms }}\` |"
+            echo "| app | \`${{ steps.parse.outputs.app_platforms }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-  backend-linux-arm64:
-    name: package / linux arm64
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
+  # ---------------------------------------------------------------------------
+  # C++ backend packages: Linux x64 + arm64 (native runners, Vulkan ON).
+  # ---------------------------------------------------------------------------
+  backend-linux:
+    name: package / linux ${{ matrix.arch }}
+    needs: parse-tag
+    if: contains(fromJSON(needs.parse-tag.outputs.backend_platforms), 'linux')
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+            preset: release
+            artifact: chatvv-server-linux-x64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            preset: linux-arm64
+            artifact: chatvv-server-linux-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
+      - name: Install build + Vulkan dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build \
-            libsqlite3-dev libcurl4-openssl-dev libssl-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libsqlite3-dev libcurl4-openssl-dev libssl-dev \
+            libvulkan-dev glslc spirv-headers vulkan-tools
+          glslc --version | head -n 2
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('third_party/read_aloud/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
       - name: Configure
-        run: cmake --preset linux-arm64
+        run: cmake --preset ${{ matrix.preset }} -DCHATVV_VULKAN=ON
       - name: Build
-        run: cmake --build --preset linux-arm64
+        run: cmake --build --preset ${{ matrix.preset }}
       - name: Test
-        run: ctest --test-dir build/linux-arm64 --output-on-failure
+        run: ctest --preset ${{ matrix.preset }}
       - name: Package
+        shell: bash
         run: |
           mkdir -p package
-          cmake --install build/linux-arm64 --prefix "$PWD/package/chatvv"
+          cmake --install "build/${{ matrix.preset }}" --prefix "$PWD/package/chatvv"
           cp README.md package/chatvv/README.md
-          tar -C package -czf chatvv-server-linux-arm64.tar.gz chatvv
-          sha256sum chatvv-server-linux-arm64.tar.gz > chatvv-server-linux-arm64.tar.gz.sha256
+          ARCH="${{ matrix.arch }}"
+          tar -C package -czf "chatvv-server-linux-${ARCH}.tar.gz" chatvv
+          sha256sum "chatvv-server-linux-${ARCH}.tar.gz" > "chatvv-server-linux-${ARCH}.tar.gz.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: chatvv-server-linux-arm64
+          name: ${{ matrix.artifact }}
           path: |
-            chatvv-server-linux-arm64.tar.gz
-            chatvv-server-linux-arm64.tar.gz.sha256
+            chatvv-server-*.tar.gz
+            chatvv-server-*.tar.gz.sha256
           if-no-files-found: error
 
-  backend-macos-arm64:
+  # ---------------------------------------------------------------------------
+  # C++ backend package: macOS arm64 (CPU/Metal; Vulkan is rejected on Apple).
+  # ---------------------------------------------------------------------------
+  backend-macos:
     name: package / macos arm64
-    # Temporarily disabled to avoid macOS runner overage.
-    if: false
+    needs: parse-tag
+    if: contains(fromJSON(needs.parse-tag.outputs.backend_platforms), 'macos')
     runs-on: macos-14
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Install dependencies
         run: brew install cmake ninja curl
       - name: Configure
-        run: cmake --preset macos-arm64 -DCURL_ROOT="$(brew --prefix curl)"
+        run: cmake --preset macos-arm64 -DCURL_ROOT="$(brew --prefix curl)" -DCHATVV_VULKAN=OFF
       - name: Build
         run: cmake --build --preset macos-arm64
       - name: Test
-        run: ctest --test-dir build/macos-arm64 --output-on-failure
+        run: ctest --preset macos-arm64
       - name: Package
         run: |
           mkdir -p package
@@ -108,14 +171,36 @@ jobs:
             chatvv-server-macos-arm64.tar.gz.sha256
           if-no-files-found: error
 
-  backend-windows-x64:
+  # ---------------------------------------------------------------------------
+  # C++ backend package: Windows x64 (MSVC + vcpkg + Vulkan SDK).
+  # ---------------------------------------------------------------------------
+  backend-windows:
     name: package / windows x64
+    needs: parse-tag
+    if: contains(fromJSON(needs.parse-tag.outputs.backend_platforms), 'windows')
     runs-on: windows-2022
-    timeout-minutes: 70
+    timeout-minutes: 90
     env:
       VCPKG_ROOT: C:\vcpkg
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('third_party/read_aloud/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - name: Install Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          vulkan_version: latest
+          install_runtime: true
+          cache: true
       - name: Bootstrap vcpkg
         shell: pwsh
         run: |
@@ -125,7 +210,7 @@ jobs:
           C:\vcpkg\bootstrap-vcpkg.bat
           C:\vcpkg\vcpkg.exe install --classic --triplet x64-windows curl sqlite3
       - name: Configure
-        run: cmake --preset windows-x64
+        run: cmake --preset windows-x64 -DCHATVV_VULKAN=ON
       - name: Build
         run: cmake --build --preset windows-x64
       - name: Test
@@ -147,33 +232,26 @@ jobs:
             chatvv-server-windows-x64.zip.sha256
           if-no-files-found: error
 
-  detect-app:
-    name: detect app
-    runs-on: ubuntu-latest
-    outputs:
-      has_app: ${{ steps.check.outputs.has_app }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: check
-        shell: bash
-        run: |
-          if [ -f app/pubspec.yaml ]; then
-            echo "has_app=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_app=false" >> "$GITHUB_OUTPUT"
-          fi
-
+  # ---------------------------------------------------------------------------
+  # Flutter app packages for the platforms selected by the tag. Same matrix
+  # shape as ci.yml's app-package job, with release build commands.
+  # ---------------------------------------------------------------------------
   app-release:
-    name: package / android
-    needs: detect-app
-    if: needs.detect-app.outputs.has_app == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 70
+    name: package / app ${{ matrix.platform }}
+    needs: parse-tag
+    if: needs.parse-tag.outputs.run_app == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.parse-tag.outputs.app_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: actions/setup-java@v4
+      - name: Set up Java 17
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
@@ -181,7 +259,47 @@ jobs:
         with:
           channel: stable
           cache: true
+      - name: Rust toolchain (read-aloud)
+        if: matrix.rust_targets != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+      - name: Cache cargo registry
+        if: matrix.rust_targets != ''
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('third_party/read_aloud/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - name: Install cargo-ndk (Android fallback cross tool)
+        if: matrix.platform == 'android'
+        run: cargo install cargo-ndk --locked
+      - name: Install Vulkan SDK
+        if: matrix.platform == 'windows'
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          vulkan_version: latest
+          install_runtime: true
+          cache: true
+      - name: Install Vulkan build dependencies
+        if: matrix.platform == 'linux' || matrix.platform == 'android'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev glslc spirv-headers vulkan-tools
+          glslc --version | head -n 2
+      - name: Install Linux desktop dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev libsqlite3-dev libcurl4-openssl-dev libssl-dev
+      - name: Install macOS desktop dependencies
+        if: matrix.platform == 'macos'
+        run: brew install cmake ninja curl
       - name: Android SDK packages
+        if: matrix.platform == 'android'
         shell: bash
         run: |
           SDKMGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
@@ -189,122 +307,104 @@ jobs:
           yes | "$SDKMGR" --licenses >/dev/null || true
           "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" \
             "ndk;27.2.12479018" "cmake;3.22.1"
-      - name: Build Android embedded core
+      - name: Build Android FFI + read-aloud
+        if: matrix.platform == 'android'
         shell: bash
+        env:
+          CHATVV_VULKAN: ${{ matrix.vulkan }}
+          CHATVV_READ_ALOUD_LINKAGE: shared
+        # Android target Vulkan headers/libs come from the NDK sysroot; the host
+        # glslc + SPIRV-Headers come from the apt packages above. Pin both so a
+        # cross-configure cannot pick up host x86_64 Vulkan libraries (known risk,
+        # see platforms/android/README.md).
         run: |
-          export ANDROID_NDK_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/ndk/27.2.12479018"
-          ./scripts/build-android-ffi.sh
-      - name: Build APK
-        working-directory: app
+          export ANDROID_VULKAN_CMAKE_ARGS=""
+          if [ -f /usr/share/cmake/SPIRV-Headers/SPIRV-HeadersConfig.cmake ]; then
+            ANDROID_VULKAN_CMAKE_ARGS="-DSPIRV-Headers_DIR=/usr/share/cmake/SPIRV-Headers"
+          fi
+          if command -v glslc >/dev/null; then
+            ANDROID_VULKAN_CMAKE_ARGS="$ANDROID_VULKAN_CMAKE_ARGS -DVulkan_GLSLC_EXECUTABLE=$(command -v glslc)"
+          fi
+          export ANDROID_VULKAN_CMAKE_ARGS
+          ./platforms/android/build-ffi.sh
+      - name: Configure Android signing (unified key)
+        if: matrix.platform == 'android'
         shell: bash
-        run: |
-          COUNT=$(git rev-list --count HEAD)
-          SHA=$(git rev-parse --short HEAD)
-          VERSION="0.1.$COUNT"
-          flutter build apk --release --target-platform android-arm64 \
-            --build-name="$VERSION" --build-number="$COUNT" \
-            --dart-define=APP_VERSION="$VERSION" \
-            --dart-define=BUILD_NUMBER="$COUNT" \
-            --dart-define=BUILD_COMMIT="$SHA"
-      - name: Build AAB
-        working-directory: app
-        shell: bash
-        run: |
-          COUNT=$(git rev-list --count HEAD)
-          SHA=$(git rev-parse --short HEAD)
-          VERSION="0.1.$COUNT"
-          flutter build appbundle --release --target-platform android-arm64 \
-            --build-name="$VERSION" --build-number="$COUNT" \
-            --dart-define=APP_VERSION="$VERSION" \
-            --dart-define=BUILD_NUMBER="$COUNT" \
-            --dart-define=BUILD_COMMIT="$SHA"
-      - name: Stage artifacts
-        run: |
-          mkdir -p artifacts
-          cp app/build/app/outputs/flutter-apk/app-release.apk artifacts/chatvv-app-android.apk
-          cp app/build/app/outputs/bundle/release/app-release.aab artifacts/chatvv-app-android.aab
-          sha256sum artifacts/chatvv-app-android.apk artifacts/chatvv-app-android.aab > artifacts/chatvv-app-android.sha256
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+        run: ./platforms/android/setup-signing.sh --required
+      - name: Build and package
+        shell: ${{ matrix.shell }}
+        env:
+          CHATVV_VULKAN: ${{ matrix.vulkan }}
+          ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+        run: ${{ matrix.command }}
       - uses: actions/upload-artifact@v4
         with:
-          name: chatvv-app-android
-          path: artifacts/*
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error
 
-  app-release-linux:
-    name: package / desktop linux
-    needs: detect-app
-    if: needs.detect-app.outputs.has_app == 'true'
+  # ---------------------------------------------------------------------------
+  # Gate: skipped (not-selected) jobs are fine; failures are not.
+  # ---------------------------------------------------------------------------
+  gate:
+    name: verify selected jobs
+    needs:
+      - parse-tag
+      - backend-linux
+      - backend-macos
+      - backend-windows
+      - app-release
+    if: always()
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Install desktop dependencies
+      - name: Assert every selected build job succeeded
+        shell: bash
+        env:
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config \
-            libgtk-3-dev libsqlite3-dev libcurl4-openssl-dev libssl-dev
-      - name: Build and package
-        run: ./scripts/package-desktop-linux.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: chatvv-app-linux
-          path: artifacts/*
-          if-no-files-found: error
+          echo "$NEEDS_JSON"
+          test "$(echo "$NEEDS_JSON" | jq -r '.["parse-tag"].result')" = "success"
+          echo "$NEEDS_JSON" | jq -e '
+            to_entries
+            | map(select(.key != "parse-tag"))
+            | all(.value.result == "success" or .value.result == "skipped")
+          '
 
-  app-release-windows:
-    name: package / desktop windows
-    needs: detect-app
-    if: needs.detect-app.outputs.has_app == 'true'
-    runs-on: windows-2022
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Build and package
-        shell: pwsh
-        run: ./scripts/package-desktop-windows.ps1
-      - uses: actions/upload-artifact@v4
-        with:
-          name: chatvv-app-windows
-          path: artifacts/*
-          if-no-files-found: error
-
+  # ---------------------------------------------------------------------------
+  # Publish (tag pushes only). Artifact file names already carry the platform.
+  # ---------------------------------------------------------------------------
   release:
     name: github release
     needs:
-      - backend-linux-x64
-      - backend-linux-arm64
-      - backend-windows-x64
-      - app-release
-      - app-release-linux
-      - app-release-windows
-    if: ${{ always() && needs.backend-linux-x64.result == 'success' && needs.backend-linux-arm64.result == 'success' && needs.backend-windows-x64.result == 'success' && (needs.app-release.result == 'success' || needs.app-release.result == 'skipped') && (needs.app-release-linux.result == 'success' || needs.app-release-linux.result == 'skipped') && (needs.app-release-windows.result == 'success' || needs.app-release-windows.result == 'skipped') }}
+      - parse-tag
+      - gate
+    if: always() && needs.parse-tag.outputs.publish == 'true' && needs.gate.result == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
           merge-multiple: true
       - name: Checksums
+        shell: bash
         run: |
           cd artifacts
           ls -lh
-          sha256sum * > SHA256SUMS
+          sha256sum -- * > SHA256SUMS
           cat SHA256SUMS
       - uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.parse-tag.outputs.tag }}
+          name: chatvv ${{ needs.parse-tag.outputs.version }} (${{ needs.parse-tag.outputs.platforms_label }})
           files: artifacts/*
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ needs.parse-tag.outputs.prerelease == 'true' }}
           fail_on_unmatched_files: true

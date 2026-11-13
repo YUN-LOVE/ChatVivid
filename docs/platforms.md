@@ -21,10 +21,13 @@
 
 ## 2. 依赖
 
-代码本身只依赖 C++23 标准库；外部依赖只有两个运行库：
+代码本身只依赖 C++23 标准库；外部依赖：
 
 - **SQLite 3**（事实源）
 - **libcurl**（调用云端 LLM / 以后的 MCP HTTP）
+- **Rust / cargo**（编译 vendored 的 `read_aloud` TTS 库；本机/CI 都需要）
+- **Vulkan SDK**（可选：ggml 的 Vulkan 后端；`CHATVV_VULKAN=AUTO` 缺 SDK 时回退 CPU，
+  CI 传 `-DCHATVV_VULKAN=ON` 强制。Apple 暂不启用 Vulkan）
 
 加上三个固定版本的单头文件（nlohmann/json、toml++、cpp-httplib），已放在 `third_party/`，不依赖网络。
 
@@ -39,7 +42,9 @@ sudo apt install clang cmake ninja-build libsqlite3-dev libcurl4-openssl-dev
 Arch：
 
 ```bash
-sudo pacman -S clang cmake ninja sqlite curl
+sudo pacman -S clang cmake ninja sqlite curl rustup
+# 需要 Vulkan 后端时（可选）：
+sudo pacman -S vulkan-devel shaderc
 ```
 
 ### macOS
@@ -49,7 +54,9 @@ xcode-select --install
 brew install cmake ninja curl
 ```
 
-macOS 自带 SQLite。libcurl 建议用 Homebrew 的版本（系统版本被标记为 deprecated）：
+macOS 自带 SQLite，`native-tls` 用系统 Security 框架，不需要 OpenSSL。Rust 用 rustup 安装：
+`curl https://sh.rustup.rs -sSf | sh`。Vulkan 暂不启用（Apple 后端保持 CPU/Metal）。
+libcurl 建议用 Homebrew 的版本（系统版本被标记为 deprecated）：
 
 ```bash
 cmake --preset macos-arm64 -DCURL_ROOT=$(brew --prefix curl)
@@ -163,16 +170,27 @@ qemu-aarch64 -L /usr/aarch64-linux-gnu ./build/arm64-cross/chatvv_tests
 
 ## 6. CI
 
-`.github/workflows/ci.yml`：
+CI 已改为**按改动路径选择平台**（`platforms/<p>/**` 只触发该平台；共享路径触发全部启用平台），
+release 用 tag 选择平台子集；完整规则、tag 表与依赖清单见 [ci-cd.md](ci-cd.md)。平台适配脚本在
+`platforms/<platform>/`（`scripts/` 保留兼容转发入口）。
 
 | Job | Runner | 验证内容 |
 |---|---|---|
-| `linux-x64` | `ubuntu-latest` | 构建 + `core` + `smoke` |
-| `linux-arm64` | `ubuntu-24.04-arm` | 构建 + 测试（原生 arm64） |
-| `macos-arm64` | `macos-14` | 构建 + 测试 |
-| `windows-x64` | `windows-latest` | MSVC + vcpkg，构建 + `core` |
+| `detect affected platforms` | `ubuntu-latest` | 改动分类 → 输出平台矩阵（`platforms/`、backend/app 子集） |
+| `lint / workflows & scripts` | `ubuntu-latest` | workflow YAML + 脚本静态检查；纯文档改动只跑这个 |
+| `backend / linux x64` | `ubuntu-latest` | `dev` preset 构建 + `core` + `smoke`，Vulkan ON |
+| `backend / linux arm64` | `ubuntu-24.04-arm` | `linux-arm64` preset 构建 + 测试（原生 arm64），Vulkan ON |
+| `backend / macos arm64` | `macos-14` | `macos-arm64` 构建 + 测试；CPU/Metal，Vulkan OFF；默认被 `ENABLE_MACOS_RUNNERS` 成本开关跳过 |
+| `backend / windows x64` | `windows-2022` | MSVC + vcpkg，构建 + `core`，Vulkan ON |
+| `app / <platform>` | 按平台 | Android APK / Linux / Windows / macOS desktop 打包（动态矩阵） |
 
-如果账号没有 arm64 runner，把 `linux-arm64` 换成 `arm64-cross` 构建 + qemu 跑测试；或者只在自建 ARM 设备上跑。
+说明：
+
+- Linux/Windows/Android 在 CI 传 `-DCHATVV_VULKAN=ON` 并安装对应 Vulkan SDK/glslc；
+  macOS（以及未启用的 iOS）明确 `-DCHATVV_VULKAN=OFF`，保持 CPU/Metal（MoltenVK 未接入）。
+- iOS/web 需要先 scaffold `app/ios`、`app/web`，之后才会自动进入 CI/release 矩阵。
+- 如果账号没有 arm64 runner，把 `backend / linux arm64` 换成 `arm64-cross` 构建 + qemu 跑测试；
+  或者只在自建 ARM 设备上跑。
 
 ---
 
@@ -191,3 +209,8 @@ qemu-aarch64 -L /usr/aarch64-linux-gnu ./build/arm64-cross/chatvv_tests
 - Windows 路径按 UTF-8 处理，非 ASCII 路径没有专门测试；建议数据目录用 ASCII。
 - macOS x86_64 没有单独 CI job；同一份代码、同一套预设，理论上可用。
 - 32 位和大端不支持，也不打算支持。
+- **Linux aarch64 私有环境受限**：C++ 后端可在 aarch64 本机原生构建并跑测试；
+  但 `flutter build linux` 会被 `rive_native` 的 x86_64 预编译静态库卡住，
+  `flutter build apk` 会因官方 NDK 只提供 `linux-x86_64` 主机工具链而无法进行。
+  Android 包和桌面包请在 x86_64 主机/CI 上构建，详见
+  [install-arch-aarch64-chroot.md](install-arch-aarch64-chroot.md)。

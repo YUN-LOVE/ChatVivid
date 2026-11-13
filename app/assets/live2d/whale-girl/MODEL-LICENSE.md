@@ -26,5 +26,5 @@
 
 ## 运行时
 
-- `flutter_live2d` 插件：BSD-3-Clause；其内置 Live2D Cubism Core 为 Live2D Inc. 专有许可，发布前核对 Cubism SDK 条款。
-- App 内 About / Third-party licenses 需同时展示本模型许可、`flutter_live2d` 许可和 Cubism Core 声明。
+- `live2d_flutter` 插件：BSD-3-Clause；其内置 Live2D Cubism Core 为 Live2D Inc. 专有许可，发布前核对 Cubism SDK 条款。
+- App 内 About / Third-party licenses 需同时展示本模型许可、`live2d_flutter` 许可和 Cubism Core 声明。

@@ -12,3 +12,6 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Android keystore backups (make-keystore.sh writes the base64 next to it)
+*.jks.b64

@@ -7,9 +7,15 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Unified Android signing key (debug *and* release, every artifact from every
+// machine/CI run). The keystore itself and key.properties are gitignored; CI
+// materializes them from the ANDROID_KEYSTORE_BASE64 secret via
+// platforms/android/setup-signing.sh. Without signing material Gradle falls back
+// to the default debug key so local builds still work (not unified).
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
-if (keystorePropertiesFile.exists()) {
+val hasUnifiedKey = keystorePropertiesFile.exists()
+if (hasUnifiedKey) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
@@ -35,8 +41,8 @@ android {
     }
 
     signingConfigs {
-        create("release") {
-            if (keystorePropertiesFile.exists()) {
+        if (hasUnifiedKey) {
+            create("chatvv") {
                 storeFile = file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
                 keyAlias = keystoreProperties.getProperty("keyAlias")
@@ -46,12 +52,22 @@ android {
     }
 
     buildTypes {
-        release {
-            // Use android/key.properties for a production keystore; the
-            // debug key is a local/test fallback only.
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
+        // One key for every build type: a debug APK and a release APK share the
+        // same certificate and applicationId, so they can replace each other on
+        // a device and keep user data. Set by platforms/android/setup-signing.sh
+        // locally and in CI.
+        debug {
+            signingConfig = if (hasUnifiedKey) {
+                signingConfigs.getByName("chatvv")
             } else {
+                signingConfigs.getByName("debug")
+            }
+        }
+        release {
+            signingConfig = if (hasUnifiedKey) {
+                signingConfigs.getByName("chatvv")
+            } else {
+                // Local fallback only: not unified with other machines/CI.
                 signingConfigs.getByName("debug")
             }
         }

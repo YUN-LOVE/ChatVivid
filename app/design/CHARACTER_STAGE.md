@@ -70,7 +70,7 @@ abstract interface class CharacterRuntime {
 ```
 
 - `CharacterStageController` 根据 `kind` 选择 adapter；UI 只依赖 `CharacterRuntime`。
-- `Live2DCharacterRuntime`：`flutter_live2d`，`model3.json`；`setParameter('ParamMouthOpenY')`；`startMotion`/`setExpression`；`setRenderingPaused`。
+- `Live2DCharacterRuntime`：`live2d_flutter`，`model3.json`；`setParameter('ParamMouthOpenY')`；`startMotion`/`setExpression`；`setRenderingPaused`。
 - `VrmCharacterRuntime`：未来；VRM 1.0 + VRMA；需要 3D 渲染器；同一接口。
 - `StaticCharacterRuntime`：WebP/PNG 静态或 2–3 帧呼吸；所有平台兜底。
 - `CharacterStage` widget：负责舞台尺寸、渐变过渡、折叠、生命周期；不关心底层是 Live2D 还是 VRM。
@@ -79,7 +79,7 @@ abstract interface class CharacterRuntime {
 
 | 平台 | Live2D runtime | 状态 |
 |---|---|---|
-| Android / iOS | `flutter_live2d`（Cubism Native + OpenGL ES） | v1 |
+| Android / iOS | `live2d_flutter`（Cubism Native + OpenGL ES） | v1 |
 | Windows / macOS / Linux | 独立 `DesktopLive2D`（Cubism Native + FFI/Texture，或 WebView 兜底） | v1 后补；先静态 |
 | Web | 不做主目标；必要时 WebView/pixi-live2d | 不做 |
 

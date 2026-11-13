@@ -110,6 +110,8 @@ class _CharacterStageState extends State<CharacterStage> {
           fallback: fallback,
         );
       }
+      // No Live2D renderer on this platform (Linux, Fuchsia, ...): keep the
+      // static mascot so the character stage never goes blank.
       return fallback;
     }
 
