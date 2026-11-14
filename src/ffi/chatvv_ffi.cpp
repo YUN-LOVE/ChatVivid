@@ -41,14 +41,10 @@ void configure_llama_vulkan_environment() {
   static bool configured = false;
   if (configured) return;
   configured = true;
-  // Adreno 725's Android driver rejects several ggml shader variants with
-  // VK_ERROR_UNKNOWN (q8_0 mat-vec, f16-accumulation quantized matmul). Stick
-  // to the portable f32-accumulation variants; everything still executes on
-  // the Vulkan GPU.
+  // Adreno 725's Android driver rejects the q8_0 dequant mat-vec shader; the
+  // matvec (MMVQ) path is optional and disabling it keeps everything on the
+  // regular matmul shaders while still running on the Vulkan GPU.
   setenv("GGML_VK_DISABLE_MMVQ", "1", 0);
-  setenv("GGML_VK_DISABLE_F16", "1", 0);
-  setenv("GGML_VK_DISABLE_BFLOAT16", "1", 0);
-  setenv("GGML_VK_DISABLE_INTEGER_DOT_PRODUCT", "1", 0);
 #endif
 }
 
