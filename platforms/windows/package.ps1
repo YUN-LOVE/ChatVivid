@@ -38,9 +38,16 @@ try {
   # the build directory so the plugin CMake always finds it.
   $RiveBuild = "$Root\app\build\rive_native\native\build\windows\bin"
   if (Test-Path $RiveBuild) {
+    $RiveTargets = @()
     $PubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
     Get-ChildItem -Path (Join-Path $PubCache "hosted\pub.dev") -Directory -Filter "rive_native-*" -ErrorAction SilentlyContinue | ForEach-Object {
-      $RivePkgBin = Join-Path $_.FullName "windows\bin"
+      $RiveTargets += (Join-Path $_.FullName "windows\bin")
+    }
+    # Flutter may materialize the plugin under windows/flutter/ephemeral as a
+    # copy (created by `flutter pub get`, before setup ran). Repair every candidate
+    # location; only the ones the plugin CMake actually reads matter.
+    $RiveTargets += "$Root\app\windows\flutter\ephemeral\.plugin_symlinks\rive_native\windows\bin"
+    foreach ($RivePkgBin in $RiveTargets) {
       if (!(Test-Path (Join-Path $RivePkgBin "lib\release\rive_native.lib"))) {
         Write-Host "repairing rive_native windows libs: $RivePkgBin"
         New-Item -ItemType Directory -Force -Path $RivePkgBin | Out-Null
