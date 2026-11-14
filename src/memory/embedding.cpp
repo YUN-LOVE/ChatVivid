@@ -142,6 +142,9 @@ bool EmbeddingEngine::load(const std::string& model_path, int threads,
   context_params.embeddings = true;
   context_params.pooling_type = LLAMA_POOLING_TYPE_CLS;
   context_params.attention_type = LLAMA_ATTENTION_TYPE_NON_CAUSAL;
+  // Adreno cannot build ggml's flash-attention compute pipelines either; the
+  // embedding workload does not need them.
+  context_params.flash_attn_type = LLAMA_FLASH_ATTN_TYPE_DISABLED;
   context_ = llama_init_from_model(model_, context_params);
   if (!context_) {
     if (error) *error = "llama_init_from_model failed";
@@ -207,15 +210,29 @@ std::vector<float> EmbeddingEngine::embed(const std::string& text,
     return {};
   }
   llama_batch batch = llama_batch_get_one(tokens.data(), count);
-  const int32_t rc = llama_model_has_encoder(model_)
-                          ? llama_encode(context_, batch)
-                          : llama_decode(context_, batch);
+  int32_t rc = -1;
+  try {
+    rc = llama_model_has_encoder(model_) ? llama_encode(context_, batch)
+                                         : llama_decode(context_, batch);
+  } catch (const std::exception& e) {
+    // A failed Vulkan pipeline throws a C++ exception out of ggml; catch it so
+    // the dialog worker reports a soft memory-embedding failure instead of the
+    // whole process crashing.
+    if (error) *error = e.what();
+    return {};
+  }
   if (rc != 0) {
     if (error) *error = "llama encode failed: " + std::to_string(rc);
     return {};
   }
-  const float* values = llama_get_embeddings_seq(context_, 0);
-  if (!values) values = llama_get_embeddings(context_);
+  const float* values = nullptr;
+  try {
+    values = llama_get_embeddings_seq(context_, 0);
+    if (!values) values = llama_get_embeddings(context_);
+  } catch (const std::exception& e) {
+    if (error) *error = e.what();
+    return {};
+  }
   if (!values) {
     if (error) *error = "no embeddings returned";
     return {};
