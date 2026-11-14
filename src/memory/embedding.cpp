@@ -1,6 +1,7 @@
 #include "memory/embedding.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <filesystem>
 #include <mutex>
@@ -178,7 +179,15 @@ int EmbeddingEngine::dim() const {
 
 std::vector<float> EmbeddingEngine::embed(const std::string& text,
                                           std::string* error) {
-  std::lock_guard lock(mutex_);
+  // A corrupt/hung llama context used to hold this mutex forever: the next
+  // turn's context build blocked on it and the whole chat stopped responding.
+  // Memory semantics are optional, so time out and let the turn proceed
+  // without semantic recall instead of deadlocking the dialog worker.
+  std::unique_lock<std::timed_mutex> lock(mutex_, std::defer_lock);
+  if (!lock.try_lock_for(std::chrono::milliseconds(800))) {
+    if (error) *error = "embedding busy";
+    return {};
+  }
   if (!ready()) {
     if (error) *error = "embedding engine not ready";
     return {};

@@ -26,7 +26,7 @@ class EmbeddingEngine {
   std::vector<float> embed(const std::string& text, std::string* error = nullptr);
 
  private:
-  mutable std::mutex mutex_;
+  mutable std::timed_mutex mutex_;
   std::atomic<bool> ready_{false};
   llama_model* model_ = nullptr;
   llama_context* context_ = nullptr;
