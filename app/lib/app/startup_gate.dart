@@ -6,6 +6,7 @@ import '../data/settings_store.dart';
 import '../features/chat/chat_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../theme/app_theme.dart';
+import '../theme/glass.dart';
 
 /// Loads settings and storage before showing the chat. This is the equivalent
 /// of Kazumi's startup gate: storage failure gets its own screen, first run
@@ -37,6 +38,7 @@ class _StartupGateState extends State<StartupGate> {
     try {
       final store = await SettingsStore.open();
       final settings = await store.load();
+      GlassPanel.intensity = settings.glassStrength;
       if (!mounted) return;
       await appThemeController.setMode(settings.colorMode);
       if (!mounted) return;
@@ -62,6 +64,7 @@ class _StartupGateState extends State<StartupGate> {
   }
 
   Future<void> _saveSettings(AppSettings settings) async {
+    GlassPanel.intensity = settings.glassStrength;
     await _store?.save(settings);
     await appThemeController.setMode(settings.colorMode);
     if (!mounted) return;

@@ -100,6 +100,7 @@ class AppSettings {
     required this.characterScale,
     required this.characterOffsetX,
     required this.characterOffsetY,
+    required this.glassStrength,
   });
 
   factory AppSettings.defaults() {
@@ -134,6 +135,7 @@ class AppSettings {
       characterScale: 1.0,
       characterOffsetX: 0.0,
       characterOffsetY: 0.0,
+      glassStrength: 1.0,
     );
   }
 
@@ -208,6 +210,8 @@ class AppSettings {
           defaults.characterOffsetX,
       characterOffsetY: (json['character_offset_y'] as num?)?.toDouble() ??
           defaults.characterOffsetY,
+      glassStrength: (json['glass_strength'] as num?)?.toDouble() ??
+          defaults.glassStrength,
     );
   }
 
@@ -241,6 +245,8 @@ class AppSettings {
   final double characterScale;
   final double characterOffsetX;
   final double characterOffsetY;
+  /// Global frosted-glass blur multiplier (设置 → 外观 → 毛玻璃强度).
+  final double glassStrength;
 
   Map<String, Object?> toJson() => {
         'mode': mode.wireName,
@@ -274,6 +280,7 @@ class AppSettings {
         'character_scale': characterScale,
         'character_offset_x': characterOffsetX,
         'character_offset_y': characterOffsetY,
+        'glass_strength': glassStrength,
       };
 
   AppSettings copyWith({
@@ -307,6 +314,7 @@ class AppSettings {
     double? characterScale,
     double? characterOffsetX,
     double? characterOffsetY,
+    double? glassStrength,
   }) {
     return AppSettings(
       mode: mode ?? this.mode,
@@ -339,6 +347,7 @@ class AppSettings {
       characterScale: characterScale ?? this.characterScale,
       characterOffsetX: characterOffsetX ?? this.characterOffsetX,
       characterOffsetY: characterOffsetY ?? this.characterOffsetY,
+      glassStrength: glassStrength ?? this.glassStrength,
     );
   }
 

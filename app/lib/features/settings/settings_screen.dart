@@ -1188,14 +1188,27 @@ class _SettingsDetailState extends State<SettingsDetail> {
           onTap: () => _setColorMode(AppColorMode.stage),
         ),
         SizedBox(height: 10),
-        _SettingCard(
-          icon: Icons.blur_on_rounded,
-          title: '玻璃强度',
-          subtitle: 'BackdropFilter · 2–3 个表面',
-          trailing: Icon(Icons.chevron_right_rounded),
-          onTap: null,
+        _ttsSlider(
+          label: '毛玻璃强度',
+          value: _settings.glassStrength,
+          min: 0.2,
+          max: 2.0,
+          divisions: 18,
+          format: (value) => '${value.toStringAsFixed(1)}×',
+          onChanged: (value) {
+            GlassPanel.intensity = value;
+            _updateSettings(_settings.copyWith(glassStrength: value));
+          },
         ),
-        SizedBox(height: 10),
+        Text(
+          '输入框 / 输出框白底毛玻璃的模糊强度；数值越大越磨砂。',
+          style: TextStyle(
+            color: AppColors.muted.withValues(alpha: 0.6),
+            fontSize: 10,
+            height: 1.4,
+          ),
+        ),
+        SizedBox(height: 14),
         _SettingCard(
           icon: Icons.animation_rounded,
           title: '动效',
@@ -1205,7 +1218,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         ),
         SizedBox(height: 18),
         _ttsSlider(
-          label: '水墨显现速度',
+          label: '输出框显示速度',
           value: _settings.typewriterSpeed,
           min: 0.5,
           max: 3.0,
@@ -1215,7 +1228,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
               _updateSettings(_settings.copyWith(typewriterSpeed: value)),
         ),
         Text(
-          '仅影响聊天输出框的水墨晕染速度（数值越大晕染越快）。',
+          '聊天输出框水墨晕染的显现速度（数值越大显现越快）。',
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.6),
             fontSize: 10,

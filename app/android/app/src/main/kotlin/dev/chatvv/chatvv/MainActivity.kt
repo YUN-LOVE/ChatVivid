@@ -59,7 +59,9 @@ class MainActivity : FlutterActivity() {
                             prepare()
                             start()
                         }
-                        result.success(true)
+                        // Return the clip duration so Dart can arm a playback
+                        // watchdog in case the completion callback is lost.
+                        result.success(mediaPlayer?.duration ?: -1)
                     } catch (error: Exception) {
                         result.error("play_failed", error.message, null)
                     }

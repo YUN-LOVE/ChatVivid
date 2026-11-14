@@ -76,3 +76,10 @@ Fix: `Live2DModel::SetParameterValue()` now records the value in
 motion/drag/eye-blink/expression/physics/pose and immediately before
 `CubismModel::Update()`, so app-driven parameters win for that frame while the
 idle motion still drives everything the app does not override.
+
+## 4. Changed: Android render hub capped to ~30 fps
+
+`android/src/main/kotlin/.../Live2DPlatformView.kt`: the GL render hub used to
+sleep 16 ms between frames (60 fps) even while the chat was idle, which kept a
+CPU core busy on phones. It now sleeps 28 ms (~30 fps), which still looks smooth
+for a stage character and cuts idle CPU roughly in half.

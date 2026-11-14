@@ -49,8 +49,10 @@ class Live2DStage extends StatefulWidget {
   State<Live2DStage> createState() => _Live2DStageState();
 }
 
-class _Live2DStageState extends State<Live2DStage> {
+class _Live2DStageState extends State<Live2DStage>
+    with WidgetsBindingObserver {
   final Live2DViewController _controller = Live2DViewController();
+  bool _appActive = true;
   Timer? _blinkTimer;
   Timer? _mouthTimer;
   Timer? _tailTimer;
@@ -67,6 +69,7 @@ class _Live2DStageState extends State<Live2DStage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _attachGaze();
     _controller.whenAttached.then((_) async {
       try {
@@ -178,7 +181,7 @@ class _Live2DStageState extends State<Live2DStage> {
   /// has not touched the stage for a while.
   void _startGaze() {
     _gazeTimer?.cancel();
-    _gazeTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+    _gazeTimer = Timer.periodic(const Duration(milliseconds: 80), (_) {
       if (!_loaded) return;
       final now = DateTime.now();
       final last = _lastPointerAt;
@@ -190,8 +193,8 @@ class _Live2DStageState extends State<Live2DStage> {
         );
       }
       _gaze = Offset(
-        _gaze.dx + (_gazeTarget.dx - _gaze.dx) * 0.22,
-        _gaze.dy + (_gazeTarget.dy - _gaze.dy) * 0.22,
+        _gaze.dx + (_gazeTarget.dx - _gaze.dx) * 0.30,
+        _gaze.dy + (_gazeTarget.dy - _gaze.dy) * 0.30,
       );
       _applyGaze(_gaze);
     });
@@ -209,7 +212,7 @@ class _Live2DStageState extends State<Live2DStage> {
 
   void _startTail() {
     _tailTimer?.cancel();
-    _tailTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
+    _tailTimer = Timer.periodic(const Duration(milliseconds: 150), (_) {
       if (!_loaded) return;
       final phase = DateTime.now().millisecondsSinceEpoch / 850.0;
       final sway = math.sin(phase);
@@ -232,7 +235,7 @@ class _Live2DStageState extends State<Live2DStage> {
       _setMouth(0);
       return;
     }
-    _mouthTimer = Timer.periodic(Duration(milliseconds: 90), (_) {
+    _mouthTimer = Timer.periodic(Duration(milliseconds: 110), (_) {
       if (!_loaded) return;
       _mouth = 0.15 + (math.sin(DateTime.now().millisecondsSinceEpoch / 95) + 1) * 0.36;
       _setMouth(_mouth);
@@ -248,7 +251,31 @@ class _Live2DStageState extends State<Live2DStage> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final active = state == AppLifecycleState.resumed;
+    if (active == _appActive) return;
+    _appActive = active;
+    if (!active) {
+      // Never burn CPU/GPU on the GL render hub while the app is in the
+      // background; the platform view keeps its last frame.
+      _blinkTimer?.cancel();
+      _mouthTimer?.cancel();
+      _tailTimer?.cancel();
+      _gazeTimer?.cancel();
+      _controller.setRenderingPaused(true).catchError((_) {});
+      return;
+    }
+    if (!_loaded) return;
+    _controller.setRenderingPaused(false).catchError((_) {});
+    _startBlink();
+    _startMouth();
+    _startTail();
+    _startGaze();
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.gazeNotifier?.removeListener(_onGazeChanged);
     _blinkTimer?.cancel();
     _mouthTimer?.cancel();

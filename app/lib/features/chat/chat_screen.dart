@@ -438,6 +438,16 @@ class _ChatScreenState extends State<ChatScreen>
     return '';
   }
 
+  Future<void> _toggleAutoSpeak() async {
+    AppHaptics.medium();
+    final next = widget.settings.copyWith(
+      ttsAutoSpeak: !widget.settings.ttsAutoSpeak,
+    );
+    await widget.onSettingsChanged(next);
+    if (!mounted) return;
+    _showMessage(next.ttsAutoSpeak ? '自动朗读已开启' : '自动朗读已关闭');
+  }
+
   Future<void> _toggleSpeech() async {
     AppHaptics.light();
     if (_tts.speaking.value) {
@@ -580,6 +590,8 @@ class _ChatScreenState extends State<ChatScreen>
                   onDragUpdate: _onHistoryDragUpdate,
                   onDragEnd: _onHistoryDragEnd,
                   onEyeTap: () => _showMessage('YOLO 视觉识别即将接入'),
+                  autoSpeak: widget.settings.ttsAutoSpeak,
+                  onToggleAutoSpeak: _toggleAutoSpeak,
                   editing: _editMode,
                   onToggleEdit: () => _setEditMode(!_editMode),
                 ),
@@ -743,6 +755,8 @@ class _StageTopBar extends StatelessWidget {
     required this.onDragUpdate,
     required this.onDragEnd,
     required this.onEyeTap,
+    required this.autoSpeak,
+    required this.onToggleAutoSpeak,
     required this.editing,
     required this.onToggleEdit,
   });
@@ -752,6 +766,8 @@ class _StageTopBar extends StatelessWidget {
   final ValueChanged<double> onDragUpdate;
   final VoidCallback onDragEnd;
   final VoidCallback onEyeTap;
+  final bool autoSpeak;
+  final VoidCallback onToggleAutoSpeak;
   final bool editing;
   final VoidCallback onToggleEdit;
 
@@ -766,7 +782,10 @@ class _StageTopBar extends StatelessWidget {
       child: ClipRRect(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(
+            sigmaX: 12 * GlassPanel.intensity.clamp(0.2, 2.0),
+            sigmaY: 12 * GlassPanel.intensity.clamp(0.2, 2.0),
+          ),
           child: Container(
             height: 66,
             padding: EdgeInsets.fromLTRB(8, 6, 8, 8),
@@ -780,6 +799,19 @@ class _StageTopBar extends StatelessWidget {
               listenable: chat,
               builder: (context, _) => Row(
                 children: [
+                  IconButton(
+                    onPressed: onToggleAutoSpeak,
+                    tooltip: autoSpeak ? '关闭自动朗读' : '开启自动朗读',
+                    icon: Icon(
+                      autoSpeak
+                          ? Icons.volume_up_rounded
+                          : Icons.volume_off_rounded,
+                      size: 21,
+                      color: autoSpeak
+                          ? AppColors.primary
+                          : AppColors.muted,
+                    ),
+                  ),
                   IconButton(
                     onPressed: onEyeTap,
                     tooltip: 'YOLO 视觉（即将接入）',
@@ -1114,8 +1146,8 @@ class _DialogueCardState extends State<_DialogueCard>
       alignment: Alignment.topCenter,
       child: GlassPanel(
         radius: 16,
-        blur: 18,
-        premium: true,
+        blur: 16,
+        tint: GlassTint.light,
         padding: EdgeInsets.zero,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: widget.collapsed ? 28 : 156),
@@ -1578,8 +1610,8 @@ class _Composer extends StatelessWidget {
               children: [
                 GlassPanel(
                   radius: 28,
-                  blur: 26,
-                  premium: true,
+                  blur: 18,
+                  tint: GlassTint.light,
                   padding: EdgeInsets.fromLTRB(8, 6, 6, 2),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

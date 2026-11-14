@@ -65,6 +65,8 @@ class TtsService {
     _ready = true;
     _audio.setMethodCallHandler((call) async {
       if (call.method == 'completed' || call.method == 'error') {
+        _playbackWatchdog?.cancel();
+        _playbackWatchdog = null;
         speaking.value = false;
       }
     });
@@ -146,6 +148,8 @@ class TtsService {
   }
 
   Future<void> stop() async {
+    _playbackWatchdog?.cancel();
+    _playbackWatchdog = null;
     try {
       await _audio.invokeMethod('stop');
     } catch (_) {}
@@ -162,10 +166,26 @@ class TtsService {
     speaking.dispose();
   }
 
+  Timer? _playbackWatchdog;
+
+  void _armPlaybackWatchdog(int durationMs) {
+    _playbackWatchdog?.cancel();
+    final safeMs = durationMs > 0 ? durationMs : 120000;
+    _playbackWatchdog = Timer(Duration(milliseconds: safeMs + 1500), () {
+      if (!speaking.value) return;
+      // The native completion callback can be lost (player released by another
+      // screen etc.); never leave the speaking state/mouth animation stuck on.
+      speaking.value = false;
+      _audio.invokeMethod('stop').catchError((_) => null);
+    });
+  }
+
   Future<bool> _playFile(String path) async {
     if (Platform.isAndroid || Platform.isIOS) {
       try {
-        await _audio.invokeMethod('play', {'path': path});
+        final durationMs =
+            await _audio.invokeMethod<int>('play', {'path': path}) ?? -1;
+        _armPlaybackWatchdog(durationMs);
         return true;
       } catch (error) {
         debugPrint('native audio failed: $error');
@@ -225,7 +245,10 @@ class TtsService {
   String _plain(String input) {
     return input
         .replaceAll(RegExp(r'```[\s\S]*?```'), ' ')
-        .replaceAll(RegExp(r'[*_`#>\[\]()]'), '')
+        // Never read parenthetical stage directions out loud:
+        // （动作描写） / (stage direction) / 【旁白】 / [note].
+        .replaceAll(RegExp(r'[（(【\[][^）)】\]]*[）)】\]]'), ' ')
+        .replaceAll(RegExp(r'[*_`#>]'), '')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
   }

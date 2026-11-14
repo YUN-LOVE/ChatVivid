@@ -304,7 +304,10 @@ private object Live2DRenderHub {
                 anyDrawn = true
             }
 
-            SystemClock.sleep(if (anyDrawn) 16 else 50)
+            // 30 fps is plenty for a static stage character and halves the
+            // GL/CPU cost on phones; the old 16 ms (60 fps) loop was a major
+            // battery/CPU drain while the chat was idle.
+            SystemClock.sleep(if (anyDrawn) 28 else 50)
         }
 
         teardownAll()
