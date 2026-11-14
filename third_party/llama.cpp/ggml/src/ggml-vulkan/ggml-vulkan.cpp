@@ -4790,6 +4790,26 @@ vk_device ggml_vk_get_device(size_t idx) {
         device_create_info.setPNext(&device_features2);
         device->device = device->physical_device.createDevice(device_create_info);
 
+        // chatvv: Android's Vulkan loader can return NULL from
+        // vkGetInstanceProcAddr() for device commands promoted after Vulkan 1.0
+        // (observed with vkGetBufferDeviceAddress on an Adreno 725 / Android 16).
+        // Vulkan-Hpp's dynamic dispatcher was initialised with the instance only,
+        // so those entries stay NULL and the first use jumps to pc=0. Re-resolve
+        // every device entry point through vkGetDeviceProcAddr() now that the
+        // device exists.
+        {
+            auto & dispatcher = ggml_vk_default_dispatcher();
+            const bool had_null_gbda = dispatcher.vkGetBufferDeviceAddress == nullptr;
+            dispatcher.init(device->device);
+            if (had_null_gbda) {
+                GGML_LOG_INFO("ggml_vulkan: re-resolved device entry points via vkGetDeviceProcAddr (vkGetBufferDeviceAddress was NULL)\n");
+            }
+            if (dispatcher.vkGetBufferDeviceAddress == nullptr) {
+                GGML_LOG_WARN("ggml_vulkan: vkGetBufferDeviceAddress still unavailable; disabling buffer device addresses\n");
+                device->buffer_device_address = false;
+            }
+        }
+
         if (device->device_fault) {
             device->pfn_vkGetDeviceFaultInfoEXT = (PFN_vkGetDeviceFaultInfoEXT)
                 vkGetDeviceProcAddr(device->device, "vkGetDeviceFaultInfoEXT");
