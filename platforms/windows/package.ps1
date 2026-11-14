@@ -59,7 +59,10 @@ try {
   $CommitCount = (git -C $Root rev-list --count HEAD).Trim()
   $CommitSha = (git -C $Root rev-parse --short HEAD).Trim()
   $Version = "0.1.$CommitCount"
-  flutter build windows --release `
+  # --no-pub: `flutter build` otherwise runs an implicit `pub get` that
+  # re-materializes windows/flutter/ephemeral (discarding the rive_native libs
+  # repaired above), which made the link fail on cold-cache runners.
+  flutter build windows --release --no-pub `
     --build-name=$Version --build-number=$CommitCount `
     --dart-define=APP_VERSION=$Version `
     --dart-define=BUILD_NUMBER=$CommitCount `
