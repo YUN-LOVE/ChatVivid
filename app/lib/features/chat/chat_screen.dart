@@ -1039,6 +1039,10 @@ class _DialogueCard extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(14, 0, 14, 10),
                   child: Align(
                     alignment: Alignment.topLeft,
+                    // heightFactor: 1 keeps the card as short as its content;
+                    // a plain Align expands to the bounded max height, which
+                    // made the card permanently ~156 px tall.
+                    heightFactor: 1,
                     child: ShaderMask(
                       blendMode: BlendMode.dstIn,
                       shaderCallback: (rect) => LinearGradient(
