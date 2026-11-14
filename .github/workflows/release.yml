@@ -405,10 +405,19 @@ jobs:
         run: |
           echo "$NEEDS_JSON"
           test "$(echo "$NEEDS_JSON" | jq -r '.["parse-tag"].result')" = "success"
+          # macOS is cost-gated (ENABLE_MACOS_RUNNERS): its legs are cancelled
+          # intentionally, which makes the aggregate result of backend-macos /
+          # app-release "cancelled" even when every non-macOS platform built
+          # fine. Failures still surface as "failure".
           echo "$NEEDS_JSON" | jq -e '
             to_entries
             | map(select(.key != "parse-tag"))
-            | all(.value.result == "success" or .value.result == "skipped")
+            | all(
+                .value.result == "success"
+                or .value.result == "skipped"
+                or (((.key == "backend-macos") or (.key == "app-release"))
+                    and .value.result == "cancelled")
+              )
           '
 
   # ---------------------------------------------------------------------------
