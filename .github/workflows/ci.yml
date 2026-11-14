@@ -25,7 +25,7 @@ on:
         description: '额外构建 Android profile APK（性能测试用）'
         required: false
         type: boolean
-        default: false''
+        default: false
 
 permissions:
   contents: read
