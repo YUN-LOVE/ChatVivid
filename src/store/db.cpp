@@ -373,8 +373,12 @@ std::vector<StoredEvent> Db::list_events(const std::string& response_id,
 std::vector<std::pair<std::string, StoredEvent>> Db::list_recent_events(
     int limit) {
   std::lock_guard lock(mu_);
+  // Streaming text deltas would otherwise fill the window and hide
+  // context.built / tool events; the developer view wants the structure, not
+  // every token chunk.
   Stmt q(db_,
          "SELECT response_id, seq, type, data FROM response_events "
+         "WHERE type <> 'response.output_text.delta' "
          "ORDER BY created_at DESC, seq DESC LIMIT ?");
   q.integer(1, limit);
   std::vector<std::pair<std::string, StoredEvent>> out;
