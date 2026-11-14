@@ -30,6 +30,25 @@ Push-Location "$Root\app"
 try {
   flutter pub get
   dart run rive_native:setup --verbose -p windows
+
+  # rive_native's setup unzips the prebuilt libs into the pub-cache package
+  # (windows/bin/lib/<config>). On a cold pub cache that can leave the package
+  # copy without libs even though the app build directory has them (seen on a
+  # fresh GitHub runner: LNK1181 rive_native.lib). Repair the package copy from
+  # the build directory so the plugin CMake always finds it.
+  $RiveBuild = "$Root\app\build\rive_native\native\build\windows\bin"
+  if (Test-Path $RiveBuild) {
+    $PubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
+    Get-ChildItem -Path (Join-Path $PubCache "hosted\pub.dev") -Directory -Filter "rive_native-*" -ErrorAction SilentlyContinue | ForEach-Object {
+      $RivePkgBin = Join-Path $_.FullName "windows\bin"
+      if (!(Test-Path (Join-Path $RivePkgBin "lib\release\rive_native.lib"))) {
+        Write-Host "repairing rive_native windows libs: $RivePkgBin"
+        New-Item -ItemType Directory -Force -Path $RivePkgBin | Out-Null
+        Copy-Item "$RiveBuild\*" $RivePkgBin -Recurse -Force
+      }
+    }
+  }
+
   $CommitCount = (git -C $Root rev-list --count HEAD).Trim()
   $CommitSha = (git -C $Root rev-parse --short HEAD).Trim()
   $Version = "0.1.$CommitCount"
