@@ -31,6 +31,22 @@
 
 namespace {
 
+// The Adreno Vulkan driver on this Android build fails to create the
+// mul_mat_vec_q8_0 compute pipeline (vk::Device::createComputePipeline:
+// ErrorUnknown). Disabling the mat-vec (MMVQ) shader path makes ggml use the
+// regular mat-mul shaders, which compile fine while staying on the GPU.
+// Must be set before llama_backend_init()/device initialisation.
+void configure_llama_vulkan_environment() {
+#if defined(__ANDROID__)
+  static bool configured = false;
+  if (configured) return;
+  configured = true;
+  setenv("GGML_VK_DISABLE_MMVQ", "1", 0);
+#endif
+}
+
+
+
 using json = nlohmann::json;
 
 char* dup_string(const std::string& value) {
@@ -278,6 +294,7 @@ chatvv::AsrEngineConfig parse_asr_config(const char* config_json,
                                         std::string& error) {
   chatvv::AsrEngineConfig config;
   if (!config_json || !*config_json) return config;
+  configure_llama_vulkan_environment();
   try {
     const json input = json::parse(config_json);
     if (!input.is_object()) {
