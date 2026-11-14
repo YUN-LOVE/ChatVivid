@@ -4,6 +4,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 struct sqlite3;
@@ -97,6 +98,10 @@ class Db {
                     const std::string& type, const std::string& data);
   std::vector<StoredEvent> list_events(const std::string& response_id,
                                        int64_t after_seq);
+
+  /// Newest-first response events across all responses (developer session log:
+  /// full context snapshots + tool/context events).
+  std::vector<std::pair<std::string, StoredEvent>> list_recent_events(int limit);
 
  private:
   void exec_locked(const std::string& sql);

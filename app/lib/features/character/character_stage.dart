@@ -20,6 +20,7 @@ class CharacterStage extends StatefulWidget {
     this.speaking = false,
     this.live2dDir = '',
     this.live2dModel = '',
+    this.gazeNotifier,
   });
 
   final String customRivePath;
@@ -27,6 +28,7 @@ class CharacterStage extends StatefulWidget {
   final bool speaking;
   final String live2dDir;
   final String live2dModel;
+  final ValueNotifier<Offset?>? gazeNotifier;
 
   @override
   State<CharacterStage> createState() => _CharacterStageState();
@@ -108,6 +110,7 @@ class _CharacterStageState extends State<CharacterStage> {
               : 'c_0120.model3.json',
           speaking: widget.speaking,
           fallback: fallback,
+          gazeNotifier: widget.gazeNotifier,
         );
       }
       // No Live2D renderer on this platform (Linux, Fuchsia, ...): keep the
@@ -141,7 +144,7 @@ class _CharacterStageState extends State<CharacterStage> {
 
     if (_riveLoader == null) {
       return Image.asset(
-        'assets/mascot/avatar.jpg',
+        'assets/mascot/avatar_circle.png',
         fit: BoxFit.contain,
         filterQuality: FilterQuality.medium,
       );
@@ -157,12 +160,12 @@ class _CharacterStageState extends State<CharacterStage> {
       },
       builder: (context, state) => switch (state) {
         RiveLoading() => Image.asset(
-          'assets/mascot/avatar.jpg',
+          'assets/mascot/avatar_circle.png',
           fit: BoxFit.contain,
           filterQuality: FilterQuality.medium,
         ),
         RiveFailed() => Image.asset(
-          'assets/mascot/avatar.jpg',
+          'assets/mascot/avatar_circle.png',
           fit: BoxFit.contain,
           filterQuality: FilterQuality.medium,
         ),
@@ -197,6 +200,7 @@ class _CharacterStageState extends State<CharacterStage> {
             ? widget.live2dModel
             : 'c_0120.model3.json',
         speaking: widget.speaking,
+        gazeNotifier: widget.gazeNotifier,
         fallback: Image.asset(
           'assets/mascot/dafeiyu-front.png',
           fit: BoxFit.contain,

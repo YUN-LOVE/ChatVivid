@@ -32,12 +32,18 @@ class Live2DStage extends StatefulWidget {
     this.modelFile = 'c_0120.model3.json',
     this.speaking = false,
     this.fallback,
+    this.gazeNotifier,
   });
 
   final String modelDir;
   final String modelFile;
   final bool speaking;
   final Widget? fallback;
+
+  /// Normalized (-1..1) pointer target from the chat screen's top-level touch
+  /// layer. The platform view itself does not reliably receive Flutter pointer
+  /// events on Android, so the screen owns the gesture and pushes it here.
+  final ValueNotifier<Offset?>? gazeNotifier;
 
   @override
   State<Live2DStage> createState() => _Live2DStageState();
@@ -61,6 +67,7 @@ class _Live2DStageState extends State<Live2DStage> {
   @override
   void initState() {
     super.initState();
+    _attachGaze();
     _controller.whenAttached.then((_) async {
       try {
         var ok = false;
@@ -100,6 +107,10 @@ class _Live2DStageState extends State<Live2DStage> {
   @override
   void didUpdateWidget(Live2DStage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.gazeNotifier != widget.gazeNotifier) {
+      oldWidget.gazeNotifier?.removeListener(_onGazeChanged);
+      _attachGaze();
+    }
     if (oldWidget.speaking != widget.speaking && _loaded) {
       _startMouth();
       _syncSpeakingMotion();
@@ -148,6 +159,20 @@ class _Live2DStageState extends State<Live2DStage> {
     }
   }
 
+  void _attachGaze() {
+    widget.gazeNotifier?.addListener(_onGazeChanged);
+  }
+
+  void _onGazeChanged() {
+    final point = widget.gazeNotifier?.value;
+    if (point == null) return;
+    _gazeTarget = Offset(
+      point.dx.clamp(-1.0, 1.0),
+      point.dy.clamp(-1.0, 1.0),
+    );
+    _lastPointerAt = DateTime.now();
+  }
+
   /// Restores gaze tracking: the eyes (ParamEyeBallX/Y) and head
   /// (ParamAngleX/Y/Z) follow the pointer, with an idle auto-sway when the user
   /// has not touched the stage for a while.
@@ -170,14 +195,6 @@ class _Live2DStageState extends State<Live2DStage> {
       );
       _applyGaze(_gaze);
     });
-  }
-
-  void _updateGazeTarget(Offset localPosition, Size size) {
-    if (size.width <= 0 || size.height <= 0) return;
-    final dx = (localPosition.dx / size.width) * 2 - 1;
-    final dy = (localPosition.dy / size.height) * 2 - 1;
-    _gazeTarget = Offset(dx.clamp(-1.0, 1.0), dy.clamp(-1.0, 1.0));
-    _lastPointerAt = DateTime.now();
   }
 
   void _applyGaze(Offset gaze) {
@@ -232,6 +249,7 @@ class _Live2DStageState extends State<Live2DStage> {
 
   @override
   void dispose() {
+    widget.gazeNotifier?.removeListener(_onGazeChanged);
     _blinkTimer?.cancel();
     _mouthTimer?.cancel();
     _tailTimer?.cancel();
@@ -244,20 +262,7 @@ class _Live2DStageState extends State<Live2DStage> {
   @override
   Widget build(BuildContext context) {
     if (_failed) return widget.fallback ?? SizedBox.shrink();
-    return LayoutBuilder(
-      builder: (context, constraints) => Listener(
-        behavior: HitTestBehavior.translucent,
-        onPointerDown: (event) =>
-            _updateGazeTarget(event.localPosition, constraints.biggest),
-        onPointerMove: (event) =>
-            _updateGazeTarget(event.localPosition, constraints.biggest),
-        child: MouseRegion(
-          onHover: (event) =>
-              _updateGazeTarget(event.localPosition, constraints.biggest),
-          child: _buildStage(),
-        ),
-      ),
-    );
+    return _buildStage();
   }
 
   Widget _buildStage() {

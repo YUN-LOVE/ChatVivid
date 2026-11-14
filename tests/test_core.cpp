@@ -119,6 +119,12 @@ int main() {
   const auto events = db.list_events(row.id, 0);
   CHECK(events.size() == 2);
   CHECK(events[1].seq == 2);
+  // Developer session log uses the newest-first cross-response event list.
+  const auto recent_events = db.list_recent_events(10);
+  CHECK(recent_events.size() == 2);
+  CHECK(recent_events.front().first == row.id);
+  CHECK(recent_events.front().second.seq == 2);
+  CHECK(recent_events.front().second.type == "response.completed");
   CHECK(db.response_status(row.id) == "in_progress");
   db.update_response(row.id, "completed", R"({"output":[]})", R"({"input_tokens":1})",
                      "", now_ms());

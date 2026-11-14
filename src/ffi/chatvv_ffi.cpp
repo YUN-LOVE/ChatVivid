@@ -3,6 +3,7 @@
 #include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdint>
@@ -576,8 +577,46 @@ char* chatvv_capabilities(chatvv_engine* engine, char** error_json) {
                         .dump());
 }
 
+char* chatvv_context_log(chatvv_engine* engine, int32_t limit,
+                         char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!engine) {
+    set_error(error_json, "invalid_argument", "engine is required");
+    return nullptr;
+  }
+  try {
+    const int32_t clamped =
+        std::clamp<int32_t>(limit > 0 ? limit : 400, 1, 4000);
+    json out;
+    out["system_prompt"] = engine->cfg.prompt.system_text;
+    out["provider"] = engine->cfg.llm.provider;
+    out["model"] = engine->cfg.llm.model;
+    out["base_url"] = engine->cfg.llm.base_url;
+    json events = json::array();
+    for (const auto& entry : engine->db->list_recent_events(clamped)) {
+      const std::string& response_id = entry.first;
+      const auto& event = entry.second;
+      json data;
+      try {
+        data = json::parse(event.data);
+      } catch (const std::exception&) {
+        data = event.data;
+      }
+      events.push_back({{"response_id", response_id},
+                        {"seq", event.seq},
+                        {"type", event.type},
+                        {"data", std::move(data)}});
+    }
+    out["events"] = std::move(events);
+    return dup_string(out.dump());
+  } catch (const std::exception& error) {
+    set_error(error_json, "context_log_failed", error.what());
+    return nullptr;
+  }
+}
+
 char* chatvv_memories(chatvv_engine* engine, int32_t limit,
-                       const char* query, char** error_json) {
+                      const char* query, char** error_json) {
   if (error_json) *error_json = nullptr;
   if (!engine) {
     set_error(error_json, "invalid_argument", "engine is null");

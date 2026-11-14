@@ -187,6 +187,17 @@ class RemoteChatApi implements ChatBackend {
     }
   }
 
+
+  @override
+  Future<Map<String, dynamic>> contextLog({int limit = 400}) async {
+    return {
+      'unsupported': true,
+      'reason': 'Only client 模式暂不提供完整上下文日志；请切换到 Full 模式查看',
+    };
+  }
+
+  @override
+  Future<void> clearAllMemories() => clearAllMemoriesPaginated(this);
   @override
   Future<MemoryArchiveResult> saveContext() async {
     try {

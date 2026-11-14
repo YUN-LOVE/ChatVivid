@@ -104,6 +104,17 @@ CHATVV_API int32_t chatvv_tts_synthesize_opts(const char* text,
                                               const char* output_path,
                                               char** error_json);
 
+/*
+ * Developer-mode context log (Full mode only). Returns a JSON object:
+ * {"system_prompt","provider","model","base_url","events":[
+ *   {"response_id","seq","type","data"}]}. Events are the persisted response
+ * events for the most recent responses, oldest across the DB (newest first),
+ * including chatvv.context.built with the complete instructions/tools/input,
+ * tool calls and provider events. Free the result with chatvv_free().
+ */
+CHATVV_API char* chatvv_context_log(chatvv_engine* engine, int32_t limit,
+                                     char** error_json);
+
 /* Memory archive. JSON arrays/objects; free with chatvv_free(). */
 CHATVV_API char* chatvv_memories(chatvv_engine* engine, int32_t limit,
                                  const char* query, char** error_json);

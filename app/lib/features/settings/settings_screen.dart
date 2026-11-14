@@ -316,7 +316,7 @@ class _SummaryCard extends StatelessWidget {
       padding: EdgeInsets.all(16),
       child: Row(
         children: [
-          Image.asset('assets/mascot/avatar.jpg', width: 52, height: 52),
+          Image.asset('assets/mascot/avatar_circle.png', width: 52, height: 52),
           SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -556,7 +556,10 @@ class _SettingsDetailState extends State<SettingsDetail> {
   void _openSessionLog() {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => SessionLogScreen(backend: widget.backend),
+        builder: (_) => SessionLogScreen(
+          backend: widget.backend,
+          settings: _settings,
+        ),
       ),
     );
   }

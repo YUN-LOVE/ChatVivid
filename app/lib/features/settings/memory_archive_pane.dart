@@ -140,6 +140,45 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
     }
   }
 
+  Future<void> _clearAllMemories() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('清除全部记忆？'),
+        content: const Text(
+          '所有长期记忆条目都会被删除，无法恢复。当前对话上下文不受影响。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('全部清除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await widget.backend.clearAllMemories();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('全部记忆已清除')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('清除失败：$error')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   void _show(MemoryEntry memory) {
     showModalBottomSheet<void>(
       context: context,
@@ -228,6 +267,20 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
           icon: Icon(Icons.delete_sweep_outlined, size: 17),
           label: Text('清除上下文'),
         ),
+        if (widget.developerMode) ...[
+          SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _busy ? null : _clearAllMemories,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.coral,
+              side: BorderSide(
+                color: AppColors.coral.withValues(alpha: 0.45),
+              ),
+            ),
+            icon: Icon(Icons.delete_forever_outlined, size: 17),
+            label: Text('清除全部记忆'),
+          ),
+        ],
         SizedBox(height: 12),
         if (_loading)
           Center(
@@ -299,6 +352,17 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
                           ],
                         ),
                       ),
+                      if (widget.developerMode)
+                        IconButton(
+                          onPressed: () => _deleteMemory(memory),
+                          tooltip: '删除记忆',
+                          visualDensity: VisualDensity.compact,
+                          icon: Icon(
+                            Icons.delete_outline_rounded,
+                            size: 18,
+                            color: AppColors.coral.withValues(alpha: 0.85),
+                          ),
+                        ),
                     ],
                   ),
                 ),

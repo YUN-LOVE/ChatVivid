@@ -234,7 +234,7 @@ class _WelcomePage extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(24, 28, 24, 20),
       children: [
         Center(
-          child: Image.asset('assets/mascot/avatar.jpg', width: 150),
+          child: Image.asset('assets/mascot/avatar_circle.png', width: 150),
         ),
         SizedBox(height: 18),
         Text(

@@ -117,6 +117,17 @@ typedef _HistoryDart = Pointer<Utf8> Function(
   Pointer<Pointer<Utf8>> errorJson,
 );
 
+typedef _ContextLogNative = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  Int32 limit,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+typedef _ContextLogDart = Pointer<Utf8> Function(
+  Pointer<Void> engine,
+  int limit,
+  Pointer<Pointer<Utf8>> errorJson,
+);
+
 typedef _FreeNative = Void Function(Pointer<Utf8> value);
 typedef _FreeDart = void Function(Pointer<Utf8> value);
 
@@ -167,6 +178,15 @@ class FfiChatApi implements ChatBackend {
         _SaveContextNative, _SaveContextDart>('chatvv_save_context');
     _clearContext = _library.lookupFunction<
         _ClearContextNative, _ClearContextDart>('chatvv_clear_context');
+    // Developer-mode context log was added later: keep working with older
+    // native builds that don't export the symbol.
+    try {
+      _contextLog = _library.lookupFunction<_ContextLogNative, _ContextLogDart>(
+        'chatvv_context_log',
+      );
+    } on ArgumentError {
+      _contextLog = null;
+    }
     _free = _library.lookupFunction<_FreeNative, _FreeDart>('chatvv_free');
 
     _callable = NativeCallable<_EventCallbackNative>.listener(_onNativeEvent);
@@ -197,6 +217,7 @@ class FfiChatApi implements ChatBackend {
   late final _DeleteMemoryDart _deleteMemory;
   late final _SaveContextDart _saveContext;
   late final _ClearContextDart _clearContext;
+  _ContextLogDart? _contextLog;
   late final _FreeDart _free;
   late final NativeCallable<_EventCallbackNative> _callable;
 
@@ -474,6 +495,44 @@ class FfiChatApi implements ChatBackend {
     calloc.free(idPtr);
   }
 
+
+  @override
+  Future<Map<String, dynamic>> contextLog({int limit = 400}) async {
+    final lookup = _contextLog;
+    if (lookup == null) {
+      return {
+        'unsupported': true,
+        'reason': '当前原生库不包含 chatvv_context_log（请更新构建）',
+      };
+    }
+    if (_disposed || _engine.address == 0) {
+      throw const ChatApiException('FFI engine 已释放');
+    }
+    final errorPtr = calloc<Pointer<Utf8>>();
+    try {
+      final resultPtr = lookup(_engine, limit, errorPtr);
+      if (resultPtr == nullptr) {
+        throw ChatApiException(_takeError(errorPtr));
+      }
+      try {
+        final decoded = jsonDecode(resultPtr.toDartString());
+        if (decoded is Map) {
+          return Map<String, dynamic>.from(decoded);
+        }
+        throw const ChatApiException('context_log 返回了非对象 JSON');
+      } finally {
+        _free(resultPtr);
+      }
+    } finally {
+      if (errorPtr.value != nullptr) {
+        _free(errorPtr.value);
+      }
+      calloc.free(errorPtr);
+    }
+  }
+
+  @override
+  Future<void> clearAllMemories() => clearAllMemoriesPaginated(this);
   @override
   Future<MemoryArchiveResult> saveContext() async {
     if (_disposed) {

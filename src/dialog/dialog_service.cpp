@@ -120,10 +120,16 @@ void DialogService::run(std::string id, BuiltContext ctx, std::string model,
           {"status", "in_progress"},
           {"model", model},
           {"created_at", now_ms() / 1000}}}});
+  // Persist the complete built context (not just counts) so developer mode can
+  // show system prompt, tools, injections, memories and the tool-call events in
+  // the session log. This is a local debug log stored in response_events.
   emit("chatvv.context.built",
        {{"type", "chatvv.context.built"},
         {"response_id", id},
-        {"manifest", ctx.manifest}});
+        {"manifest", ctx.manifest},
+        {"instructions", ctx.instructions},
+        {"tools", ctx.tools},
+        {"input", ctx.input}});
 
   LlmRequest req;
   req.model = model;

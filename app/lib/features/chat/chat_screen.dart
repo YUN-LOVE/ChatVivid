@@ -65,6 +65,10 @@ class _ChatScreenState extends State<ChatScreen>
   Offset _editStartOffset = Offset.zero;
   Offset _editStartFocal = Offset.zero;
   final TtsService _tts = TtsService();
+  // Normalized (-1..1) pointer target used to drive the Live2D gaze. The
+  // platform view does not get reliable Flutter pointer events on Android, so
+  // a transparent Listener above the stage captures touches instead.
+  final ValueNotifier<Offset?> _gazeTarget = ValueNotifier<Offset?>(null);
 
   @override
   void initState() {
@@ -396,6 +400,7 @@ class _ChatScreenState extends State<ChatScreen>
     _tts.speaking.removeListener(_onTtsChanged);
     _drawer.dispose();
     _livePulse.dispose();
+    _gazeTarget.dispose();
     unawaited(_tts.dispose());
     final chat = _chat;
     if (chat != null) {
@@ -477,9 +482,39 @@ class _ChatScreenState extends State<ChatScreen>
                     speaking: chat.busy || _tts.speaking.value,
                     live2dDir: widget.settings.live2dDir,
                     live2dModel: widget.settings.live2dModel,
+                    gazeNotifier: _gazeTarget,
                   ),
                 ),
               ),
+            ),
+          ),
+          // Touch overlay for Live2D gaze: sits above the native platform view
+          // (which swallows pointer events) but below the top bar, history
+          // drawer and composer, so those keep their own gestures.
+          Positioned.fill(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                Offset? normalize(Offset local) {
+                  final size = constraints.biggest;
+                  if (size.width <= 0 || size.height <= 0) return null;
+                  return Offset(
+                    (local.dx / size.width) * 2 - 1,
+                    (local.dy / size.height) * 2 - 1,
+                  );
+                }
+
+                void update(PointerEvent event) {
+                  final value = normalize(event.localPosition);
+                  if (value != null) _gazeTarget.value = value;
+                }
+
+                return Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: update,
+                  onPointerMove: update,
+                  onPointerHover: update,
+                );
+              },
             ),
           ),
           if (_editMode)
@@ -531,7 +566,6 @@ class _ChatScreenState extends State<ChatScreen>
                 onClose: _closeHistory,
                 onCloseDragUpdate: _onHistoryCloseDragUpdate,
                 onCloseDragEnd: _onHistoryCloseDragEnd,
-                typewriterSpeed: widget.settings.typewriterSpeed,
               ),
             ),
           ),
@@ -558,6 +592,7 @@ class _ChatScreenState extends State<ChatScreen>
                         text: _latestLine(),
                         collapsed: _captionCollapsed,
                         speaking: _tts.speaking.value,
+                        typewriterSpeed: widget.settings.typewriterSpeed,
                         onSpeak: _toggleSpeech,
                         onToggle: () => setState(
                           () => _captionCollapsed = !_captionCollapsed,
@@ -626,7 +661,7 @@ class _BootstrapScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset(
-                  'assets/mascot/avatar.jpg',
+                  'assets/mascot/avatar_circle.png',
                   width: 96,
                   height: 96,
                 ),
@@ -785,7 +820,6 @@ class _HistoryDrawer extends StatelessWidget {
     required this.onClose,
     required this.onCloseDragUpdate,
     required this.onCloseDragEnd,
-    required this.typewriterSpeed,
   });
 
   final Animation<double> animation;
@@ -794,7 +828,6 @@ class _HistoryDrawer extends StatelessWidget {
   final Future<void> Function() onClose;
   final ValueChanged<double> onCloseDragUpdate;
   final VoidCallback onCloseDragEnd;
-  final double typewriterSpeed;
 
   @override
   Widget build(BuildContext context) {
@@ -854,13 +887,7 @@ class _HistoryDrawer extends StatelessWidget {
                   ],
                 ),
               ),
-              Expanded(
-                child: _ChatSurface(
-                  chat: chat,
-                  scroll: scroll,
-                  typewriterSpeed: typewriterSpeed,
-                ),
-              ),
+              Expanded(child: _ChatSurface(chat: chat, scroll: scroll)),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onVerticalDragUpdate: (details) {
@@ -949,11 +976,17 @@ class _EditModeBar extends StatelessWidget {
   }
 }
 
-class _DialogueCard extends StatelessWidget {
+/// Bottom-of-stage chat output card.
+///
+/// Shows the latest reply with the configured typewriter effect (this is the
+/// "chat box"; the history drawer renders complete messages immediately) and a
+/// subtle gaussian blur so the text sits on the glass surface.
+class _DialogueCard extends StatefulWidget {
   _DialogueCard({
     required this.text,
     required this.collapsed,
     required this.speaking,
+    required this.typewriterSpeed,
     required this.onSpeak,
     required this.onToggle,
   });
@@ -961,11 +994,84 @@ class _DialogueCard extends StatelessWidget {
   final String text;
   final bool collapsed;
   final bool speaking;
+  final double typewriterSpeed;
   final VoidCallback onSpeak;
   final VoidCallback onToggle;
 
   @override
+  State<_DialogueCard> createState() => _DialogueCardState();
+}
+
+class _DialogueCardState extends State<_DialogueCard> {
+  Timer? _timer;
+  String _visible = '';
+
+  @override
+  void initState() {
+    super.initState();
+    // Existing text (e.g. the last reply when the screen opens) is shown
+    // immediately; only new streaming content is typed out.
+    _visible = widget.text;
+  }
+
+  @override
+  void didUpdateWidget(covariant _DialogueCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.text == oldWidget.text) return;
+    if (!widget.text.startsWith(_visible)) {
+      // A different reply replaced the current one: restart from the beginning.
+      _visible = '';
+    }
+    _startTimer();
+  }
+
+  double get _speed => widget.typewriterSpeed.clamp(0.2, 4.0);
+
+  void _startTimer() {
+    if (_timer != null) return;
+    final intervalMs = (1000.0 / (90.0 * _speed)).round().clamp(8, 160);
+    _timer = Timer.periodic(Duration(milliseconds: intervalMs), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        _timer = null;
+        return;
+      }
+      final target = widget.text;
+      if (!target.startsWith(_visible)) _visible = '';
+      if (_visible.length >= target.length) {
+        if (_visible != target) setState(() => _visible = target);
+        timer.cancel();
+        _timer = null;
+        return;
+      }
+      final lag = target.length - _visible.length;
+      // Catch up when the network streams faster than the typewriter so the
+      // card never trails far behind the real text.
+      var step = 1 + (lag > 24 ? 1 : 0) + (lag > 60 ? 3 : 0);
+      if (_speed >= 2.0) step += 1;
+      var nextLen = ( _visible.length + step ).clamp(0, target.length);
+      if (nextLen < target.length &&
+          nextLen > 0 &&
+          _isHighSurrogate(target.codeUnitAt(nextLen - 1))) {
+        nextLen = (nextLen + 1).clamp(0, target.length);
+      }
+      setState(() => _visible = target.substring(0, nextLen));
+    });
+  }
+
+  bool _isHighSurrogate(int codeUnit) =>
+      codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final revealing = _timer != null && _visible.length < widget.text.length;
+    final display = '$_visible${revealing ? '▍' : ''}';
     return AnimatedSize(
       duration: Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
@@ -975,11 +1081,11 @@ class _DialogueCard extends StatelessWidget {
         blur: 18,
         padding: EdgeInsets.zero,
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxHeight: collapsed ? 28 : 156),
+          constraints: BoxConstraints(maxHeight: widget.collapsed ? 28 : 156),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-            SizedBox(
+              SizedBox(
                 height: 28,
                 child: Row(
                   children: [
@@ -1004,14 +1110,14 @@ class _DialogueCard extends StatelessWidget {
                     ),
                     Spacer(),
                     IconButton(
-                      onPressed: onSpeak,
+                      onPressed: widget.onSpeak,
                       padding: EdgeInsets.zero,
                       constraints: BoxConstraints.tightFor(
                         width: 34,
                         height: 26,
                       ),
                       icon: Icon(
-                        speaking
+                        widget.speaking
                             ? Icons.stop_circle_outlined
                             : Icons.volume_up_rounded,
                         size: 17,
@@ -1020,9 +1126,9 @@ class _DialogueCard extends StatelessWidget {
                     ),
                     SizedBox(width: 10),
                     GestureDetector(
-                      onTap: onToggle,
+                      onTap: widget.onToggle,
                       child: Icon(
-                        collapsed
+                        widget.collapsed
                             ? Icons.keyboard_arrow_up_rounded
                             : Icons.keyboard_arrow_down_rounded,
                         size: 17,
@@ -1032,47 +1138,36 @@ class _DialogueCard extends StatelessWidget {
                     SizedBox(width: 10),
                   ],
                 ),
-            ),
-            if (!collapsed)
-              Flexible(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(14, 0, 14, 10),
-                  child: Align(
-                    alignment: Alignment.topLeft,
-                    // heightFactor: 1 keeps the card as short as its content;
-                    // a plain Align expands to the bounded max height, which
-                    // made the card permanently ~156 px tall.
-                    heightFactor: 1,
-                    child: ShaderMask(
-                      blendMode: BlendMode.dstIn,
-                      shaderCallback: (rect) => LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          AppColors.onPrimaryContainer,
-                          AppColors.onPrimaryContainer,
-                          AppColors.onPrimaryContainer.withValues(alpha: 0.0),
-                        ],
-                        stops: const [0.0, 0.72, 1.0],
-                      ).createShader(rect),
-                      child: Text(
-                        text,
-                        // Sharp text (no gaussian blur); the box grows with the
-                        // content up to the AnimatedSize/Constraint max height.
-                        maxLines: 4,
-                        overflow: TextOverflow.fade,
-                        style: TextStyle(
-                          color: speaking
-                              ? AppColors.primary
-                              : AppColors.onPrimaryContainer,
-                          fontSize: 12.5,
-                          height: 1.55,
+              ),
+              if (!widget.collapsed)
+                Flexible(
+                  child: Padding(
+                    padding: EdgeInsets.fromLTRB(14, 0, 14, 10),
+                    child: Align(
+                      alignment: Alignment.topLeft,
+                      // heightFactor: 1 keeps the card as short as its content.
+                      heightFactor: 1,
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: widget.speaking ? 0.35 : 0.18,
+                          sigmaY: widget.speaking ? 0.35 : 0.18,
+                        ),
+                        child: Text(
+                          display,
+                          maxLines: 4,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: widget.speaking
+                                ? AppColors.primary
+                                : AppColors.onPrimaryContainer,
+                            fontSize: 12.5,
+                            height: 1.55,
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -1082,15 +1177,10 @@ class _DialogueCard extends StatelessWidget {
 }
 
 class _ChatSurface extends StatelessWidget {
-  _ChatSurface({
-    required this.chat,
-    required this.scroll,
-    required this.typewriterSpeed,
-  });
+  _ChatSurface({required this.chat, required this.scroll});
 
   final ChatController chat;
   final ScrollController scroll;
-  final double typewriterSpeed;
 
   @override
   Widget build(BuildContext context) {
@@ -1126,7 +1216,6 @@ class _ChatSurface extends StatelessWidget {
                   itemCount: messages.length,
                   itemBuilder: (context, index) => _MessageTile(
                     message: messages[index],
-                    typewriterSpeed: typewriterSpeed,
                   ),
                 );
               },
@@ -1153,10 +1242,9 @@ class _ChatSurface extends StatelessWidget {
 }
 
 class _MessageTile extends StatelessWidget {
-  _MessageTile({required this.message, required this.typewriterSpeed});
+  _MessageTile({required this.message});
 
   final ChatMessage message;
-  final double typewriterSpeed;
 
   @override
   Widget build(BuildContext context) {
@@ -1202,7 +1290,7 @@ class _MessageTile extends StatelessWidget {
           CircleAvatar(
             radius: 16,
             backgroundColor: AppColors.surfaceHigh,
-            backgroundImage: AssetImage('assets/mascot/avatar.jpg'),
+            backgroundImage: AssetImage('assets/mascot/avatar_circle.png'),
           ),
           SizedBox(width: 10),
           Expanded(
@@ -1238,7 +1326,6 @@ class _MessageTile extends StatelessWidget {
                   MarkdownMessage(
                     data: body,
                     streaming: message.streaming,
-                    typewriterSpeed: typewriterSpeed,
                   ),
               ],
             ),
@@ -1369,7 +1456,7 @@ class _EmptyChat extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset('assets/mascot/avatar.jpg', width: 88, height: 88),
+          Image.asset('assets/mascot/avatar_circle.png', width: 88, height: 88),
           SizedBox(height: 12),
           Text(
             '记忆体已就绪',

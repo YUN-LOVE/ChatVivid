@@ -370,6 +370,21 @@ std::vector<StoredEvent> Db::list_events(const std::string& response_id,
 }
 
 
+std::vector<std::pair<std::string, StoredEvent>> Db::list_recent_events(
+    int limit) {
+  std::lock_guard lock(mu_);
+  Stmt q(db_,
+         "SELECT response_id, seq, type, data FROM response_events "
+         "ORDER BY created_at DESC, seq DESC LIMIT ?");
+  q.integer(1, limit);
+  std::vector<std::pair<std::string, StoredEvent>> out;
+  while (q.step()) {
+    out.emplace_back(q.get_text(0),
+                     StoredEvent{q.get_int(1), q.get_text(2), q.get_text(3)});
+  }
+  return out;
+}
+
 Memory Db::append_memory(const std::string& text, double importance,
                          int durability) {
   std::lock_guard lock(mu_);
