@@ -4918,6 +4918,56 @@ vk_device ggml_vk_get_device(size_t idx) {
         }
 
 
+        // Adreno's Android driver rejects many of ggml's modern Vulkan shader
+        // variants (q8_0 mat-vec, f16-accumulation quantized matmul, ...) with
+        // VK_ERROR_UNKNOWN. Force the most conservative, widely supported
+        // configuration: no fp16/bf16 arithmetic in shaders, no subgroup
+        // intrinsics (shared-memory reductions instead), no integer dot /
+        // coopmat / 64-bit indexing / async queues / pipeline statistics.
+        // Everything still runs on the Vulkan GPU.
+        if (device->vendor_id == VK_VENDOR_ID_QUALCOMM) {
+            GGML_LOG_WARN("ggml_vulkan: applying conservative Adreno compatibility profile\n");
+            device->fp16 = false;
+            device->bf16 = false;
+            device->subgroup_basic = true;
+            device->subgroup_arithmetic = false;
+            device->subgroup_shuffle = false;
+            device->subgroup_ballot = false;
+            device->subgroup_clustered = false;
+            device->subgroup_vote = false;
+            device->subgroup_size_control = false;
+            device->integer_dot_product = false;
+            device->coopmat_support = false;
+            device->coopmat2 = false;
+            device->coopmat_int_support = false;
+            device->shader_int64 = false;
+            device->buffer_device_address = false;
+            device->vulkan_memory_model = false;
+            device->pipeline_executable_properties_support = false;
+            device->pipeline_robustness = false;
+            device->multi_add = false;
+            device->dot2_f16 = false;
+            device->ocp_fp4 = false;
+            device->support_async = false;
+            device->async_use_transfer_queue = false;
+            device->add_rms_fusion = false;
+            device->mmvq_mode = -1;
+            for (uint32_t i = 0; i < GGML_TYPE_COUNT; ++i) {
+                device->mul_mat_l[i] = true;
+                device->mul_mat_m[i] = true;
+                device->mul_mat_s[i] = true;
+                device->mul_mat_l_int[i] = false;
+                device->mul_mat_m_int[i] = false;
+                device->mul_mat_s_int[i] = false;
+                device->mul_mat_id_l[i] = true;
+                device->mul_mat_id_m[i] = true;
+                device->mul_mat_id_s[i] = true;
+                device->mul_mat_id_l_int[i] = false;
+                device->mul_mat_id_m_int[i] = false;
+                device->mul_mat_id_s_int[i] = false;
+            }
+        }
+
         std::vector<vk::DescriptorSetLayoutBinding> dsl_binding;
         std::vector<vk::DescriptorBindingFlags> dsl_binding_flags;
         for (uint32_t i = 0; i < MAX_PARAMETER_COUNT; i++) {
