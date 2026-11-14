@@ -334,7 +334,26 @@ iOS job（若启用）需要 `targets: aarch64-apple-ios`。
   C++ 构建而不希望引入 Rust/OpenSSL，可用 `-DCHATVV_ENABLE_READ_ALOUD=OFF`
   得到只返回明确错误的 stub。
 
-## 10. 许可 / License
+## 10. App 侧 TTS 设置（系统 TTS / Edge TTS）
+
+设置 →「语音与 TTS」可切换引擎并调节参数，持久化在 `settings.json`：
+
+| 设置 | 键 | 说明 |
+|---|---|---|
+| 引擎 | `tts_engine` | `edge`（默认，read_aloud 联网合成 MP3）或 `system`（flutter_tts，离线） |
+| Edge 音色 | `tts_voice` | Edge 音色短名，如 `zh-CN-XiaoxiaoNeural`；系统 TTS 用它推断 locale |
+| 语速 | `tts_rate` | 0.5–2.0×；Edge 侧映射为 read_aloud 相对 rate，系统侧传 `setSpeechRate` |
+| 音调 | `tts_pitch_hz` | ±50 Hz；Edge 侧直接传 `pitch_hz`，系统侧折算到 `setPitch` |
+| 音量 | `tts_volume` | 0–100%；Edge 侧映射为相对 volume offset，系统侧传 `setVolume` |
+| 自动朗读 | `tts_auto_speak` | 流式回复完成后自动朗读最新一条 |
+
+C ABI 新增 `chatvv_tts_synthesize_opts(text, voice, options_json, path, error)`，
+`options_json` 为 `{"pitch_hz":int,"rate":float,"volume":float}`（rate/volume 相对值
+-1..1，0 为服务默认）。旧的 `chatvv_tts_synthesize` 保留为无参数版本；Dart
+`TtsService` 会对旧 `.so` 自动回退到旧符号。任一引擎失败时会自动尝试另一种引擎，
+最后才回退到平台系统语音。
+
+## 11. 许可 / License
 
 read_aloud v0.3.3 以 **GPL-3.0-only** 发布（`third_party/read_aloud/LICENSE`），
 与本仓库根目录的 GPL-3.0 兼容。分发二进制时需要遵守 GPL-3.0 的相应义务。
