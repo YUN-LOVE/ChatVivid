@@ -53,6 +53,21 @@ enum CharacterMode {
       );
 }
 
+enum TtsEngine {
+  edge('edge', 'Edge TTS'),
+  system('system', '系统 TTS');
+
+  const TtsEngine(this.wireName, this.label);
+
+  final String wireName;
+  final String label;
+
+  static TtsEngine fromWire(String? value) => TtsEngine.values.firstWhere(
+        (engine) => engine.wireName == value,
+        orElse: () => TtsEngine.edge,
+      );
+}
+
 class AppSettings {
   const AppSettings({
     required this.mode,
@@ -74,6 +89,17 @@ class AppSettings {
     required this.colorMode,
     required this.agentEnabled,
     required this.onboardingComplete,
+    required this.ttsEngine,
+    required this.ttsVoice,
+    required this.ttsRate,
+    required this.ttsPitchHz,
+    required this.ttsVolume,
+    required this.ttsAutoSpeak,
+    required this.developerMode,
+    required this.typewriterSpeed,
+    required this.characterScale,
+    required this.characterOffsetX,
+    required this.characterOffsetY,
   });
 
   factory AppSettings.defaults() {
@@ -97,6 +123,17 @@ class AppSettings {
       colorMode: AppColorMode.classic,
       agentEnabled: false,
       onboardingComplete: false,
+      ttsEngine: TtsEngine.edge,
+      ttsVoice: 'zh-CN-XiaoxiaoNeural',
+      ttsRate: 1.0,
+      ttsPitchHz: 0,
+      ttsVolume: 1.0,
+      ttsAutoSpeak: false,
+      developerMode: false,
+      typewriterSpeed: 1.0,
+      characterScale: 1.0,
+      characterOffsetX: 0.0,
+      characterOffsetY: 0.0,
     );
   }
 
@@ -141,6 +178,24 @@ class AppSettings {
       colorMode: AppColorMode.fromWire(json['color_mode'] as String?),
       agentEnabled: (json['agent_enabled'] as bool?) ?? false,
       onboardingComplete: (json['onboarding_complete'] as bool?) ?? false,
+      ttsEngine: TtsEngine.fromWire(json['tts_engine'] as String?),
+      ttsVoice:
+          (json['tts_voice'] as String?) ?? defaults.ttsVoice,
+      ttsRate: (json['tts_rate'] as num?)?.toDouble() ?? defaults.ttsRate,
+      ttsPitchHz:
+          (json['tts_pitch_hz'] as num?)?.toInt() ?? defaults.ttsPitchHz,
+      ttsVolume:
+          (json['tts_volume'] as num?)?.toDouble() ?? defaults.ttsVolume,
+      ttsAutoSpeak: (json['tts_auto_speak'] as bool?) ?? false,
+      developerMode: (json['developer_mode'] as bool?) ?? false,
+      typewriterSpeed: (json['typewriter_speed'] as num?)?.toDouble() ??
+          defaults.typewriterSpeed,
+      characterScale: (json['character_scale'] as num?)?.toDouble() ??
+          defaults.characterScale,
+      characterOffsetX: (json['character_offset_x'] as num?)?.toDouble() ??
+          defaults.characterOffsetX,
+      characterOffsetY: (json['character_offset_y'] as num?)?.toDouble() ??
+          defaults.characterOffsetY,
     );
   }
 
@@ -163,6 +218,17 @@ class AppSettings {
   final AppColorMode colorMode;
   final bool agentEnabled;
   final bool onboardingComplete;
+  final TtsEngine ttsEngine;
+  final String ttsVoice;
+  final double ttsRate;
+  final int ttsPitchHz;
+  final double ttsVolume;
+  final bool ttsAutoSpeak;
+  final bool developerMode;
+  final double typewriterSpeed;
+  final double characterScale;
+  final double characterOffsetX;
+  final double characterOffsetY;
 
   Map<String, Object?> toJson() => {
         'mode': mode.wireName,
@@ -184,6 +250,17 @@ class AppSettings {
         'color_mode': colorMode.wireName,
         'agent_enabled': agentEnabled,
         'onboarding_complete': onboardingComplete,
+        'tts_engine': ttsEngine.wireName,
+        'tts_voice': ttsVoice,
+        'tts_rate': ttsRate,
+        'tts_pitch_hz': ttsPitchHz,
+        'tts_volume': ttsVolume,
+        'tts_auto_speak': ttsAutoSpeak,
+        'developer_mode': developerMode,
+        'typewriter_speed': typewriterSpeed,
+        'character_scale': characterScale,
+        'character_offset_x': characterOffsetX,
+        'character_offset_y': characterOffsetY,
       };
 
   AppSettings copyWith({
@@ -206,6 +283,17 @@ class AppSettings {
     AppColorMode? colorMode,
     bool? agentEnabled,
     bool? onboardingComplete,
+    TtsEngine? ttsEngine,
+    String? ttsVoice,
+    double? ttsRate,
+    int? ttsPitchHz,
+    double? ttsVolume,
+    bool? ttsAutoSpeak,
+    bool? developerMode,
+    double? typewriterSpeed,
+    double? characterScale,
+    double? characterOffsetX,
+    double? characterOffsetY,
   }) {
     return AppSettings(
       mode: mode ?? this.mode,
@@ -227,6 +315,17 @@ class AppSettings {
       colorMode: colorMode ?? this.colorMode,
       agentEnabled: agentEnabled ?? this.agentEnabled,
       onboardingComplete: onboardingComplete ?? this.onboardingComplete,
+      ttsEngine: ttsEngine ?? this.ttsEngine,
+      ttsVoice: ttsVoice ?? this.ttsVoice,
+      ttsRate: ttsRate ?? this.ttsRate,
+      ttsPitchHz: ttsPitchHz ?? this.ttsPitchHz,
+      ttsVolume: ttsVolume ?? this.ttsVolume,
+      ttsAutoSpeak: ttsAutoSpeak ?? this.ttsAutoSpeak,
+      developerMode: developerMode ?? this.developerMode,
+      typewriterSpeed: typewriterSpeed ?? this.typewriterSpeed,
+      characterScale: characterScale ?? this.characterScale,
+      characterOffsetX: characterOffsetX ?? this.characterOffsetX,
+      characterOffsetY: characterOffsetY ?? this.characterOffsetY,
     );
   }
 

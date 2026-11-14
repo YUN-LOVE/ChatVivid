@@ -6,9 +6,17 @@ import '../../data/memory_entry.dart';
 import '../../theme/app_theme.dart';
 
 class MemoryArchivePane extends StatefulWidget {
-  MemoryArchivePane({super.key, required this.backend});
+  MemoryArchivePane({
+    super.key,
+    required this.backend,
+    this.developerMode = false,
+  });
 
   final ChatBackend backend;
+
+  /// Developer mode unlocks write operations (deleting archived memories);
+  /// normal users keep the read-only archive view.
+  final bool developerMode;
 
   @override
   State<MemoryArchivePane> createState() => _MemoryArchivePaneState();
@@ -94,6 +102,44 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
     }
   }
 
+  Future<void> _deleteMemory(MemoryEntry memory) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('删除这条记忆？'),
+        content: Text(
+          memory.text.length > 120
+              ? '${memory.text.substring(0, 120)}…'
+              : memory.text,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await widget.backend.deleteMemory(memory.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('记忆已删除')),
+      );
+      await _load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('删除失败：$error')),
+      );
+    }
+  }
+
   void _show(MemoryEntry memory) {
     showModalBottomSheet<void>(
       context: context,
@@ -168,7 +214,7 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
             ),
             Spacer(),
             Text(
-              '每轮自动保存 · 只读',
+              widget.developerMode ? '开发者模式 · 可读写' : '每轮自动保存 · 只读',
               style: TextStyle(
                 color: AppColors.primary.withValues(alpha: 0.75),
                 fontSize: 10,
@@ -215,6 +261,8 @@ class _MemoryArchivePaneState extends State<MemoryArchivePane> {
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: () => _show(memory),
+                onLongPress:
+                    widget.developerMode ? () => _deleteMemory(memory) : null,
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(12, 10, 4, 10),
                   child: Row(

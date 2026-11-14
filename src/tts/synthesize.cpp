@@ -240,7 +240,8 @@ std::string ResolveVoiceName(const std::string& voice) {
 }
 
 SynthesizeResult Synthesize(const std::string& text, const std::string& voice,
-                            const std::string& output_path) {
+                            const std::string& output_path,
+                            const SynthesizeOptions& options) {
   SynthesizeResult result;
   if (text.empty()) {
     result.error = "text is empty";
@@ -279,8 +280,17 @@ SynthesizeResult Synthesize(const std::string& text, const std::string& voice,
     return result;
   }
 
+  ReadAloudSpeechOptions speech_options{};
+  speech_options.size = sizeof(ReadAloudSpeechOptions);
+  speech_options.pitch_hz =
+      std::clamp(options.pitch_hz, -500, 500);
+  speech_options.rate = std::clamp(options.rate, -1.0f, 1.0f);
+  speech_options.volume = std::clamp(options.volume, -1.0f, 1.0f);
+  const ReadAloudSpeechOptions* speech_options_ptr =
+      options.IsDefault() ? nullptr : &speech_options;
+
   const ReadAloudStatus status = read_aloud_text_to_speech(
-      text.c_str(), entry->voice, /*options=*/nullptr, output_path.c_str());
+      text.c_str(), entry->voice, speech_options_ptr, output_path.c_str());
   if (status != READ_ALOUD_STATUS_SUCCESS) {
     const char* detail = read_aloud_last_error_message();
     const std::string message =

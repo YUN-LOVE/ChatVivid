@@ -374,6 +374,60 @@ CHATVV_API int32_t chatvv_tts_synthesize(const char* text, const char* voice,
 }
 
 
+CHATVV_API int32_t chatvv_tts_synthesize_opts(
+    const char* text, const char* voice, const char* options_json,
+    const char* output_path, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!text || !*text || !output_path || !*output_path) {
+    set_error(error_json, "invalid_argument", "text/output_path is required");
+    return 1;
+  }
+  chatvv::SynthesizeOptions options;
+  if (options_json && *options_json) {
+    try {
+      const json parsed = json::parse(options_json);
+      if (!parsed.is_object()) {
+        set_error(error_json, "invalid_argument",
+                  "options_json must be a JSON object");
+        return 1;
+      }
+      if (const auto it = parsed.find("pitch_hz"); it != parsed.end()) {
+        if (!it->is_number_integer() && !it->is_number_float()) {
+          set_error(error_json, "invalid_argument", "pitch_hz must be a number");
+          return 1;
+        }
+        options.pitch_hz = static_cast<int32_t>(it->get<double>());
+      }
+      if (const auto it = parsed.find("rate"); it != parsed.end()) {
+        if (!it->is_number()) {
+          set_error(error_json, "invalid_argument", "rate must be a number");
+          return 1;
+        }
+        options.rate = static_cast<float>(it->get<double>());
+      }
+      if (const auto it = parsed.find("volume"); it != parsed.end()) {
+        if (!it->is_number()) {
+          set_error(error_json, "invalid_argument", "volume must be a number");
+          return 1;
+        }
+        options.volume = static_cast<float>(it->get<double>());
+      }
+    } catch (const std::exception& error) {
+      set_error(error_json, "invalid_argument",
+                std::string("options_json is not valid JSON: ") + error.what());
+      return 1;
+    }
+  }
+  const auto result = chatvv::Synthesize(
+      text, (voice && *voice) ? voice : "zh-CN-XiaoxiaoNeural", output_path,
+      options);
+  if (!result.ok) {
+    set_error(error_json, "tts_failed", result.error);
+    return 1;
+  }
+  return 0;
+}
+
 chatvv_engine* chatvv_create(const char* config_json, char** error_json) {
   if (error_json) *error_json = nullptr;
   if (!config_json) {

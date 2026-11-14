@@ -92,6 +92,18 @@ CHATVV_API int32_t chatvv_tts_synthesize(const char* text, const char* voice,
                                           const char* output_path,
                                           char** error_json);
 
+/*
+ * Same as chatvv_tts_synthesize with Edge TTS prosody overrides.
+ * options_json (optional) is {"pitch_hz":int,"rate":float,"volume":float};
+ * rate/volume are relative -1..=1 (0 = service default), pitch_hz is a hertz
+ * offset. Invalid/absent fields keep the service default. Returns 0 on success.
+ */
+CHATVV_API int32_t chatvv_tts_synthesize_opts(const char* text,
+                                              const char* voice,
+                                              const char* options_json,
+                                              const char* output_path,
+                                              char** error_json);
+
 /* Memory archive. JSON arrays/objects; free with chatvv_free(). */
 CHATVV_API char* chatvv_memories(chatvv_engine* engine, int32_t limit,
                                  const char* query, char** error_json);

@@ -16,6 +16,19 @@ struct SynthesizeResult {
   std::string audio_path;
 };
 
+/// Optional prosody overrides for Edge TTS. All fields are relative: rate and
+/// volume are in read_aloud's `-1.0..=1.0` range (0 = service default), pitch is
+/// a hertz offset (0 = service default).
+struct SynthesizeOptions {
+  int32_t pitch_hz = 0;
+  float rate = 0.0f;
+  float volume = 0.0f;
+
+  bool IsDefault() const {
+    return pitch_hz == 0 && rate == 0.0f && volume == 0.0f;
+  }
+};
+
 /// Synthesize `text` to an MP3 file at `output_path` using the vendored
 /// read_aloud backend (Microsoft Edge read-aloud service).
 ///
@@ -32,7 +45,8 @@ struct SynthesizeResult {
 /// transport timeouts are reported through the returned error.
 SynthesizeResult Synthesize(const std::string& text,
                             const std::string& voice,
-                            const std::string& output_path);
+                            const std::string& output_path,
+                            const SynthesizeOptions& options = {});
 
 /// Canonical Edge voice short name chosen for a caller supplied `voice` value.
 /// Unknown/empty input resolves to `DefaultVoiceName()`. Exposed for tests and

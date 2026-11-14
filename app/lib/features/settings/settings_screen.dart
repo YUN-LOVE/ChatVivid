@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/build_info.dart';
 import '../../data/app_paths.dart';
+import 'dart:async';
 import 'dart:io';
 
 import '../../data/app_settings.dart';
@@ -13,8 +14,10 @@ import '../../data/prompt_injection.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
 import '../chat/file_upload_service.dart';
+import '../chat/tts_service.dart';
 import 'injection_editor.dart';
 import 'memory_archive_pane.dart';
+import 'session_log_screen.dart';
 import 'mcp_pane.dart';
 import 'skill_editor.dart';
 
@@ -79,6 +82,11 @@ final _categories = [
     title: '外观',
     description: '主题、玻璃、动效',
     icon: Icons.palette_rounded,
+  ),
+  SettingsCategory(
+    title: '语音与 TTS',
+    description: '系统 TTS / Edge TTS、音色与参数',
+    icon: Icons.record_voice_over_rounded,
   ),
   SettingsCategory(
     title: '数据与存储',
@@ -477,6 +485,11 @@ class _SettingsDetailState extends State<SettingsDetail> {
       TextEditingController(text: _settings.systemPrompt);
   late String _provider =
       _settings.provider == 'mock' ? 'mock' : 'deepseek';
+  late final TextEditingController _ttsVoice =
+      TextEditingController(text: _settings.ttsVoice);
+  int _versionTaps = 0;
+  DateTime? _lastVersionTap;
+  TtsService? _ttsTest;
 
   List<TextEditingController> get _controllers => [
         _apiKey,
@@ -493,6 +506,62 @@ class _SettingsDetailState extends State<SettingsDetail> {
     for (final controller in _controllers) {
       controller.addListener(_emit);
     }
+    _ttsVoice.addListener(_onTtsVoiceChanged);
+  }
+
+  void _onTtsVoiceChanged() {
+    if (!mounted) return;
+    final next = _settings.copyWith(ttsVoice: _ttsVoice.text.trim());
+    setState(() => _settings = next);
+    widget.onChanged(next);
+  }
+
+  void _updateSettings(AppSettings next) {
+    setState(() => _settings = next);
+    widget.onChanged(next);
+  }
+
+  void _onVersionTap() {
+    final now = DateTime.now();
+    if (_lastVersionTap != null &&
+        now.difference(_lastVersionTap!).inSeconds > 3) {
+      _versionTaps = 0;
+    }
+    _lastVersionTap = now;
+    _versionTaps += 1;
+    if (_versionTaps < 7) {
+      final remaining = 7 - _versionTaps;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('再连点 $remaining 次开启开发者模式'),
+          duration: const Duration(milliseconds: 900),
+        ),
+      );
+      return;
+    }
+    _versionTaps = 0;
+    final enabled = !_settings.developerMode;
+    _updateSettings(_settings.copyWith(developerMode: enabled));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(enabled ? '开发者模式已开启' : '开发者模式已关闭'),
+      ),
+    );
+  }
+
+  void _openSessionLog() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SessionLogScreen(backend: widget.backend),
+      ),
+    );
+  }
+
+  Future<void> _testTts() async {
+    final tts = _ttsTest ??= TtsService();
+    tts.applySettings(_settings);
+    await tts.init();
+    await tts.speak('你好，我是大肥鱼。这是当前语音设置的试听。');
   }
 
   @override
@@ -501,6 +570,9 @@ class _SettingsDetailState extends State<SettingsDetail> {
       controller.removeListener(_emit);
       controller.dispose();
     }
+    _ttsVoice.removeListener(_onTtsVoiceChanged);
+    _ttsVoice.dispose();
+    unawaited(_ttsTest?.dispose());
     super.dispose();
   }
 
@@ -545,6 +617,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         if (widget.category.title == '记忆归档') _memory(),
         if (widget.category.title == '角色与舞台') _character(),
         if (widget.category.title == '外观') _appearance(),
+        if (widget.category.title == '语音与 TTS') _tts(),
         if (widget.category.title == '数据与存储') _data(),
         if (widget.category.title == '关于') _about(),
         SizedBox(height: 22),
@@ -874,7 +947,10 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   Widget _memory() {
-    return MemoryArchivePane(backend: widget.backend);
+    return MemoryArchivePane(
+      backend: widget.backend,
+      developerMode: _settings.developerMode,
+    );
   }
 
   Future<void> _importRive() async {
@@ -1098,6 +1174,170 @@ class _SettingsDetailState extends State<SettingsDetail> {
     );
   }
 
+  Widget _tts() {
+    final settings = _settings;
+    final edge = settings.ttsEngine == TtsEngine.edge;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SegmentedButton<TtsEngine>(
+          segments: const [
+            ButtonSegment(
+              value: TtsEngine.edge,
+              label: Text('Edge TTS'),
+              icon: Icon(Icons.cloud_outlined),
+            ),
+            ButtonSegment(
+              value: TtsEngine.system,
+              label: Text('系统 TTS'),
+              icon: Icon(Icons.smart_toy_outlined),
+            ),
+          ],
+          selected: {settings.ttsEngine},
+          onSelectionChanged: (value) =>
+              _updateSettings(settings.copyWith(ttsEngine: value.first)),
+        ),
+        SizedBox(height: 16),
+        if (edge) ...[
+          Text(
+            'Edge 音色',
+            style: TextStyle(color: AppColors.muted, fontSize: 11),
+          ),
+          SizedBox(height: 6),
+          TextField(
+            controller: _ttsVoice,
+            style: TextStyle(color: AppColors.text, fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'zh-CN-XiaoxiaoNeural',
+              hintStyle: TextStyle(
+                color: AppColors.muted.withValues(alpha: 0.45),
+                fontSize: 12,
+              ),
+              filled: true,
+              fillColor: AppColors.surfaceHigh.withValues(alpha: 0.4),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: EdgeInsets.fromLTRB(14, 12, 14, 12),
+            ),
+          ),
+          SizedBox(height: 4),
+          Text(
+            '填 Microsoft Edge 音色短名，例如 zh-CN-XiaoxiaoNeural；留空使用默认音色。',
+            style: TextStyle(
+              color: AppColors.muted.withValues(alpha: 0.6),
+              fontSize: 10,
+              height: 1.4,
+            ),
+          ),
+          SizedBox(height: 10),
+        ] else
+          Text(
+            '使用系统自带语音引擎，无需联网；语速/音调/音量由系统 TTS 解释。',
+            style: TextStyle(
+              color: AppColors.muted.withValues(alpha: 0.6),
+              fontSize: 10,
+              height: 1.4,
+            ),
+          ),
+        SizedBox(height: 12),
+        _ttsSlider(
+          label: '语速',
+          value: settings.ttsRate,
+          min: 0.5,
+          max: 2.0,
+          divisions: 15,
+          format: (value) => '${value.toStringAsFixed(2)}×',
+          onChanged: (value) =>
+              _updateSettings(settings.copyWith(ttsRate: value)),
+        ),
+        _ttsSlider(
+          label: edge ? '音调（Hz）' : '音调',
+          value: settings.ttsPitchHz.toDouble(),
+          min: -50,
+          max: 50,
+          divisions: 20,
+          format: (value) => '${value.round()} Hz',
+          onChanged: (value) => _updateSettings(
+            settings.copyWith(ttsPitchHz: value.round()),
+          ),
+        ),
+        _ttsSlider(
+          label: '音量',
+          value: settings.ttsVolume,
+          min: 0.0,
+          max: 1.0,
+          divisions: 20,
+          format: (value) => '${(value * 100).round()}%',
+          onChanged: (value) =>
+              _updateSettings(settings.copyWith(ttsVolume: value)),
+        ),
+        SizedBox(height: 6),
+        Material(
+          color: AppColors.surfaceHigh.withValues(alpha: 0.4),
+          borderRadius: BorderRadius.circular(18),
+          clipBehavior: Clip.antiAlias,
+          child: SwitchListTile(
+            title: Text(
+              '自动朗读回复',
+              style: TextStyle(color: AppColors.text, fontSize: 13),
+            ),
+            subtitle: Text(
+              '对话完成后自动朗读最新一条回复',
+              style: TextStyle(color: AppColors.muted, fontSize: 10),
+            ),
+            value: settings.ttsAutoSpeak,
+            onChanged: (value) =>
+                _updateSettings(settings.copyWith(ttsAutoSpeak: value)),
+          ),
+        ),
+        SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: _testTts,
+          icon: const Icon(Icons.play_arrow_rounded, size: 18),
+          label: const Text('试听当前设置'),
+        ),
+      ],
+    );
+  }
+
+  Widget _ttsSlider({
+    required String label,
+    required double value,
+    required double min,
+    required double max,
+    required int divisions,
+    required String Function(double) format,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              label,
+              style: TextStyle(color: AppColors.muted, fontSize: 11),
+            ),
+            const Spacer(),
+            Text(
+              format(value),
+              style: TextStyle(color: AppColors.text, fontSize: 11),
+            ),
+          ],
+        ),
+        Slider(
+          value: value.clamp(min, max),
+          min: min,
+          max: max,
+          divisions: divisions,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+
   Widget _data() {
     return FutureBuilder(
       future: appSupportDirectory(),
@@ -1146,10 +1386,29 @@ class _SettingsDetailState extends State<SettingsDetail> {
         _SettingCard(
           icon: Icons.info_outline_rounded,
           title: 'ChatVivid',
-          subtitle: '$buildLabel · commit $commitLabel · Flutter 3.44',
+          subtitle:
+              '$buildLabel · commit $commitLabel · Flutter 3.44${_settings.developerMode ? ' · DEV' : ''}',
           trailing: SizedBox.shrink(),
-          onTap: null,
+          onTap: _onVersionTap,
         ),
+        if (_settings.developerMode) ...[
+          SizedBox(height: 10),
+          _SettingCard(
+            icon: Icons.receipt_long_rounded,
+            title: 'Session log',
+            subtitle: '完整运行日志与上下文历史',
+            trailing: Icon(Icons.chevron_right_rounded),
+            onTap: _openSessionLog,
+          ),
+          SizedBox(height: 10),
+          _SettingCard(
+            icon: Icons.science_rounded,
+            title: '开发者模式已开启',
+            subtitle: '记忆可读写；连点版本号 7 次可关闭',
+            trailing: Icon(Icons.check_rounded, color: AppColors.success),
+            onTap: null,
+          ),
+        ],
         SizedBox(height: 10),
         _SettingCard(
           icon: Icons.article_outlined,

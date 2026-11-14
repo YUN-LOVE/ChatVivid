@@ -57,15 +57,25 @@ class _ChatScreenState extends State<ChatScreen>
   bool _captionCollapsed = false;
   bool _liveMode = false;
   bool _voiceActive = false;
+  String? _lastSpokenId;
   final TtsService _tts = TtsService();
 
   @override
   void initState() {
     super.initState();
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
+    _tts.applySettings(widget.settings);
     _tts.speaking.addListener(_onTtsChanged);
     unawaited(_tts.init());
     unawaited(_bootstrap());
+  }
+
+  @override
+  void didUpdateWidget(ChatScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // TTS settings are UI-only (excluded from cacheKey), so the same
+    // ChatScreen state survives a settings change; re-apply them here.
+    _tts.applySettings(widget.settings);
   }
 
   Future<void> _bootstrap() async {
@@ -109,6 +119,16 @@ class _ChatScreenState extends State<ChatScreen>
     _lastId = last.id;
     _lastLength = last.content.length;
     if (!changed) return;
+
+    if (widget.settings.ttsAutoSpeak &&
+        !chat.busy &&
+        !last.isUser &&
+        last.content.trim().isNotEmpty &&
+        last.id != _lastSpokenId &&
+        !_tts.speaking.value) {
+      _lastSpokenId = last.id;
+      unawaited(_tts.speak(last.content));
+    }
 
     final distance =
         _scroll.position.maxScrollExtent - _scroll.position.pixels;

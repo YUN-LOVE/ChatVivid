@@ -59,6 +59,29 @@ void CheckErrorContains(const chatvv::SynthesizeResult& result,
   CheckErrorContains((result), (needle), #result " error contains " #needle, \
                      __LINE__)
 
+void TestOptions() {
+  chatvv::SynthesizeOptions options;
+  CHECK(options.IsDefault());
+  options.rate = 0.5f;
+  CHECK(!options.IsDefault());
+  options.rate = 0.0f;
+  options.pitch_hz = -20;
+  CHECK(!options.IsDefault());
+  options.pitch_hz = 0;
+  options.volume = -0.5f;
+  CHECK(!options.IsDefault());
+  options.volume = 0.0f;
+  CHECK(options.IsDefault());
+
+  // Argument validation happens before any network I/O, so this stays offline.
+  const auto empty_text = chatvv::Synthesize("", "zh-CN-XiaoxiaoNeural",
+                                             "/tmp/never.mp3", options);
+  CHECK_ERROR_CONTAINS(empty_text, "text is empty");
+  const auto empty_path = chatvv::Synthesize("hello", "zh-CN-XiaoxiaoNeural",
+                                             "", options);
+  CHECK_ERROR_CONTAINS(empty_path, "output_path is empty");
+}
+
 void TestDefaults() {
   CHECK_EQ(chatvv::DefaultVoiceName(), "zh-CN-XiaoxiaoNeural");
   // The Flutter app always requests this voice; it must round-trip unchanged.
@@ -199,6 +222,7 @@ void TestReadAloudAbi() {
 }  // namespace
 
 int main() {
+  TestOptions();
   std::fprintf(stderr,
                "tts tests: read_aloud backend %s\n",
                chatvv::ReadAloudAvailable() ? "enabled" : "disabled (stub)");
