@@ -7,6 +7,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../data/app_settings.dart';
+import '../../data/asr_api.dart';
+import '../../data/asr_model.dart';
+import '../../data/mic_recorder.dart';
 import '../../data/backend_factory.dart';
 import '../../data/prompt_injection.dart';
 import '../settings/settings_screen.dart';
@@ -57,6 +60,17 @@ class _ChatScreenState extends State<ChatScreen>
   bool _historyOpen = false;
   bool _captionCollapsed = false;
   bool _liveMode = false;
+  Timer? _keyHoldTimer;
+  bool _keyHoldTriggered = false;
+  bool _inputTouchStartedUnfocused = false;
+  final MicRecorder _mic = MicRecorder();
+  AsrApi? _asrApi;
+  bool _voiceTranscribing = false;
+  bool _liveAwaitingReply = false;
+  Timer? _liveVadTimer;
+  Timer? _liveMaxTimer;
+  bool _liveHeardSpeech = false;
+  int _liveSilentMs = 0;
   bool _voiceActive = false;
   String? _lastSpokenId;
   bool _editMode = false;
@@ -223,6 +237,19 @@ class _ChatScreenState extends State<ChatScreen>
       unawaited(_tts.stop());
     }
 
+    if (_liveMode &&
+        _liveAwaitingReply &&
+        !chat.busy &&
+        !_tts.active &&
+        !_voiceActive &&
+        !_voiceTranscribing) {
+      _liveAwaitingReply = false;
+      Future<void>.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted || !_liveMode) return;
+        unawaited(_startVoice());
+      });
+    }
+
     if (!changed || !_scroll.hasClients) return;
     final distance =
         _scroll.position.maxScrollExtent - _scroll.position.pixels;
@@ -312,7 +339,8 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   bool _onHardwareKey(KeyEvent event) {
-    if (event.logicalKey == LogicalKeyboardKey.escape) {
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.escape) {
       if (_voiceActive) {
         _stopVoice();
         return true;
@@ -326,29 +354,68 @@ class _ChatScreenState extends State<ChatScreen>
         return true;
       }
     }
-    if (event.logicalKey == LogicalKeyboardKey.enter &&
-        event is KeyDownEvent &&
-        !_focus.hasFocus &&
-        !_liveMode &&
-        !_voiceActive) {
-      _setLive(true);
-      return true;
+
+    // PC gestures while the composer is NOT focused:
+    //   long-press Enter -> Live mode
+    //   long-press Space -> hold-to-talk voice input
+    // Plain Enter no longer enters Live; it only sends when the field is
+    // focused (handled by the TextField itself).
+    final canHold = !_focus.hasFocus && !_historyOpen;
+    if (event is KeyDownEvent && canHold && !_voiceActive) {
+      if (key == LogicalKeyboardKey.enter && !_liveMode) {
+        _beginKeyHold(() {
+          _keyHoldTriggered = true;
+          AppHaptics.medium();
+          _setLive(true);
+        });
+        return true;
+      }
+      if (key == LogicalKeyboardKey.space && !_liveMode) {
+        _beginKeyHold(() {
+          _keyHoldTriggered = true;
+          unawaited(_startVoice());
+        });
+        return true;
+      }
     }
-    if (event.logicalKey == LogicalKeyboardKey.space &&
-        event is KeyDownEvent &&
-        !_focus.hasFocus &&
-        !_liveMode &&
-        !_voiceActive) {
-      _startVoice();
-      return true;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.space &&
-        event is KeyUpEvent &&
-        _voiceActive) {
-      _stopVoice();
-      return true;
+    if (event is KeyUpEvent) {
+      if (key == LogicalKeyboardKey.enter || key == LogicalKeyboardKey.space) {
+        _keyHoldTimer?.cancel();
+        _keyHoldTimer = null;
+        if (key == LogicalKeyboardKey.space && _keyHoldTriggered) {
+          _keyHoldTriggered = false;
+          _stopVoice();
+        } else {
+          _keyHoldTriggered = false;
+        }
+        return true;
+      }
     }
     return false;
+  }
+
+  void _beginKeyHold(VoidCallback action) {
+    _keyHoldTimer?.cancel();
+    _keyHoldTriggered = false;
+    _keyHoldTimer = Timer(const Duration(milliseconds: 450), action);
+  }
+
+  void _onInputPointerDown() {
+    // Capture focus state before the TextField (possibly) requests focus, so a
+    // mobile long-press on the *unfocused* input can start voice input while a
+    // long-press on focused text keeps the normal selection behaviour.
+    _inputTouchStartedUnfocused = !_focus.hasFocus;
+  }
+
+  void _onInputLongPressStart() {
+    if (!_inputTouchStartedUnfocused || _liveMode || _voiceActive) return;
+    AppHaptics.medium();
+    unawaited(_startVoice());
+  }
+
+  void _onInputLongPressEnd() {
+    if (!_voiceActive) return;
+    unawaited(_stopVoice());
   }
 
   Future<void> _closeHistory() async {
@@ -409,31 +476,156 @@ class _ChatScreenState extends State<ChatScreen>
     setState(() => _liveMode = value);
     if (value) {
       _livePulse.repeat();
+      unawaited(_startVoice());
     } else {
       _livePulse.stop();
+      _liveAwaitingReply = false;
+      unawaited(_cancelVoice());
     }
   }
 
-  void _startVoice() {
-    if (_voiceActive || _liveMode) return;
+  Future<void> _startVoice() async {
+    if (_voiceActive || _voiceTranscribing || _historyOpen) return;
     AppHaptics.light();
     setState(() => _voiceActive = true);
-    _showMessage('语音输入已开启：X-ASR / Whisper 模型接入中');
+    try {
+      await _mic.start();
+      if (_liveMode) _startLiveVad();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _voiceActive = false);
+      _showMessage('无法打开麦克风：$error');
+    }
   }
 
-  void _stopVoice() {
+  void _startLiveVad() {
+    _liveVadTimer?.cancel();
+    _liveMaxTimer?.cancel();
+    _liveHeardSpeech = false;
+    _liveSilentMs = 0;
+    _liveVadTimer = Timer.periodic(const Duration(milliseconds: 120), (_) async {
+      if (!_voiceActive || !_liveMode) {
+        _liveVadTimer?.cancel();
+        return;
+      }
+      final level = await _mic.level();
+      if (level > 0.012) {
+        _liveHeardSpeech = true;
+        _liveSilentMs = 0;
+      } else if (_liveHeardSpeech) {
+        _liveSilentMs += 120;
+        if (_liveSilentMs >= 1200) {
+          _liveVadTimer?.cancel();
+          _liveMaxTimer?.cancel();
+          if (_voiceActive) await _stopVoice();
+        }
+      }
+    });
+    _liveMaxTimer = Timer(const Duration(seconds: 15), () {
+      if (!_voiceActive) return;
+      _liveVadTimer?.cancel();
+      unawaited(_stopVoice());
+    });
+  }
+
+  void _stopLiveVad() {
+    _liveVadTimer?.cancel();
+    _liveMaxTimer?.cancel();
+    _liveHeardSpeech = false;
+    _liveSilentMs = 0;
+  }
+
+  Future<void> _stopVoice() async {
     if (!_voiceActive) return;
+    _stopLiveVad();
     AppHaptics.selection();
     setState(() => _voiceActive = false);
+    String? path;
+    try {
+      path = await _mic.stop();
+    } catch (error) {
+      _showMessage('录音失败：$error');
+      return;
+    }
+    if (path == null || path.isEmpty) return;
+    await _transcribeVoice(path);
+  }
+
+  Future<void> _cancelVoice() async {
+    _stopLiveVad();
+    if (_voiceActive) setState(() => _voiceActive = false);
+    await _mic.cancel();
+  }
+
+  Future<void> _transcribeVoice(String wavPath) async {
+    if (_voiceTranscribing) return;
+    _voiceTranscribing = true;
+    _showMessage('正在识别语音…');
+    try {
+      final model = await WhisperModelStore.resolve(
+        overridePath: widget.settings.asrModelPath,
+        downloadIfMissing: true,
+        onProgress: (progress, label) {
+          if (!mounted || progress >= 1) return;
+          _showMessage('$label ${(progress * 100).toStringAsFixed(0)}%');
+        },
+      );
+      if (model == null) {
+        _showMessage('未找到 Whisper 模型，可在 设置 → 语音与 TTS 填写模型路径。');
+        return;
+      }
+      final asr = _asrApi ??= AsrApi();
+      AsrTranscript? transcript;
+      try {
+        transcript = await asr.transcribeFileOnce(
+          modelPath: model,
+          wavPath: wavPath,
+          language: 'zh',
+          useGpu: true,
+        );
+      } catch (error) {
+        debugPrint('GPU whisper failed, retrying on CPU: $error');
+        transcript = await asr.transcribeFileOnce(
+          modelPath: model,
+          wavPath: wavPath,
+          language: 'zh',
+          useGpu: false,
+        );
+      }
+      final text = transcript.text.trim();
+      if (text.isEmpty) {
+        _showMessage('没听清，再说一次？');
+        return;
+      }
+      _input.text = text;
+      _input.selection = TextSelection.collapsed(offset: text.length);
+      if (_liveMode) {
+        final chat = _chat;
+        if (chat != null && !chat.busy) {
+          _liveAwaitingReply = true;
+          _send();
+        }
+      } else {
+        _focus.requestFocus();
+      }
+    } catch (error) {
+      _showMessage('语音识别失败：$error');
+    } finally {
+      _voiceTranscribing = false;
+    }
   }
 
   @override
   void dispose() {
+    _keyHoldTimer?.cancel();
     HardwareKeyboard.instance.removeHandler(_onHardwareKey);
     _tts.speaking.removeListener(_onTtsChanged);
     _drawer.dispose();
     _livePulse.dispose();
     _gazeTarget.dispose();
+    _stopLiveVad();
+    unawaited(_mic.cancel());
+    unawaited(_asrApi?.dispose());
     unawaited(_tts.dispose());
     final chat = _chat;
     if (chat != null) {
@@ -447,7 +639,22 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   void _onTtsChanged() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    setState(() {});
+    if (_liveMode &&
+        _liveAwaitingReply &&
+        !_tts.active &&
+        !_voiceActive &&
+        !_voiceTranscribing) {
+      final chat = _chat;
+      if (chat != null && !chat.busy) {
+        _liveAwaitingReply = false;
+        Future<void>.delayed(const Duration(milliseconds: 400), () {
+          if (!mounted || !_liveMode) return;
+          unawaited(_startVoice());
+        });
+      }
+    }
   }
 
   String _latestRaw() {
@@ -698,7 +905,13 @@ class _ChatScreenState extends State<ChatScreen>
                         onExitLive: () => _setLive(false),
                         onVoiceStart: _startVoice,
                         onVoiceEnd: _stopVoice,
-                        onLongPressSend: () => _setLive(true),
+                        onLongPressSend: () {
+                          AppHaptics.medium();
+                          _setLive(true);
+                        },
+                        onInputPointerDown: _onInputPointerDown,
+                        onInputLongPressStart: _onInputLongPressStart,
+                        onInputLongPressEnd: _onInputLongPressEnd,
                       ),
                     ),
                     ],
@@ -1613,6 +1826,9 @@ class _Composer extends StatelessWidget {
     required this.onVoiceStart,
     required this.onVoiceEnd,
     required this.onLongPressSend,
+    required this.onInputPointerDown,
+    required this.onInputLongPressStart,
+    required this.onInputLongPressEnd,
   });
 
   final ChatController chat;
@@ -1631,6 +1847,9 @@ class _Composer extends StatelessWidget {
   final VoidCallback onVoiceStart;
   final VoidCallback onVoiceEnd;
   final VoidCallback onLongPressSend;
+  final VoidCallback onInputPointerDown;
+  final VoidCallback onInputLongPressStart;
+  final VoidCallback onInputLongPressEnd;
 
   @override
   Widget build(BuildContext context) {
@@ -1698,10 +1917,15 @@ class _Composer extends StatelessWidget {
                                 ? _LiveBody(pulse: pulse)
                                 : voice
                                     ? _VoiceBody(pulse: pulse)
-                                    : GestureDetector(
+                                    : Listener(
+                                        onPointerDown: (_) =>
+                                            onInputPointerDown(),
+                                        child: GestureDetector(
                                         behavior: HitTestBehavior.translucent,
-                                        onLongPressStart: (_) => onVoiceStart(),
-                                        onLongPressEnd: (_) => onVoiceEnd(),
+                                        onLongPressStart: (_) =>
+                                            onInputLongPressStart(),
+                                        onLongPressEnd: (_) =>
+                                            onInputLongPressEnd(),
                                         child: ConstrainedBox(
                                           constraints: BoxConstraints(
                                             maxHeight: 168,
@@ -1713,7 +1937,7 @@ class _Composer extends StatelessWidget {
                                           maxLines: null,
                                           keyboardType: TextInputType.multiline,
                                           textInputAction: TextInputAction.send,
-                                          onSubmitted: (_) => onLongPressSend(),
+                                          onSubmitted: (_) => onSend(),
                                           style: TextStyle(
                                             color: AppColors.text,
                                             fontSize: 14.5,
@@ -1729,6 +1953,7 @@ class _Composer extends StatelessWidget {
                                           ),
                                           ),
                                         ),
+                                      ),
                                       ),
                           ),
                           SizedBox(width: 4),

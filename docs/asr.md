@@ -331,3 +331,36 @@ CI 建议：
    用 EXCLUDE_FROM_ALL 保证不编译不安装；如未来需要可单独启用。
 7. **不是流式 ASR**：当前是「整段 WAV/PCM → 一次 whisper_full」，长语音需要上层
    分段；流式方案（X-ASR/sherpa-onnx）仍按 `docs/voice-yolo.md` 的路线另行评估。
+
+## App integration (chatvv Flutter)
+
+Voice input is now wired end-to-end in the Android/Linux app:
+
+* **Android recording** — `MainActivity` exposes `chatvv/mic` (`start`/`stop`/
+  `cancel`/`level`). It records 16 kHz mono PCM16 with `AudioRecord` into a WAV
+  file in the app cache directory and requests `RECORD_AUDIO` on first use.
+  `level` returns the RMS of the last chunk, used for simple silence detection
+  in Live mode.
+* **Linux recording** — `MicRecorder` shells out to `arecord -f S16_LE -r 16000
+  -c 1 -t wav` (alsa-utils) so the same push-to-talk works on desktop.
+* **Transcription** — `AsrApi.transcribeFileOnce()` runs whisper.cpp with
+  Vulkan (`use_gpu: true`) in a background isolate; if the GPU path fails the
+  app retries on CPU.
+* **Model** — models are not bundled. `WhisperModelStore` resolves an existing
+  model path or downloads `ggml-base-q5_1.bin` (~57 MB) from the Hugging Face
+  mirror (`hf-mirror.com`, falling back to `huggingface.co`) into
+  `<support>/models/whisper/`. 设置 → 语音与 TTS → Whisper 模型路径 lets the
+  user point at any local ggml model.
+
+### Gestures
+
+| Platform | Gesture (composer not focused) | Action |
+|---|---|---|
+| Android | long-press send button | enter Live mode |
+| Android | long-press input field | hold-to-talk voice input |
+| Android (in Live) | automatic silence detection (1.2 s after speech, 15 s max) | stop recording, transcribe, send, speak reply, listen again |
+| Desktop (PC) | long-press Enter | enter Live mode |
+| Desktop (PC) | long-press Space | hold-to-talk voice input |
+
+Plain Enter only sends the message while the text field is focused; it no
+longer enters Live mode.

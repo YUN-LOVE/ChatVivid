@@ -102,6 +102,7 @@ class AppSettings {
     required this.characterOffsetX,
     required this.characterOffsetY,
     required this.glassStrength,
+    required this.asrModelPath,
   });
 
   factory AppSettings.defaults() {
@@ -138,6 +139,7 @@ class AppSettings {
       characterOffsetX: 0.0,
       characterOffsetY: 0.0,
       glassStrength: 1.0,
+      asrModelPath: '',
     );
   }
 
@@ -223,6 +225,7 @@ class AppSettings {
           defaults.characterOffsetY,
       glassStrength: (json['glass_strength'] as num?)?.toDouble() ??
           defaults.glassStrength,
+      asrModelPath: (json['asr_model_path'] as String?) ?? '',
     );
   }
 
@@ -264,6 +267,10 @@ class AppSettings {
   /// Global frosted-glass blur multiplier (设置 → 外观 → 毛玻璃强度).
   final double glassStrength;
 
+  /// Optional custom whisper.cpp GGML model path; empty means the app-managed
+  /// download location (`<support>/models/whisper/ggml-base-q5_1.bin`).
+  final String asrModelPath;
+
   Map<String, Object?> toJson() => {
         'mode': mode.wireName,
         'client_base_url': clientBaseUrl,
@@ -298,6 +305,7 @@ class AppSettings {
         'character_offset_x': characterOffsetX,
         'character_offset_y': characterOffsetY,
         'glass_strength': glassStrength,
+        'asr_model_path': asrModelPath,
       };
 
   AppSettings copyWith({
@@ -333,6 +341,7 @@ class AppSettings {
     double? characterOffsetX,
     double? characterOffsetY,
     double? glassStrength,
+    String? asrModelPath,
   }) {
     return AppSettings(
       mode: mode ?? this.mode,
@@ -367,6 +376,7 @@ class AppSettings {
       characterOffsetX: characterOffsetX ?? this.characterOffsetX,
       characterOffsetY: characterOffsetY ?? this.characterOffsetY,
       glassStrength: glassStrength ?? this.glassStrength,
+      asrModelPath: asrModelPath ?? this.asrModelPath,
     );
   }
 

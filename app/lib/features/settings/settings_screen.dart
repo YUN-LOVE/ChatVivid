@@ -481,11 +481,14 @@ class _SettingsDetailState extends State<SettingsDetail> {
       _settings.provider == 'mock' ? 'mock' : 'deepseek';
   late final TextEditingController _ttsVoice =
       TextEditingController(text: _settings.ttsVoice);
+  late final TextEditingController _asrModel =
+      TextEditingController(text: _settings.asrModelPath);
   int _versionTaps = 0;
   DateTime? _lastVersionTap;
   TtsService? _ttsTest;
 
   List<TextEditingController> get _controllers => [
+        _asrModel,
         _apiKey,
         _model,
         _fullBase,
@@ -602,6 +605,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           : _clientBase.text.trim(),
       clientToken: _clientToken.text.trim(),
       systemPrompt: _systemPrompt.text.trim(),
+      asrModelPath: _asrModel.text.trim(),
     );
   }
 
@@ -1371,6 +1375,34 @@ class _SettingsDetailState extends State<SettingsDetail> {
         ),
         Text(
           '声音开始后延迟多久再动嘴；用来补偿本机音频输出/蓝牙延迟。',
+          style: TextStyle(
+            color: AppColors.muted.withValues(alpha: 0.6),
+            fontSize: 10,
+            height: 1.4,
+          ),
+        ),
+        SizedBox(height: 18),
+        Text(
+          '语音输入（Whisper）',
+          style: TextStyle(color: AppColors.muted, fontSize: 11),
+        ),
+        SizedBox(height: 6),
+        TextField(
+          controller: _asrModel,
+          style: TextStyle(color: AppColors.text, fontSize: 12),
+          decoration: InputDecoration(
+            hintText: 'ggml Whisper 模型路径（留空自动下载 base-q5_1）',
+            hintStyle: TextStyle(
+              color: AppColors.muted.withValues(alpha: 0.45),
+              fontSize: 11,
+            ),
+            isDense: true,
+          ),
+        ),
+        SizedBox(height: 6),
+        Text(
+          '首次语音输入会从 Hugging Face 镜像下载 ggml-base-q5_1.bin（约 57MB）。'
+          '也可以把已有 ggml 模型路径填在这里。',
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.6),
             fontSize: 10,
