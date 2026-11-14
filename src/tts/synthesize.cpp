@@ -295,24 +295,29 @@ SynthesizeResult Synthesize(const std::string& text, const std::string& voice,
                                      output_path.c_str());
   };
 
-  ReadAloudStatus status = attempt(entry);
   std::string used_voice = canonical;
-  if (status != READ_ALOUD_STATUS_SUCCESS && canonical != DefaultVoiceName()) {
-    // Some voices have been removed from the Edge Read Aloud service (e.g.
-    // zh-CN-XiaomengNeural was retired in 2026-09) and close the socket while
-    // others keep working. Fall back to the default voice instead of failing
-    // the whole TTS call.
-    const std::string fallback_voice = DefaultVoiceName();
-    const VoiceEntry* fallback = FindVoice(fallback_voice);
-    if (fallback != nullptr) {
-      log_warn("tts_voice_fallback", {{"requested", canonical},
-                                      {"fallback", fallback_voice}});
-      status = attempt(fallback);
-      if (status == READ_ALOUD_STATUS_SUCCESS) {
-        used_voice = fallback_voice;
-      }
+  ReadAloudStatus status = attempt(entry);
+  const std::string fallback_voice = DefaultVoiceName();
+  const VoiceEntry* fallback = FindVoice(fallback_voice);
+
+  auto use_default_voice = [&]() -> bool {
+    if (fallback == nullptr || used_voice == fallback_voice) return false;
+    log_warn("tts_voice_fallback", {{"requested", canonical},
+                                    {"fallback", fallback_voice}});
+    status = attempt(fallback);
+    if (status == READ_ALOUD_STATUS_SUCCESS) {
+      used_voice = fallback_voice;
+      return true;
     }
-  }
+    return false;
+  };
+
+  // Some voices have been removed from the Edge Read Aloud service (e.g.
+  // zh-CN-XiaomengNeural was retired in 2026-09) and close the socket while
+  // others keep working. Fall back to the default voice instead of failing the
+  // whole TTS call.
+  if (status != READ_ALOUD_STATUS_SUCCESS) use_default_voice();
+
   if (status != READ_ALOUD_STATUS_SUCCESS) {
     const char* detail = read_aloud_last_error_message();
     const std::string message =
@@ -326,9 +331,20 @@ SynthesizeResult Synthesize(const std::string& text, const std::string& voice,
   }
 
   // The C ABI reports success after creating the file; make sure a usable MP3
-  // was actually produced (mirrors the old "no audio received" check).
+  // was actually produced. A zero-byte file happens occasionally (Edge can
+  // close early under rate limiting); retry once with the default voice.
   std::error_code error_code;
-  const auto bytes = std::filesystem::file_size(output_path, error_code);
+  auto bytes = std::filesystem::file_size(output_path, error_code);
+  if (!error_code && bytes == 0) {
+    std::error_code remove_error;
+    std::filesystem::remove(output_path, remove_error);
+    log_warn("tts_output_empty_retry",
+             {{"voice", used_voice}, {"path", output_path}});
+    if (use_default_voice()) {
+      error_code.clear();
+      bytes = std::filesystem::file_size(output_path, error_code);
+    }
+  }
   if (error_code) {
     log_warn("tts_output_missing", {{"voice", used_voice},
                                     {"path", output_path},

@@ -71,6 +71,8 @@ class _ChatScreenState extends State<ChatScreen>
   Timer? _liveMaxTimer;
   bool _liveHeardSpeech = false;
   int _liveSilentMs = 0;
+  Timer? _inputHoldTimer;
+  bool _inputHoldVoice = false;
   bool _voiceActive = false;
   String? _lastSpokenId;
   bool _editMode = false;
@@ -405,17 +407,28 @@ class _ChatScreenState extends State<ChatScreen>
     // mobile long-press on the *unfocused* input can start voice input while a
     // long-press on focused text keeps the normal selection behaviour.
     _inputTouchStartedUnfocused = !_focus.hasFocus;
-  }
-
-  void _onInputLongPressStart() {
+    _inputHoldTimer?.cancel();
+    _inputHoldVoice = false;
     if (!_inputTouchStartedUnfocused || _liveMode || _voiceActive) return;
-    AppHaptics.medium();
-    unawaited(_startVoice());
+    // Raw pointer hold: do not rely on the gesture arena, the TextField's own
+    // tap/selection recognizers can win it before a LongPressGestureRecognizer.
+    _inputHoldTimer = Timer(const Duration(milliseconds: 520), () {
+      if (!mounted || !_inputTouchStartedUnfocused || _liveMode || _voiceActive) {
+        return;
+      }
+      _inputHoldVoice = true;
+      AppHaptics.medium();
+      unawaited(_startVoice());
+    });
   }
 
-  void _onInputLongPressEnd() {
-    if (!_voiceActive) return;
-    unawaited(_stopVoice());
+  void _onInputPointerUp() {
+    _inputHoldTimer?.cancel();
+    _inputHoldTimer = null;
+    if (_inputHoldVoice) {
+      _inputHoldVoice = false;
+      if (_voiceActive) unawaited(_stopVoice());
+    }
   }
 
   Future<void> _closeHistory() async {
@@ -623,6 +636,7 @@ class _ChatScreenState extends State<ChatScreen>
     _drawer.dispose();
     _livePulse.dispose();
     _gazeTarget.dispose();
+    _inputHoldTimer?.cancel();
     _stopLiveVad();
     unawaited(_mic.cancel());
     unawaited(_asrApi?.dispose());
@@ -910,8 +924,7 @@ class _ChatScreenState extends State<ChatScreen>
                           _setLive(true);
                         },
                         onInputPointerDown: _onInputPointerDown,
-                        onInputLongPressStart: _onInputLongPressStart,
-                        onInputLongPressEnd: _onInputLongPressEnd,
+                        onInputPointerUp: _onInputPointerUp,
                       ),
                     ),
                     ],
@@ -1827,8 +1840,7 @@ class _Composer extends StatelessWidget {
     required this.onVoiceEnd,
     required this.onLongPressSend,
     required this.onInputPointerDown,
-    required this.onInputLongPressStart,
-    required this.onInputLongPressEnd,
+    required this.onInputPointerUp,
   });
 
   final ChatController chat;
@@ -1848,8 +1860,7 @@ class _Composer extends StatelessWidget {
   final VoidCallback onVoiceEnd;
   final VoidCallback onLongPressSend;
   final VoidCallback onInputPointerDown;
-  final VoidCallback onInputLongPressStart;
-  final VoidCallback onInputLongPressEnd;
+  final VoidCallback onInputPointerUp;
 
   @override
   Widget build(BuildContext context) {
@@ -1920,12 +1931,10 @@ class _Composer extends StatelessWidget {
                                     : Listener(
                                         onPointerDown: (_) =>
                                             onInputPointerDown(),
-                                        child: GestureDetector(
-                                        behavior: HitTestBehavior.translucent,
-                                        onLongPressStart: (_) =>
-                                            onInputLongPressStart(),
-                                        onLongPressEnd: (_) =>
-                                            onInputLongPressEnd(),
+                                        onPointerUp: (_) =>
+                                            onInputPointerUp(),
+                                        onPointerCancel: (_) =>
+                                            onInputPointerUp(),
                                         child: ConstrainedBox(
                                           constraints: BoxConstraints(
                                             maxHeight: 168,
@@ -1952,7 +1961,6 @@ class _Composer extends StatelessWidget {
                                             ),
                                           ),
                                           ),
-                                        ),
                                       ),
                                       ),
                           ),
@@ -1965,30 +1973,47 @@ class _Composer extends StatelessWidget {
                                     (value.text.trim().isNotEmpty ||
                                             attachments.isNotEmpty) &&
                                         !chat.busy;
-                                return GestureDetector(
-                                  onLongPress: chat.busy ? null : onLongPressSend,
-                                  child: AnimatedSwitcher(
-                                    duration: Duration(milliseconds: 160),
-                                    child: chat.busy
-                                        ? IconButton.filled(
-                                            key: ValueKey('stop'),
-                                            onPressed: onStop,
-                                            tooltip: '停止',
-                                            icon: Icon(
-                                              Icons.stop_rounded,
-                                              size: 20,
+                                return AnimatedSwitcher(
+                                  duration: Duration(milliseconds: 160),
+                                  child: chat.busy
+                                      ? IconButton.filled(
+                                          key: ValueKey('stop'),
+                                          onPressed: onStop,
+                                          tooltip: '停止',
+                                          icon: Icon(
+                                            Icons.stop_rounded,
+                                            size: 20,
+                                          ),
+                                        )
+                                      : GestureDetector(
+                                          key: ValueKey('send'),
+                                          // Exclusively handle both tap and
+                                          // long-press: an IconButton child would
+                                          // consume the long-press and fire
+                                          // onPressed on release.
+                                          behavior: HitTestBehavior.opaque,
+                                          onTap: canSend ? onSend : null,
+                                          onLongPress:
+                                              chat.busy ? null : onLongPressSend,
+                                          child: Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: canSend
+                                                  ? AppColors.primary
+                                                  : AppColors.muted
+                                                      .withValues(alpha: 0.25),
                                             ),
-                                          )
-                                        : IconButton.filled(
-                                            key: ValueKey('send'),
-                                            onPressed: canSend ? onSend : null,
-                                            tooltip: '发送 · 长按 Live',
-                                            icon: Icon(
+                                            child: Icon(
                                               Icons.arrow_upward_rounded,
                                               size: 20,
+                                              color: canSend
+                                                  ? AppColors.backgroundTop
+                                                  : AppColors.muted,
                                             ),
                                           ),
-                                  ),
+                                        ),
                                 );
                               },
                             )
