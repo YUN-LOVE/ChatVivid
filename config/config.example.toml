@@ -37,6 +37,6 @@ dir = "./config/injections"
 
 [embedding]
 # GGUF embedding model used for RAG memory retrieval.
-model = "./data/models/bge-small-zh-v1.5-q8_0.gguf"
+model = "./data/models/bge-small-zh-v1.5-f16.gguf"
 threads = 2
 enabled = true

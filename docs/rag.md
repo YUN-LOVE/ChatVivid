@@ -2,10 +2,10 @@
 
 记忆检索使用随应用打包的 GGUF embedding 模型，由 llama.cpp 在本地加载：
 
-- 模型：`bge-small-zh-v1.5-q8_0.gguf`（512 维，MIT）
+- 模型：`bge-small-zh-v1.5-f16.gguf`（512 维，MIT）
 - 来源：https://huggingface.co/CompendiumLabs/bge-small-zh-v1.5-gguf
 - native：`third_party/llama.cpp`（静态链接；CPU 或 Vulkan 后端，由 `CHATVV_VULKAN` 决定）
-- 资产：`app/assets/models/bge-small-zh-v1.5-q8_0.gguf`
+- 资产：`app/assets/models/bge-small-zh-v1.5-f16.gguf`
 
 流程：
 

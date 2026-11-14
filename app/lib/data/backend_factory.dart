@@ -50,12 +50,12 @@ Future<ChatBackend> createChatBackend(AppSettings settings) async {
   await syncInjectionFiles(injectionsDir, settings.injections);
 
   final modelFile = File(
-    '${support.path}/models/bge-small-zh-v1.5-q8_0.gguf',
+    '${support.path}/models/bge-small-zh-v1.5-f16.gguf',
   );
   if (!await modelFile.exists()) {
     await modelFile.parent.create(recursive: true);
     final data = await rootBundle.load(
-      'assets/models/bge-small-zh-v1.5-q8_0.gguf',
+      'assets/models/bge-small-zh-v1.5-f16.gguf',
     );
     await modelFile.writeAsBytes(data.buffer.asUint8List(), flush: true);
   }

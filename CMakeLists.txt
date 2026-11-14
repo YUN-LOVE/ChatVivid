@@ -159,7 +159,7 @@ enable_testing()
 add_executable(chatvv_tests tests/test_core.cpp)
 target_link_libraries(chatvv_tests PRIVATE chatvv_core)
 target_compile_definitions(chatvv_tests PRIVATE
-  CHATVV_TEST_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/app/assets/models/bge-small-zh-v1.5-q8_0.gguf")
+  CHATVV_TEST_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/app/assets/models/bge-small-zh-v1.5-f16.gguf")
 chatvv_warnings(chatvv_tests)
 add_test(NAME core COMMAND chatvv_tests)
 

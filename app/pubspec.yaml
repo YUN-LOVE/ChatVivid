@@ -35,7 +35,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/cacert.pem
-    - assets/models/bge-small-zh-v1.5-q8_0.gguf
+    - assets/models/bge-small-zh-v1.5-f16.gguf
     - assets/mascot/
     - assets/rive/
     - assets/live2d/whale-girl/
