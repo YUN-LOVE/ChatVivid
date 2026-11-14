@@ -124,7 +124,7 @@ class AppSettings {
       agentEnabled: false,
       onboardingComplete: false,
       ttsEngine: TtsEngine.edge,
-      ttsVoice: 'zh-CN-XiaomengNeural',
+      ttsVoice: 'zh-CN-XiaoyiNeural',
       ttsRate: 1.0,
       ttsPitchHz: 0,
       ttsVolume: 1.0,
@@ -139,6 +139,19 @@ class AppSettings {
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
     final defaults = AppSettings.defaults();
+    // v1 stored the retired Edge voices as defaults: zh-CN-XiaomengNeural was
+    // removed from the Read Aloud service in 2026-09, and zh-CN-Xiaoxiao was the
+    // pre-settings default. Migrate both to the new default (Xiaoyi, a working
+    // young-female voice closest to Xiaomeng) unless the value is something
+    // else the user explicitly chose.
+    final settingsVersion = (json['settings_version'] as num?)?.toInt() ?? 1;
+    var storedVoice = (json['tts_voice'] as String?) ?? '';
+    if (settingsVersion < 2 &&
+        (storedVoice.isEmpty ||
+            storedVoice == 'zh-CN-XiaoxiaoNeural' ||
+            storedVoice == 'zh-CN-XiaomengNeural')) {
+      storedVoice = defaults.ttsVoice;
+    }
     return AppSettings(
       mode: BackendMode.fromWire(json['mode'] as String?),
       clientBaseUrl:
@@ -179,8 +192,7 @@ class AppSettings {
       agentEnabled: (json['agent_enabled'] as bool?) ?? false,
       onboardingComplete: (json['onboarding_complete'] as bool?) ?? false,
       ttsEngine: TtsEngine.fromWire(json['tts_engine'] as String?),
-      ttsVoice:
-          (json['tts_voice'] as String?) ?? defaults.ttsVoice,
+      ttsVoice: storedVoice.isEmpty ? defaults.ttsVoice : storedVoice,
       ttsRate: (json['tts_rate'] as num?)?.toDouble() ?? defaults.ttsRate,
       ttsPitchHz:
           (json['tts_pitch_hz'] as num?)?.toInt() ?? defaults.ttsPitchHz,
@@ -250,6 +262,7 @@ class AppSettings {
         'color_mode': colorMode.wireName,
         'agent_enabled': agentEnabled,
         'onboarding_complete': onboardingComplete,
+        'settings_version': 2,
         'tts_engine': ttsEngine.wireName,
         'tts_voice': ttsVoice,
         'tts_rate': ttsRate,

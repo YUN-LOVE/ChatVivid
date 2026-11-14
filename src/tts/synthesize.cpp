@@ -289,14 +289,36 @@ SynthesizeResult Synthesize(const std::string& text, const std::string& voice,
   const ReadAloudSpeechOptions* speech_options_ptr =
       options.IsDefault() ? nullptr : &speech_options;
 
-  const ReadAloudStatus status = read_aloud_text_to_speech(
-      text.c_str(), entry->voice, speech_options_ptr, output_path.c_str());
+  auto attempt = [&](const VoiceEntry* voice_entry) {
+    return read_aloud_text_to_speech(text.c_str(), voice_entry->voice,
+                                     speech_options_ptr,
+                                     output_path.c_str());
+  };
+
+  ReadAloudStatus status = attempt(entry);
+  std::string used_voice = canonical;
+  if (status != READ_ALOUD_STATUS_SUCCESS && canonical != DefaultVoiceName()) {
+    // Some voices have been removed from the Edge Read Aloud service (e.g.
+    // zh-CN-XiaomengNeural was retired in 2026-09) and close the socket while
+    // others keep working. Fall back to the default voice instead of failing
+    // the whole TTS call.
+    const std::string fallback_voice = DefaultVoiceName();
+    const VoiceEntry* fallback = FindVoice(fallback_voice);
+    if (fallback != nullptr) {
+      log_warn("tts_voice_fallback", {{"requested", canonical},
+                                      {"fallback", fallback_voice}});
+      status = attempt(fallback);
+      if (status == READ_ALOUD_STATUS_SUCCESS) {
+        used_voice = fallback_voice;
+      }
+    }
+  }
   if (status != READ_ALOUD_STATUS_SUCCESS) {
     const char* detail = read_aloud_last_error_message();
     const std::string message =
         DescribeStatus(status, detail == nullptr ? std::string_view{}
                                                  : std::string_view(detail));
-    log_warn("tts_failed", {{"voice", canonical},
+    log_warn("tts_failed", {{"voice", used_voice},
                             {"status", static_cast<int>(status)},
                             {"error", message}});
     result.error = message;
@@ -308,7 +330,7 @@ SynthesizeResult Synthesize(const std::string& text, const std::string& voice,
   std::error_code error_code;
   const auto bytes = std::filesystem::file_size(output_path, error_code);
   if (error_code) {
-    log_warn("tts_output_missing", {{"voice", canonical},
+    log_warn("tts_output_missing", {{"voice", used_voice},
                                     {"path", output_path},
                                     {"error", error_code.message()}});
     result.error = "TTS produced no readable output file: " +
@@ -318,14 +340,14 @@ SynthesizeResult Synthesize(const std::string& text, const std::string& voice,
   if (bytes == 0) {
     std::error_code remove_error;
     std::filesystem::remove(output_path, remove_error);
-    log_warn("tts_output_empty", {{"voice", canonical}, {"path", output_path}});
+    log_warn("tts_output_empty", {{"voice", used_voice}, {"path", output_path}});
     result.error = "no audio received (empty output)";
     return result;
   }
 
   result.ok = true;
   result.audio_path = output_path;
-  log_info("tts_synthesized", {{"voice", canonical}, {"bytes", bytes}});
+  log_info("tts_synthesized", {{"voice", used_voice}, {"bytes", bytes}});
   return result;
 #endif  // CHATVV_HAVE_READ_ALOUD
 }

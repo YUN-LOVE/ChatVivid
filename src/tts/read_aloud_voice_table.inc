@@ -309,6 +309,7 @@
     {"vi-VN-NamMinhNeural", VOICE_VI_VN_NAM_MINH_NEURAL},
     {"zh-CN-liaoning-XiaobeiNeural", VOICE_ZH_CN_LIAONING_XIAOBEI_NEURAL},
     {"zh-CN-shaanxi-XiaoniNeural", VOICE_ZH_CN_SHAANXI_XIAONI_NEURAL},
+    {"zh-CN-XiaomengNeural", VOICE_ZH_CN_XIAOMENG_NEURAL},
     {"zh-CN-XiaoxiaoNeural", VOICE_ZH_CN_XIAOXIAO_NEURAL},
     {"zh-CN-XiaoyiNeural", VOICE_ZH_CN_XIAOYI_NEURAL},
     {"zh-CN-YunjianNeural", VOICE_ZH_CN_YUNJIAN_NEURAL},

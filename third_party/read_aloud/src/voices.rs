@@ -114,6 +114,8 @@ pub enum Voice {
   #[allow(non_camel_case_types)]
   zh_HK_WanLungNeural,
   #[allow(non_camel_case_types)]
+  zh_CN_XiaomengNeural,
+  #[allow(non_camel_case_types)]
   zh_CN_XiaoxiaoNeural,
   #[allow(non_camel_case_types)]
   zh_CN_XiaoyiNeural,
@@ -707,6 +709,7 @@ impl From<Voice> for &str {
            Voice::zh_HK_HiuGaaiNeural => {"Microsoft Server Speech Text to Speech Voice (zh-HK, HiuGaaiNeural)"}
            Voice::zh_HK_HiuMaanNeural => {"Microsoft Server Speech Text to Speech Voice (zh-HK, HiuMaanNeural)"}
            Voice::zh_HK_WanLungNeural => {"Microsoft Server Speech Text to Speech Voice (zh-HK, WanLungNeural)"}
+           Voice::zh_CN_XiaomengNeural => {"Microsoft Server Speech Text to Speech Voice (zh-CN, XiaomengNeural)"}
            Voice::zh_CN_XiaoxiaoNeural => {"Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoxiaoNeural)"}
            Voice::zh_CN_XiaoyiNeural => {"Microsoft Server Speech Text to Speech Voice (zh-CN, XiaoyiNeural)"}
            Voice::zh_CN_YunjianNeural => {"Microsoft Server Speech Text to Speech Voice (zh-CN, YunjianNeural)"}

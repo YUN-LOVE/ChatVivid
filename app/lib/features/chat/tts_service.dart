@@ -111,7 +111,7 @@ class TtsService {
         'volume': _edgeVolume(settings.ttsVolume),
       });
       final voice = settings.ttsVoice.trim().isEmpty
-          ? 'zh-CN-XiaomengNeural'
+          ? 'zh-CN-XiaoyiNeural'
           : settings.ttsVoice.trim();
       final error = await Isolate.run(
         () => _edgeSynthesize(clean, voice, options, path),

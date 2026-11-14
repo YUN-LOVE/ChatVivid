@@ -334,6 +334,20 @@ iOS job（若启用）需要 `targets: aarch64-apple-ios`。
   C++ 构建而不希望引入 Rust/OpenSSL，可用 `-DCHATVV_ENABLE_READ_ALOUD=OFF`
   得到只返回明确错误的 stub。
 
+## 9.5 2026-10 服务端变更与本仓库补丁
+
+- Microsoft 把 Edge Read Aloud 的合成端点从
+  `wss://speech.platform.bing.com/consumer/...` 迁到
+  `wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1`；旧端点现在
+  直接 403。vendored `read_aloud` 已打补丁：新端点 + 客户端 token 作为
+  `Ocp-Apim-Subscription-Key` 查询参数（`src/lib.rs`），`Sec-MS-GEC` 与 UA 保持。
+- 一批 zh-CN 音色已在 2026-09 从在线列表下线（晓涵 Xiaohan、晓辰 Xiaochen、
+  晓梦 Xiaomeng、晓墨 Xiaomo、晓秋 Xiaoqiu、晓睿 Xiaorui、晓双 Xiaoshuang、
+  晓萱 Xiaoxuan、晓颜 Xiaoyan、晓悠 Xiaoyou）。选择这些音色时 C++ 层会记录
+  `tts_voice_fallback` 并自动改用默认音色（`zh-CN-XiaoxiaoNeural`）重试。
+- App 默认 Edge 音色改为可用的 `zh-CN-XiaoyiNeural`（年轻女声，最接近晓梦）；
+  旧设置文件（settings_version < 2）里的 Xiaoxiao/Xiaomeng 默认值会自动迁移。
+
 ## 10. App 侧 TTS 设置（系统 TTS / Edge TTS）
 
 设置 →「语音与 TTS」可切换引擎并调节参数，持久化在 `settings.json`：

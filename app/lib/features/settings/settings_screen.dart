@@ -1260,7 +1260,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
             controller: _ttsVoice,
             style: TextStyle(color: AppColors.text, fontSize: 13),
             decoration: InputDecoration(
-              hintText: 'zh-CN-XiaomengNeural',
+              hintText: 'zh-CN-XiaoyiNeural',
               hintStyle: TextStyle(
                 color: AppColors.muted.withValues(alpha: 0.45),
                 fontSize: 12,
@@ -1276,7 +1276,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           ),
           SizedBox(height: 4),
           Text(
-            '填 Microsoft Edge 音色短名，例如 zh-CN-XiaomengNeural；留空使用默认音色。',
+            '填 Microsoft Edge 音色短名，例如 zh-CN-XiaoyiNeural；留空使用默认音色（已下线的音色会自动回退到默认音色）。',
             style: TextStyle(
               color: AppColors.muted.withValues(alpha: 0.6),
               fontSize: 10,

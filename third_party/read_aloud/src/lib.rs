@@ -107,7 +107,12 @@ pub type Result<T> = std::result::Result<T, TTSError>;
 
 fn websocket_url(connection_id: &str, sec_ms_gec: &str) -> String {
     format!(
-        "wss://speech.platform.bing.com/consumer/speech/synthesize/readaloud/edge/v1?TrustedClientToken={TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC={sec_ms_gec}&Sec-MS-GEC-Version={SEC_MS_GEC_VERSION}&ConnectionId={connection_id}"
+        // Microsoft moved Edge Read Aloud to api.msedgeservices.com (2026-10);
+        // the old speech.platform.bing.com host now answers 403 for the
+        // WebSocket handshake. The new host expects the client token as
+        // `Ocp-Apim-Subscription-Key` instead of `TrustedClientToken`, but
+        // still accepts the same Sec-MS-GEC token/version.
+        "wss://api.msedgeservices.com/tts/cognitiveservices/websocket/v1?Ocp-Apim-Subscription-Key={TRUSTED_CLIENT_TOKEN}&Sec-MS-GEC={sec_ms_gec}&Sec-MS-GEC-Version={SEC_MS_GEC_VERSION}&ConnectionId={connection_id}"
     )
 }
 
