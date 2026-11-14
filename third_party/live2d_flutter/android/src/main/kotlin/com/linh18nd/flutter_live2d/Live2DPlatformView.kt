@@ -85,6 +85,12 @@ class Live2DPlatformView(
         }
     }
 
+    fun setParameterTarget(parameterId: String, target: Float, speed: Float) {
+        Live2DRenderHub.queueEvent(nativeHandle) {
+            Live2DBridge.nativeSetParameterTarget(nativeHandle, parameterId, target, speed)
+        }
+    }
+
     fun setMotionSpeed(speed: Float) {
         Live2DRenderHub.queueEvent(nativeHandle) {
             Live2DBridge.nativeSetMotionSpeed(nativeHandle, speed)
@@ -304,10 +310,11 @@ private object Live2DRenderHub {
                 anyDrawn = true
             }
 
-            // 30 fps is plenty for a static stage character and halves the
-            // GL/CPU cost on phones; the old 16 ms (60 fps) loop was a major
-            // battery/CPU drain while the chat was idle.
-            SystemClock.sleep(if (anyDrawn) 28 else 50)
+            // 60 fps: intermittent parameters are now lerped natively, so the
+            // motion stays smooth. The rest of the idle cost was cut by the
+            // background pause + cheaper widgets, not by lowering the frame
+            // rate.
+            SystemClock.sleep(if (anyDrawn) 16 else 50)
         }
 
         teardownAll()

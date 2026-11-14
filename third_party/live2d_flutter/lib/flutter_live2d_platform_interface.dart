@@ -105,6 +105,21 @@ abstract class FlutterLive2dPlatform extends PlatformInterface {
   ///
   /// [parameterId] follows Cubism naming, e.g. `"ParamAngleX"`. The valid
   /// range is defined by the model.
+  /// Sets a parameter target that the native renderer lerps towards every
+  /// frame. Default implementation (iOS/web) falls back to an immediate set.
+  Future<void> setParameterTarget({
+    required int viewId,
+    required String parameterId,
+    required double target,
+    double speed = 8.0,
+  }) {
+    return setParameter(
+      viewId: viewId,
+      parameterId: parameterId,
+      value: target,
+    );
+  }
+
   Future<void> setParameter({
     required int viewId,
     required String parameterId,

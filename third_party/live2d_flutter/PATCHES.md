@@ -83,3 +83,13 @@ idle motion still drives everything the app does not override.
 sleep 16 ms between frames (60 fps) even while the chat was idle, which kept a
 CPU core busy on phones. It now sleeps 28 ms (~30 fps), which still looks smooth
 for a stage character and cuts idle CPU roughly in half.
+
+## 5. Added: native smooth parameter targets (`setParameterTarget`)
+
+Flutter can only sample pointer positions at ~12 Hz without flooding the method
+channel, which made gaze/tail/mouth visibly step (the "live2d 卡顿" report).
+`Live2DModel` now stores a target + speed per parameter and lerps its own
+continuous value on every rendered frame (frame-rate independent, after
+motion/physics, before `CubismModel::Update()`), while Flutter sends sparse
+targets. Android render hub back to 60 fps; smoothness no longer depends on the
+Dart timer rate or the channel throughput.

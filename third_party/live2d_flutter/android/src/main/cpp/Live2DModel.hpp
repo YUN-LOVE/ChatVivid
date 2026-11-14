@@ -26,6 +26,13 @@ public:
     /// frame by the idle motion or drag look-at.
     void SetParameterValue(const Csm::csmChar* parameterId, Csm::csmFloat32 value);
 
+    /// Sets a target that the native render loop lerps towards every frame
+    /// (frame-rate independent, speed in "e-folds per second"). Lets Flutter
+    /// update sparse targets (gaze/tail/mouth) without visible stepping while
+    /// still rendering at the full frame rate.
+    void SetParameterTarget(const Csm::csmChar* parameterId, Csm::csmFloat32 target,
+                            Csm::csmFloat32 speed);
+
     /// Sets the motion playback speed multiplier (default 1.0).
     /// Physics, eye-blink and expressions are NOT affected.
     void SetMotionSpeed(Csm::csmFloat32 speed);
@@ -59,6 +66,14 @@ private:
     Csm::csmVector<Csm::CubismIdHandle> _lipSyncIds;
     Csm::csmMap<Csm::csmString, Csm::ACubismMotion*> _motions;
     Csm::csmMap<Csm::csmString, Csm::csmFloat32> _parameterOverrides;
+    struct ParameterTarget
+    {
+        Csm::csmFloat32 target;
+        Csm::csmFloat32 speed;
+        Csm::csmFloat32 current;
+        bool initialized;
+    };
+    Csm::csmMap<Csm::csmString, ParameterTarget> _parameterTargets;
     Csm::csmMap<Csm::csmString, Csm::ACubismMotion*> _expressions;
 
     const Csm::CubismId* _idParamAngleX;

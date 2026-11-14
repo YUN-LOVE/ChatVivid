@@ -203,11 +203,23 @@ class _Live2DStageState extends State<Live2DStage>
   void _applyGaze(Offset gaze) {
     final eyeX = gaze.dx;
     final eyeY = -gaze.dy;
-    _controller.setParameter('ParamEyeBallX', eyeX).catchError((_) {});
-    _controller.setParameter('ParamEyeBallY', eyeY).catchError((_) {});
-    _controller.setParameter('ParamAngleX', gaze.dx * 22).catchError((_) {});
-    _controller.setParameter('ParamAngleY', -gaze.dy * 14).catchError((_) {});
-    _controller.setParameter('ParamAngleZ', gaze.dx * -4).catchError((_) {});
+    // Native side lerps towards these targets on every rendered frame, so the
+    // 12.5 Hz pointer sampling above does not show up as stepping.
+    _controller
+        .setParameterTarget('ParamEyeBallX', eyeX, speed: 18)
+        .catchError((_) {});
+    _controller
+        .setParameterTarget('ParamEyeBallY', eyeY, speed: 18)
+        .catchError((_) {});
+    _controller
+        .setParameterTarget('ParamAngleX', gaze.dx * 22, speed: 12)
+        .catchError((_) {});
+    _controller
+        .setParameterTarget('ParamAngleY', -gaze.dy * 14, speed: 12)
+        .catchError((_) {});
+    _controller
+        .setParameterTarget('ParamAngleZ', gaze.dx * -4, speed: 12)
+        .catchError((_) {});
   }
 
   void _startTail() {
@@ -218,13 +230,21 @@ class _Live2DStageState extends State<Live2DStage>
       final sway = math.sin(phase);
       // Tail_2 bends the whale tail; small values keep the idle silhouette.
       _controller
-          .setParameter('Param10', 0.5 + sway * 0.22)
+          .setParameterTarget('Param10', 0.5 + sway * 0.22, speed: 6)
           .catchError((_) {});
       _controller
-          .setParameter('Param_Angle_Rotation_1_B_tail3', 0.5 + sway * 0.18)
+          .setParameterTarget(
+            'Param_Angle_Rotation_1_B_tail3',
+            0.5 + sway * 0.18,
+            speed: 6,
+          )
           .catchError((_) {});
       _controller
-          .setParameter('Param_Angle_Rotation_2_B_tail3', 0.5 + sway * 0.14)
+          .setParameterTarget(
+            'Param_Angle_Rotation_2_B_tail3',
+            0.5 + sway * 0.14,
+            speed: 6,
+          )
           .catchError((_) {});
     });
   }
@@ -244,7 +264,11 @@ class _Live2DStageState extends State<Live2DStage>
 
   Future<void> _setMouth(double value) async {
     try {
-      await _controller.setParameter('ParamMouthOpenY', value.clamp(0, 1));
+      await _controller.setParameterTarget(
+        'ParamMouthOpenY',
+        value.clamp(0, 1),
+        speed: 30,
+      );
     } catch (_) {
       // imported models may use a different mouth parameter.
     }

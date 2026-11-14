@@ -34,5 +34,12 @@ object Live2DBridge {
     external fun nativeStartMotion(handle: Long, group: String, index: Int, priority: Int)
     external fun nativeSetExpression(handle: Long, index: Int)
     external fun nativeSetParameter(handle: Long, parameterId: String, value: Float)
+
+    external fun nativeSetParameterTarget(
+        handle: Long,
+        parameterId: String,
+        target: Float,
+        speed: Float,
+    )
     external fun nativeSetMotionSpeed(handle: Long, speed: Float)
 }

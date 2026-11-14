@@ -359,6 +359,17 @@ Java_com_linh18nd_flutter_1live2d_Live2DBridge_nativeSetParameter(JNIEnv* env, j
 }
 
 JNIEXPORT void JNICALL
+Java_com_linh18nd_flutter_1live2d_Live2DBridge_nativeSetParameterTarget(JNIEnv* env, jclass,
+    jlong handle, jstring parameterId, jfloat target, jfloat speed)
+{
+    Live2DView* view = AsView(handle);
+    if (!view || !view->model || !view->model->IsLoaded()) return;
+    const char* id = env->GetStringUTFChars(parameterId, nullptr);
+    view->model->SetParameterTarget(id, target, speed);
+    env->ReleaseStringUTFChars(parameterId, id);
+}
+
+JNIEXPORT void JNICALL
 Java_com_linh18nd_flutter_1live2d_Live2DBridge_nativeSetMotionSpeed(JNIEnv*, jclass, jlong handle,
     jfloat speed)
 {

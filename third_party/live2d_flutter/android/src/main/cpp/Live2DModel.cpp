@@ -247,6 +247,33 @@ void Live2DModel::Update()
     if (_pose)
         _pose->UpdateParameters(_model, deltaTime);
 
+    // Smooth app-driven parameter targets: Flutter only sends sparse updates
+    // (12-15 Hz); lerp towards the target every rendered frame here so the
+    // gaze/tail/mouth motion is smooth even at low update rates.
+    if (!_parameterTargets.IsEmpty())
+    {
+        const csmFloat32 lerpUnit = deltaTime > 0.0f ? deltaTime : 1.0f / 60.0f;
+        for (auto it = _parameterTargets.Begin(); it != _parameterTargets.End(); ++it)
+        {
+            const CubismId* id =
+                CubismFramework::GetIdManager()->GetId(it->First.GetRawString());
+            if (id == nullptr) continue;
+            ParameterTarget& target = it->Second;
+            if (!target.initialized)
+            {
+                // The model parameter is reset from its saved value every frame,
+                // so keep our own continuous state instead of reading it back.
+                target.current = _model->GetParameterValue(id);
+                target.initialized = true;
+            }
+            csmFloat32 alpha = target.speed * lerpUnit;
+            if (alpha > 1.0f) alpha = 1.0f;
+            if (alpha < 0.0f) alpha = 0.0f;
+            target.current += (target.target - target.current) * alpha;
+            _parameterOverrides[it->First] = target.current;
+        }
+    }
+
     // App-side parameter overrides (gaze/blink/mouth/tail via setParameter).
     // Applied last so motion, drag look-at, eye blink and physics cannot
     // overwrite them before the model parameters are baked into drawables.
@@ -325,6 +352,20 @@ void Live2DModel::SetParameterValue(const Csm::csmChar* parameterId, Csm::csmFlo
     // Store instead of writing immediately: Update() would overwrite the value
     // from the playing motion/physics before Draw().
     _parameterOverrides[parameterId] = value;
+}
+
+void Live2DModel::SetParameterTarget(const Csm::csmChar* parameterId,
+                                     Csm::csmFloat32 target, Csm::csmFloat32 speed)
+{
+    if (!parameterId || !*parameterId) return;
+    auto& value = _parameterTargets[parameterId];
+    value.target = target;
+    value.speed = speed;
+    if (value.speed <= 0.0f) value.speed = 8.0f;
+    // Keep the current interpolated value; only initialise it lazily in Update
+    // (SetParameterTarget can run before the model finishes loading parameters).
+    value.current = 0.0f;
+    value.initialized = false;
 }
 
 void Live2DModel::SetMotionSpeed(Csm::csmFloat32 speed)

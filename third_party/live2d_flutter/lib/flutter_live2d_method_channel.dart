@@ -101,6 +101,21 @@ class MethodChannelFlutterLive2d extends FlutterLive2dPlatform {
   }
 
   @override
+  Future<void> setParameterTarget({
+    required int viewId,
+    required String parameterId,
+    required double target,
+    double speed = 8.0,
+  }) async {
+    await methodChannel.invokeMethod<void>('setParameterTarget', {
+      'viewId': viewId,
+      'parameterId': parameterId,
+      'target': target,
+      'speed': speed,
+    });
+  }
+
+  @override
   Future<void> setMotionSpeed({
     required int viewId,
     required double speed,

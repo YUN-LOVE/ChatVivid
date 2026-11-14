@@ -268,6 +268,24 @@ class Live2DViewController extends ValueNotifier<Live2DViewState> {
   ///
   /// [parameterId] follows Cubism convention, e.g. `"ParamAngleX"`,
   /// `"ParamMouthOpenY"`. The valid range is defined by the model.
+  /// Sets a parameter target that the native renderer lerps towards at
+  /// [speed] e-folds per second. Use this for continuous animation (gaze, tail,
+  /// mouth): the Flutter side can update sparsely and the native 60 fps loop
+  /// interpolates, avoiding visible stepping.
+  Future<void> setParameterTarget(
+    String parameterId,
+    double target, {
+    double speed = 8.0,
+  }) =>
+      _wrap(
+        () => FlutterLive2dPlatform.instance.setParameterTarget(
+          viewId: _id,
+          parameterId: parameterId,
+          target: target,
+          speed: speed,
+        ),
+      );
+
   Future<void> setParameter(String parameterId, double value) => _wrap(
         () => FlutterLive2dPlatform.instance.setParameter(
           viewId: _id,

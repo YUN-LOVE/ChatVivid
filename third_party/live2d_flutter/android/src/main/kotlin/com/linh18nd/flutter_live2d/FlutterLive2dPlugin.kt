@@ -111,6 +111,21 @@ class FlutterLive2dPlugin : FlutterPlugin, MethodCallHandler {
                 result.success(null)
             }
 
+            "setParameterTarget" -> {
+                val viewId = call.requireInt("viewId", result) ?: return
+                val parameterId = call.requireNonEmptyString("parameterId", result) ?: return
+                val target = call.argument<Double>("target")?.toFloat()
+                if (target == null) {
+                    result.error("INVALID_ARGS", "Missing 'target'", null); return
+                }
+                val speed = call.argument<Double>("speed")?.toFloat() ?: 8.0f
+                val view = viewRegistry[viewId] ?: run {
+                    result.viewNotFound(viewId); return
+                }
+                view.setParameterTarget(parameterId, target, speed)
+                result.success(null)
+            }
+
             "setMotionSpeed" -> {
                 val viewId = call.requireInt("viewId", result) ?: return
                 val speed = call.argument<Double>("speed")?.toFloat()
