@@ -19,6 +19,17 @@ bool is_terminal(const std::string& type) {
          type == "response.failed";
 }
 
+void emit_failure(ResponseHub& hub, const std::string& id,
+                  const std::string& message) {
+  const nlohmann::json event = {
+      {"type", "response.failed"},
+      {"response",
+       {{"id", id},
+        {"status", "failed"},
+        {"error", {{"code", "context_failed"}, {"message", message}}}}}};
+  hub.publish(id, 1, "response.failed", event.dump());
+}
+
 std::string extract_text(const nlohmann::json& output) {
   std::string out;
   if (!output.is_array()) return out;
@@ -50,26 +61,12 @@ DialogService::~DialogService() { shutdown(); }
 DialogService::StartResult DialogService::start(
     const std::string& text, const std::vector<Injection>& extra,
     const std::string& instructions_override) {
-  BuiltContext ctx = build_context(db_, slots_, cfg_, text, extra, embedding_);
-  if (!instructions_override.empty()) {
-    ctx.instructions = instructions_override;
-  }
-
   const std::string id = ulid();
   ResponseRow row;
   row.id = id;
   row.model = cfg_.llm.model;
-  row.instructions = ctx.instructions;
-  row.input_meta = ctx.manifest.dump();
   row.created_at = now_ms();
   db_.create_response(row);
-
-  std::string rendered;
-  if (!ctx.input.empty()) {
-    const auto& last = ctx.input.back();
-    if (last.contains("content")) rendered = last["content"].dump();
-  }
-  db_.append_message("user", text, rendered, id);
   // Register before the worker can publish. SSE clients may connect as soon
   // as start() returns; an unknown hub id would otherwise race into
   // stream_lost.
@@ -81,10 +78,41 @@ DialogService::StartResult DialogService::start(
     if (stopping_) throw std::runtime_error("dialog service is shutting down");
     cancels_[id] = cancel;
     threads_.emplace_back(
-        [this, id, ctx = std::move(ctx), model = cfg_.llm.model, cancel,
-         user_text = text]() mutable {
-          run(std::move(id), std::move(ctx), std::move(model),
-              std::move(user_text), std::move(cancel));
+        [this, id, text, extra = std::move(extra),
+         instructions_override = instructions_override,
+         model = cfg_.llm.model, cancel]() mutable {
+          // Context building includes DB queries and an embedding inference;
+          // doing it on the FFI caller thread (Flutter UI thread) could block
+          // input dispatch for seconds (Android ANR). Build it here instead:
+          // the caller only needs the response id to start streaming.
+          try {
+            BuiltContext ctx =
+                build_context(db_, slots_, cfg_, text, extra, embedding_);
+            if (!instructions_override.empty()) {
+              ctx.instructions = instructions_override;
+            }
+            std::string rendered;
+            if (!ctx.input.empty()) {
+              const auto& last = ctx.input.back();
+              if (last.contains("content")) rendered = last["content"].dump();
+            }
+            db_.append_message("user", text, rendered, id);
+            run(std::move(id), std::move(ctx), std::move(model),
+                std::move(text), std::move(cancel));
+          } catch (const std::exception& e) {
+            log_error("turn.context_failed",
+                      {{"response_id", id}, {"error", e.what()}});
+            try {
+              db_.update_response(id, "failed", "{}", "{}", e.what(),
+                                  now_ms());
+            } catch (...) {
+            }
+            emit_failure(hub_, id, e.what());
+          } catch (...) {
+            log_error("turn.context_failed",
+                      {{"response_id", id}, {"error", "unknown error"}});
+            emit_failure(hub_, id, "unknown error");
+          }
         });
   }
 

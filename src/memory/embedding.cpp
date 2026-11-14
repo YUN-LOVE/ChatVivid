@@ -94,6 +94,7 @@ void normalize(std::vector<float>& values) {
 EmbeddingEngine::EmbeddingEngine() = default;
 
 EmbeddingEngine::~EmbeddingEngine() {
+  ready_.store(false, std::memory_order_release);
   std::lock_guard lock(mutex_);
   if (context_) llama_free(context_);
   if (model_) llama_model_free(model_);
@@ -102,6 +103,7 @@ EmbeddingEngine::~EmbeddingEngine() {
 bool EmbeddingEngine::load(const std::string& model_path, int threads,
                            std::string* error) {
   std::lock_guard lock(mutex_);
+  ready_.store(false, std::memory_order_release);
   if (model_path.empty() || !std::filesystem::exists(model_path)) {
     if (error) *error = "embedding model not found: " + model_path;
     return false;
@@ -150,14 +152,18 @@ bool EmbeddingEngine::load(const std::string& model_path, int threads,
   }
   log_info("embedding.ready",
            {{"model", model_path}, {"dim", dim_}, {"threads", threads}});
+  ready_.store(true, std::memory_order_release);
   return true;
 }
 
 bool EmbeddingEngine::ready() const {
-  return model_ != nullptr && context_ != nullptr;
+  return ready_.load(std::memory_order_acquire);
 }
 
-int EmbeddingEngine::dim() const { return dim_; }
+int EmbeddingEngine::dim() const {
+  std::lock_guard lock(mutex_);
+  return dim_;
+}
 
 std::vector<float> EmbeddingEngine::embed(const std::string& text,
                                           std::string* error) {

@@ -196,18 +196,31 @@ class _ChatScreenState extends State<ChatScreen>
     _lastLength = last.content.length;
 
     // Auto-speak is evaluated on every notification, not only on content
-    // changes: the last token delta and the busy=false transition usually
-    // arrive together, so gating on `changed` meant the reply was never read
-    // aloud when the final chunk did not add characters.
-    final autoSpeakDue = widget.settings.ttsAutoSpeak &&
-        !chat.busy &&
+    // changes: the busy=false transition usually arrives without new
+    // characters. It is sentence-streamed: while the LLM is still generating,
+    // completed sentences are synthesized and played immediately (first audio
+    // after one sentence instead of after the whole reply).
+    final wantsAuto = widget.settings.ttsAutoSpeak &&
         !last.isUser &&
-        last.content.trim().isNotEmpty &&
-        last.id != _lastSpokenId &&
-        !_tts.active;
-    if (autoSpeakDue) {
-      _lastSpokenId = last.id;
-      unawaited(_tts.speak(last.content));
+        last.content.trim().isNotEmpty;
+    if (wantsAuto) {
+      if (_tts.streamActive && _tts.streamReplyId == last.id) {
+        _tts.feedSpeechStream(last.content);
+        if (!chat.busy) unawaited(_tts.finishSpeechStream());
+      } else if (!chat.busy) {
+        if (!_tts.active && last.id != _lastSpokenId) {
+          _lastSpokenId = last.id;
+          _tts.beginSpeechStream(last.id);
+          _tts.feedSpeechStream(last.content);
+          unawaited(_tts.finishSpeechStream());
+        }
+      } else if (last.id != _lastSpokenId) {
+        _lastSpokenId = last.id;
+        _tts.beginSpeechStream(last.id);
+        _tts.feedSpeechStream(last.content);
+      }
+    } else if (_tts.streamActive) {
+      unawaited(_tts.stop());
     }
 
     if (!changed || !_scroll.hasClients) return;
@@ -459,10 +472,15 @@ class _ChatScreenState extends State<ChatScreen>
 
   Future<void> _toggleSpeech() async {
     AppHaptics.light();
-    if (_tts.speaking.value) {
+    if (_tts.speaking.value || _tts.streamActive) {
       await _tts.stop();
     } else {
-      await _tts.speak(_latestRaw());
+      final text = _latestRaw();
+      if (text.trim().isNotEmpty) {
+        _tts.beginSpeechStream('manual');
+        _tts.feedSpeechStream(text);
+        await _tts.finishSpeechStream();
+      }
     }
     if (mounted) setState(() {});
   }
@@ -527,7 +545,7 @@ class _ChatScreenState extends State<ChatScreen>
                   child: CharacterStage(
                     customRivePath: widget.settings.characterRivePath,
                     characterMode: widget.settings.characterMode,
-                    speaking: chat.busy || _tts.speaking.value,
+                    speaking: _tts.speaking.value,
                     live2dDir: widget.settings.live2dDir,
                     live2dModel: widget.settings.live2dModel,
                     gazeNotifier: _gazeTarget,

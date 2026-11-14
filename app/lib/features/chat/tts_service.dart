@@ -60,6 +60,19 @@ class TtsService {
 
   bool get active => speaking.value || synthesizing.value;
 
+  // ---- sentence-level streaming speech (LLM deltas -> TTS chunks) ----
+  bool _streamActive = false;
+  bool _streamClosing = false;
+  int _streamSession = 0;
+  String _streamText = '';
+  String _streamPending = '';
+  String _streamReplyId = '';
+  final List<_SpeechChunk> _streamChunks = [];
+  Future<void>? _streamWorker;
+
+  bool get streamActive => _streamActive;
+  String get streamReplyId => _streamReplyId;
+
   AppSettings _settings = AppSettings.defaults();
   bool _ready = false;
   bool _systemReady = false;
@@ -77,6 +90,9 @@ class TtsService {
         _playbackWatchdog?.cancel();
         _playbackWatchdog = null;
         speaking.value = false;
+        final done = _playbackDone;
+        _playbackDone = null;
+        if (done != null && !done.isCompleted) done.complete();
       }
     });
     try {
@@ -90,6 +106,172 @@ class TtsService {
     } catch (_) {
       _systemReady = false;
     }
+  }
+
+  /// Starts a streaming speech session. Feed the growing assistant text with
+  /// [feedSpeechStream]; completed sentences are synthesized eagerly (next
+  /// sentence while the current one plays) and played in order, so the first
+  /// audio starts after one short sentence instead of after the whole reply.
+  void beginSpeechStream(String replyId) {
+    _cancelSpeechStream();
+    _streamActive = true;
+    _streamClosing = false;
+    _streamSession += 1;
+    _streamText = '';
+    _streamPending = '';
+    _streamReplyId = replyId;
+    _streamChunks.clear();
+    synthesizing.value = true;
+    speaking.value = false;
+    _cancelSpeakingStart();
+    _playbackWatchdog?.cancel();
+    _playbackWatchdog = null;
+    _audio.invokeMethod('stop').catchError((_) => null);
+    if (_systemReady) _system.stop().catchError((_) => null);
+  }
+
+  void feedSpeechStream(String fullText) {
+    if (!_streamActive) return;
+    if (fullText.length <= _streamText.length) return;
+    final delta = fullText.substring(_streamText.length);
+    _streamText = fullText;
+    _streamPending += delta;
+    _drainCompleteSentences();
+  }
+
+  Future<void> finishSpeechStream() async {
+    if (!_streamActive) return;
+    _drainCompleteSentences();
+    final tail = _streamPending.trim();
+    _streamPending = '';
+    if (tail.isNotEmpty) _enqueueSentence(tail);
+    _streamClosing = true;
+    final worker = _streamWorker;
+    if (worker != null) {
+      try {
+        await worker;
+      } catch (_) {}
+    }
+    if (_streamActive) {
+      _streamActive = false;
+      synthesizing.value = false;
+      speaking.value = false;
+    }
+  }
+
+  void _drainCompleteSentences() {
+    final terminators = RegExp(r'[。！？!?；;…\n]');
+    while (true) {
+      final match = terminators.firstMatch(_streamPending);
+      if (match == null) break;
+      final end = match.end;
+      final sentence = _streamPending.substring(0, end).trim();
+      _streamPending = _streamPending.substring(end);
+      if (sentence.isNotEmpty) _enqueueSentence(sentence);
+    }
+  }
+
+  void _enqueueSentence(String raw) {
+    final clean = _plain(raw);
+    if (clean.isEmpty) return;
+    _streamChunks.add(
+      _SpeechChunk(
+        clean,
+        _settings.ttsEngine == TtsEngine.edge
+            ? _synthesizeEdgeFile(clean)
+            : null,
+      ),
+    );
+    _ensureStreamWorker();
+  }
+
+  void _ensureStreamWorker() {
+    if (_streamWorker != null) return;
+    final session = _streamSession;
+    _streamWorker = _runStreamWorker(session).whenComplete(() {
+      _streamWorker = null;
+      if (_streamActive &&
+          session == _streamSession &&
+          _streamChunks.isNotEmpty) {
+        _ensureStreamWorker();
+      }
+    });
+  }
+
+  Future<void> _runStreamWorker(int session) async {
+    while (_streamActive && session == _streamSession) {
+      if (_streamChunks.isEmpty) {
+        if (_streamClosing) break;
+        return;
+      }
+      final chunk = _streamChunks.removeAt(0);
+      try {
+        if (chunk.file != null) {
+          final file = await chunk.file;
+          if (!_streamActive || session != _streamSession) return;
+          if (file == null) continue;
+          await _playChunkAndWait(file);
+        } else {
+          await _speakSystem(chunk.text, _settings);
+        }
+      } catch (error) {
+        debugPrint('streaming TTS chunk failed: $error');
+      }
+    }
+  }
+
+  Future<void> _playChunkAndWait(String path) async {
+    final done = Completer<void>();
+    _playbackDone = done;
+    final played = await _playFile(path);
+    if (!played) {
+      if (!done.isCompleted) done.complete();
+      _playbackDone = null;
+      return;
+    }
+    _startSpeakingAfter(_settings.ttsLipSyncOffsetMs.clamp(0, 1500));
+    try {
+      await done.future;
+    } catch (_) {}
+    _playbackDone = null;
+  }
+
+  void _cancelSpeechStream() {
+    _streamSession += 1;
+    _streamActive = false;
+    _streamClosing = false;
+    _streamText = '';
+    _streamPending = '';
+    _streamReplyId = '';
+    _streamChunks.clear();
+    _streamWorker = null;
+    final done = _playbackDone;
+    _playbackDone = null;
+    if (done != null && !done.isCompleted) done.complete();
+  }
+
+  Future<String?> _synthesizeEdgeFile(String clean) async {
+    try {
+      final dir = await Directory.systemTemp.createTemp('chatvv_tts_');
+      final path = '${dir.path}/reply.mp3';
+      final settings = _settings;
+      final options = jsonEncode({
+        'pitch_hz': settings.ttsPitchHz,
+        'rate': _edgeRate(settings.ttsRate),
+        'volume': _edgeVolume(settings.ttsVolume),
+      });
+      final voice = settings.ttsVoice.trim().isEmpty
+          ? 'zh-CN-XiaoyiNeural'
+          : settings.ttsVoice.trim();
+      final error = await Isolate.run(
+        () => _edgeSynthesize(clean, voice, options, path),
+      );
+      if (error == null && File(path).existsSync()) return path;
+      debugPrint('Edge streaming TTS failed: $error');
+    } catch (error) {
+      debugPrint('Edge streaming TTS exception: $error');
+    }
+    return null;
   }
 
   Future<void> speak(String text) async {
@@ -159,6 +341,7 @@ class TtsService {
   }
 
   Future<void> stop() async {
+    _cancelSpeechStream();
     _cancelSpeakingStart();
     _playbackWatchdog?.cancel();
     _playbackWatchdog = null;
@@ -180,11 +363,15 @@ class TtsService {
   }
 
   Timer? _playbackWatchdog;
+  Completer<void>? _playbackDone;
 
   void _armPlaybackWatchdog(int durationMs) {
     _playbackWatchdog?.cancel();
     final safeMs = durationMs > 0 ? durationMs : 120000;
     _playbackWatchdog = Timer(Duration(milliseconds: safeMs + 1500), () {
+      final done = _playbackDone;
+      _playbackDone = null;
+      if (done != null && !done.isCompleted) done.complete();
       if (!speaking.value) return;
       // The native completion callback can be lost (player released by another
       // screen etc.); never leave the speaking state/mouth animation stuck on.
@@ -361,4 +548,12 @@ DynamicLibrary _openLibrary() {
   if (Platform.isMacOS) return DynamicLibrary.open('libchatvv_ffi.dylib');
   if (Platform.isWindows) return DynamicLibrary.open('chatvv_ffi.dll');
   throw UnsupportedError('TTS is not available on this platform');
+}
+
+
+class _SpeechChunk {
+  _SpeechChunk(this.text, this.file);
+
+  final String text;
+  final Future<String?>? file;
 }

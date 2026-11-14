@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -26,6 +27,7 @@ class EmbeddingEngine {
 
  private:
   mutable std::mutex mutex_;
+  std::atomic<bool> ready_{false};
   llama_model* model_ = nullptr;
   llama_context* context_ = nullptr;
   int dim_ = 0;

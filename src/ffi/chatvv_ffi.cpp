@@ -188,7 +188,7 @@ struct chatvv_engine {
   chatvv::InjectionStore injections;
   chatvv::ResponseHub hub;
   std::unique_ptr<chatvv::Provider> provider;
-  std::unique_ptr<chatvv::EmbeddingEngine> embedding;
+  std::shared_ptr<chatvv::EmbeddingEngine> embedding;
   std::unique_ptr<chatvv::DialogService> dialog;
   std::mutex subs_mu;
   std::vector<std::unique_ptr<chatvv_sub>> subs;
@@ -457,15 +457,23 @@ chatvv_engine* chatvv_create(const char* config_json, char** error_json) {
     engine->provider = chatvv::make_provider(engine->cfg);
     if (engine->cfg.embedding.enabled &&
         !engine->cfg.embedding.model.empty()) {
-      engine->embedding = std::make_unique<chatvv::EmbeddingEngine>();
-      std::string embedding_error;
-      if (!engine->embedding->load(engine->cfg.embedding.model,
-                                   engine->cfg.embedding.threads,
-                                   &embedding_error)) {
-        chatvv::log_warn("embedding.load_failed",
-                         {{"error", embedding_error}});
-        engine->embedding.reset();
-      }
+      engine->embedding = std::make_shared<chatvv::EmbeddingEngine>();
+      // Loading the GGUF model (and initialising the llama backends) takes
+      // hundreds of ms to seconds. It used to run on the Flutter UI thread
+      // inside chatvv_create, which could block input dispatching long enough
+      // for Android to show an ANR dialog. Load it in the background; memory
+      // retrieval simply skips semantic search until ready() is true.
+      auto embedding = engine->embedding;
+      const std::string model_path = engine->cfg.embedding.model;
+      const int embedding_threads = engine->cfg.embedding.threads;
+      std::thread([embedding, model_path, embedding_threads] {
+        std::string embedding_error;
+        if (!embedding->load(model_path, embedding_threads,
+                             &embedding_error)) {
+          chatvv::log_warn("embedding.load_failed",
+                           {{"error", embedding_error}});
+        }
+      }).detach();
     }
     engine->dialog = std::make_unique<chatvv::DialogService>(
         engine->cfg, *engine->db, engine->injections, engine->hub,
