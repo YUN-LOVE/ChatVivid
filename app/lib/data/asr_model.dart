@@ -14,10 +14,31 @@ import 'app_paths.dart';
 class WhisperModelStore {
   static const String fileName = 'ggml-base-q5_1.bin';
 
-  static const List<String> _downloadUrls = [
-    'https://hf-mirror.com/ggerganov/whisper.cpp/resolve/main/$fileName',
-    'https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$fileName',
-  ];
+  static const String _huggingFaceBase = 'https://huggingface.co';
+  static const String _repoPath = 'ggerganov/whisper.cpp/resolve/main';
+
+  /// Builds the download attempt list: mirror first (when enabled), then the
+  /// official Hugging Face URL as a fallback.
+  static List<String> downloadUrls({
+    bool useMirror = true,
+    String mirrorUrl = 'https://hf-mirror.com',
+  }) {
+    final urls = <String>[];
+    final mirror = mirrorUrl.trim();
+    if (useMirror && mirror.isNotEmpty) {
+      if (mirror.contains(fileName)) {
+        urls.add(mirror);
+      } else if (mirror.endsWith('.bin')) {
+        urls.add(mirror);
+      } else {
+        final base = mirror.replaceAll(RegExp(r'/+$'), '');
+        urls.add('$base/$_repoPath/$fileName');
+      }
+    }
+    final fallback = '$_huggingFaceBase/$_repoPath/$fileName';
+    if (!urls.contains(fallback)) urls.add(fallback);
+    return urls;
+  }
 
   static Future<String> defaultPath() async {
     final support = await appSupportDirectory();
@@ -31,6 +52,8 @@ class WhisperModelStore {
   static Future<String?> resolve({
     String overridePath = '',
     bool downloadIfMissing = false,
+    bool useMirror = true,
+    String mirrorUrl = 'https://hf-mirror.com',
     void Function(double progress, String label)? onProgress,
   }) async {
     final candidate = overridePath.trim().isNotEmpty
@@ -43,7 +66,7 @@ class WhisperModelStore {
     if (!downloadIfMissing) return null;
 
     final temp = File('${file.path}.part');
-    for (final url in _downloadUrls) {
+    for (final url in downloadUrls(useMirror: useMirror, mirrorUrl: mirrorUrl)) {
       try {
         onProgress?.call(0, '正在下载语音识别模型');
         await _download(url, temp, onProgress);

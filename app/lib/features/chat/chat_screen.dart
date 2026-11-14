@@ -578,6 +578,8 @@ class _ChatScreenState extends State<ChatScreen>
       final model = await WhisperModelStore.resolve(
         overridePath: widget.settings.asrModelPath,
         downloadIfMissing: true,
+        useMirror: widget.settings.whisperMirrorEnabled,
+        mirrorUrl: widget.settings.whisperMirrorUrl,
         onProgress: (progress, label) {
           if (!mounted || progress >= 1) return;
           _showMessage('$label ${(progress * 100).toStringAsFixed(0)}%');

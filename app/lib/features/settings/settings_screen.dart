@@ -483,12 +483,15 @@ class _SettingsDetailState extends State<SettingsDetail> {
       TextEditingController(text: _settings.ttsVoice);
   late final TextEditingController _asrModel =
       TextEditingController(text: _settings.asrModelPath);
+  late final TextEditingController _whisperMirror =
+      TextEditingController(text: _settings.whisperMirrorUrl);
   int _versionTaps = 0;
   DateTime? _lastVersionTap;
   TtsService? _ttsTest;
 
   List<TextEditingController> get _controllers => [
         _asrModel,
+        _whisperMirror,
         _apiKey,
         _model,
         _fullBase,
@@ -606,6 +609,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
       clientToken: _clientToken.text.trim(),
       systemPrompt: _systemPrompt.text.trim(),
       asrModelPath: _asrModel.text.trim(),
+      whisperMirrorUrl: _whisperMirror.text.trim(),
     );
   }
 
@@ -1401,7 +1405,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         ),
         SizedBox(height: 6),
         Text(
-          '首次语音输入会从 Hugging Face 镜像下载 ggml-base-q5_1.bin（约 57MB）。'
+          '首次语音输入会下载 ggml-base-q5_1.bin（约 57MB）。'
           '也可以把已有 ggml 模型路径填在这里。',
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.6),
@@ -1409,6 +1413,37 @@ class _SettingsDetailState extends State<SettingsDetail> {
             height: 1.4,
           ),
         ),
+        SizedBox(height: 6),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Text(
+            '使用镜像站下载模型',
+            style: TextStyle(color: AppColors.text, fontSize: 13),
+          ),
+          subtitle: Text(
+            '默认 hf-mirror，下载失败会自动尝试 Hugging Face 官方源',
+            style: TextStyle(color: AppColors.muted, fontSize: 10),
+          ),
+          value: settings.whisperMirrorEnabled,
+          onChanged: (value) => _updateSettings(
+            settings.copyWith(whisperMirrorEnabled: value),
+          ),
+        ),
+        if (settings.whisperMirrorEnabled)
+          TextField(
+            controller: _whisperMirror,
+            style: TextStyle(color: AppColors.text, fontSize: 12),
+            decoration: InputDecoration(
+              labelText: '镜像站 URL',
+              hintText: 'https://hf-mirror.com',
+              hintStyle: TextStyle(
+                color: AppColors.muted.withValues(alpha: 0.45),
+                fontSize: 11,
+              ),
+              isDense: true,
+            ),
+          ),
         SizedBox(height: 14),
         OutlinedButton.icon(
           onPressed: _testTts,

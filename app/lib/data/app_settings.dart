@@ -103,6 +103,8 @@ class AppSettings {
     required this.characterOffsetY,
     required this.glassStrength,
     required this.asrModelPath,
+    required this.whisperMirrorEnabled,
+    required this.whisperMirrorUrl,
   });
 
   factory AppSettings.defaults() {
@@ -140,6 +142,8 @@ class AppSettings {
       characterOffsetY: 0.0,
       glassStrength: 1.0,
       asrModelPath: '',
+      whisperMirrorEnabled: true,
+      whisperMirrorUrl: 'https://hf-mirror.com',
     );
   }
 
@@ -226,6 +230,10 @@ class AppSettings {
       glassStrength: (json['glass_strength'] as num?)?.toDouble() ??
           defaults.glassStrength,
       asrModelPath: (json['asr_model_path'] as String?) ?? '',
+      whisperMirrorEnabled:
+          (json['whisper_mirror_enabled'] as bool?) ?? true,
+      whisperMirrorUrl: (json['whisper_mirror_url'] as String?) ??
+          defaults.whisperMirrorUrl,
     );
   }
 
@@ -271,6 +279,12 @@ class AppSettings {
   /// download location (`<support>/models/whisper/ggml-base-q5_1.bin`).
   final String asrModelPath;
 
+  /// Download the Whisper model from a Hugging Face mirror when available.
+  final bool whisperMirrorEnabled;
+
+  /// Base URL used for the mirror (hf-mirror by default).
+  final String whisperMirrorUrl;
+
   Map<String, Object?> toJson() => {
         'mode': mode.wireName,
         'client_base_url': clientBaseUrl,
@@ -306,6 +320,8 @@ class AppSettings {
         'character_offset_y': characterOffsetY,
         'glass_strength': glassStrength,
         'asr_model_path': asrModelPath,
+        'whisper_mirror_enabled': whisperMirrorEnabled,
+        'whisper_mirror_url': whisperMirrorUrl,
       };
 
   AppSettings copyWith({
@@ -342,6 +358,8 @@ class AppSettings {
     double? characterOffsetY,
     double? glassStrength,
     String? asrModelPath,
+    bool? whisperMirrorEnabled,
+    String? whisperMirrorUrl,
   }) {
     return AppSettings(
       mode: mode ?? this.mode,
@@ -377,6 +395,8 @@ class AppSettings {
       characterOffsetY: characterOffsetY ?? this.characterOffsetY,
       glassStrength: glassStrength ?? this.glassStrength,
       asrModelPath: asrModelPath ?? this.asrModelPath,
+      whisperMirrorEnabled: whisperMirrorEnabled ?? this.whisperMirrorEnabled,
+      whisperMirrorUrl: whisperMirrorUrl ?? this.whisperMirrorUrl,
     );
   }
 
