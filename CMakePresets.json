@@ -108,6 +108,11 @@
       "output": { "outputOnFailure": true }
     },
     {
+      "name": "release",
+      "configurePreset": "release",
+      "output": { "outputOnFailure": true }
+    },
+    {
       "name": "linux-arm64",
       "configurePreset": "linux-arm64",
       "output": { "outputOnFailure": true }
