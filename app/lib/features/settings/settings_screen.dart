@@ -529,9 +529,13 @@ class _SettingsDetailState extends State<SettingsDetail> {
     }
     _lastVersionTap = now;
     _versionTaps += 1;
+    // Replace the in-flight hint instead of queueing one per tap: rapid taps
+    // used to leave stale "再连点 N 次" snackbars behind after enabling DEV.
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.clearSnackBars();
     if (_versionTaps < 7) {
       final remaining = 7 - _versionTaps;
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text('再连点 $remaining 次开启开发者模式'),
           duration: const Duration(milliseconds: 900),
@@ -542,7 +546,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
     _versionTaps = 0;
     final enabled = !_settings.developerMode;
     _updateSettings(_settings.copyWith(developerMode: enabled));
-    ScaffoldMessenger.of(context).showSnackBar(
+    messenger.showSnackBar(
       SnackBar(
         content: Text(enabled ? '开发者模式已开启' : '开发者模式已关闭'),
       ),
