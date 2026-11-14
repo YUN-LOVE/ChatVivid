@@ -71,6 +71,16 @@ android {
                 signingConfigs.getByName("debug")
             }
         }
+        // Flutter's Gradle plugin registers a `profile` build type. Sign it with
+        // the same unified key so a profile APK can replace a debug/release APK
+        // on a device (keeping user data) and CI artifacts stay installable.
+        maybeCreate("profile").apply {
+            signingConfig = if (hasUnifiedKey) {
+                signingConfigs.getByName("chatvv")
+            } else {
+                signingConfigs.getByName("debug")
+            }
+        }
     }
 }
 
