@@ -781,6 +781,15 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
         pipeline->pipeline = device->device.createComputePipeline(VK_NULL_HANDLE, compute_pipeline_create_info).value;
     } catch (const vk::SystemError& e) {
         GGML_LOG_ERROR("ggml_vulkan: compute pipeline creation failed for %s: %s\n", pipeline->name.c_str(), e.what());
+        // Adreno's Android driver refuses to build some optional shaders (e.g.
+        // mul_mat_vec_q8_0_f32_f32). When the MMVQ path is disabled via
+        // GGML_VK_DISABLE_MMVQ these pipelines are never selected, so treat
+        // their creation failure as non-fatal instead of aborting the whole
+        // Vulkan backend; required pipelines still throw.
+        if (pipeline->name.rfind("mul_mat_vec_", 0) == 0) {
+            GGML_LOG_WARN("ggml_vulkan: skipping optional MMVQ pipeline %s\n", pipeline->name.c_str());
+            return;
+        }
         throw;
     }
 
