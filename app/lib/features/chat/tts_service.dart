@@ -68,6 +68,7 @@ class TtsService {
   String _streamPending = '';
   String _streamReplyId = '';
   final List<_SpeechChunk> _streamChunks = [];
+  Future<void> _synthChain = Future<void>.value();
   Future<void>? _streamWorker;
 
   bool get streamActive => _streamActive;
@@ -178,7 +179,7 @@ class TtsService {
       _SpeechChunk(
         clean,
         _settings.ttsEngine == TtsEngine.edge
-            ? _synthesizeEdgeFile(clean)
+            ? _enqueueEdgeSynthesis(clean)
             : null,
       ),
     );
@@ -250,6 +251,25 @@ class TtsService {
     if (done != null && !done.isCompleted) done.complete();
   }
 
+  /// Edge TTS is a WebSocket service; firing one request per sentence
+  /// simultaneously triggers 403/empty responses. Chain them so at most one
+  /// synthesis is in flight while the previous sentence plays.
+  Future<String?> _enqueueEdgeSynthesis(String clean) {
+    final completer = Completer<String?>();
+    _synthChain = _synthChain.then((_) async {
+      if (!_streamActive) {
+        if (!completer.isCompleted) completer.complete(null);
+        return;
+      }
+      final path = await _synthesizeEdgeFile(clean);
+      if (!completer.isCompleted) completer.complete(path);
+    }).catchError((Object error) {
+      debugPrint('edge synth chain error: $error');
+      if (!completer.isCompleted) completer.complete(null);
+    });
+    return completer.future;
+  }
+
   Future<String?> _synthesizeEdgeFile(String clean) async {
     try {
       final dir = await Directory.systemTemp.createTemp('chatvv_tts_');
@@ -266,8 +286,14 @@ class TtsService {
       final error = await Isolate.run(
         () => _edgeSynthesize(clean, voice, options, path),
       );
-      if (error == null && File(path).existsSync()) return path;
-      debugPrint('Edge streaming TTS failed: $error');
+      final file = File(path);
+      if (error == null && file.existsSync() && file.lengthSync() > 0) {
+        return path;
+      }
+      debugPrint(
+        'Edge streaming TTS failed: error=$error '
+        'bytes=${file.existsSync() ? file.lengthSync() : -1}',
+      );
     } catch (error) {
       debugPrint('Edge streaming TTS exception: $error');
     }

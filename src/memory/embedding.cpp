@@ -122,6 +122,17 @@ bool EmbeddingEngine::load(const std::string& model_path, int threads,
   }
 
   llama_model_params model_params = llama_model_default_params();
+  // The embedding model is tiny and only used for memory indexing; keep it
+  // entirely on the CPU. Letting llama.cpp consider the Vulkan device (even
+  // with n_gpu_layers=0) made ggml create Vulkan compute pipelines for the
+  // context, which fails on this Android loader/driver combination with
+  // "vk::Device::createComputePipeline: ErrorUnknown" and aborted memory
+  // embedding on every turn.
+  static ggml_backend_dev_t cpu_devices[2] = {nullptr, nullptr};
+  cpu_devices[0] = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
+  if (cpu_devices[0] != nullptr) {
+    model_params.devices = cpu_devices;
+  }
   model_params.n_gpu_layers = 0;
   model_ = llama_model_load_from_file(model_path.c_str(), model_params);
   if (!model_) {
