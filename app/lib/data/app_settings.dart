@@ -148,10 +148,17 @@ class AppSettings {
     // else the user explicitly chose.
     final settingsVersion = (json['settings_version'] as num?)?.toInt() ?? 1;
     var storedVoice = (json['tts_voice'] as String?) ?? '';
+    const edgeVoicePattern = r'^[a-z]{2,3}-[A-Z]{2}-[A-Za-z0-9]+Neural$';
+    final looksLikeEdgeVoice =
+        RegExp(edgeVoicePattern).hasMatch(storedVoice.trim());
     if (settingsVersion < 2 &&
         (storedVoice.isEmpty ||
             storedVoice == 'zh-CN-XiaoxiaoNeural' ||
             storedVoice == 'zh-CN-XiaomengNeural')) {
+      storedVoice = defaults.ttsVoice;
+    } else if (storedVoice.isNotEmpty && !looksLikeEdgeVoice) {
+      // Leftover from a half-typed custom voice field (e.g. "z"): fall back to
+      // the default instead of sending garbage to the service forever.
       storedVoice = defaults.ttsVoice;
     }
     return AppSettings(
