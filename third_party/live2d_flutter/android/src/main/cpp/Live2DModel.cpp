@@ -358,14 +358,19 @@ void Live2DModel::SetParameterTarget(const Csm::csmChar* parameterId,
                                      Csm::csmFloat32 target, Csm::csmFloat32 speed)
 {
     if (!parameterId || !*parameterId) return;
-    auto& value = _parameterTargets[parameterId];
+    const Csm::csmString key(parameterId);
+    const bool existed = _parameterTargets.IsExist(key);
+    auto& value = _parameterTargets[key];
     value.target = target;
     value.speed = speed;
     if (value.speed <= 0.0f) value.speed = 8.0f;
-    // Keep the current interpolated value; only initialise it lazily in Update
-    // (SetParameterTarget can run before the model finishes loading parameters).
-    value.current = 0.0f;
-    value.initialized = false;
+    if (!existed) {
+        // Only the first call initialises the interpolation state. Resetting
+        // `current` on every Dart tick (12-15 Hz) restarted the lerp from the
+        // base value each time, which visibly twitched the gaze/tail/mouth.
+        value.current = 0.0f;
+        value.initialized = false;
+    }
 }
 
 void Live2DModel::SetMotionSpeed(Csm::csmFloat32 speed)
