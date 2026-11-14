@@ -31,39 +31,54 @@ try {
   flutter pub get
   dart run rive_native:setup --verbose -p windows
 
-  # rive_native's setup downloads the prebuilt libs into the pub-cache package
-  # (windows/bin/lib/<config>) and copies them into
-  # app/build/rive_native/native/build/windows/bin. A cold pub cache can still
-  # leave the path read by the plugin CMake
-  # (windows/flutter/ephemeral/.plugin_symlinks/rive_native/windows/bin) without
-  # lib/release/rive_native.lib (fresh-runner LNK1181). Locate the libs anywhere
-  # under the app build dir and copy them into every candidate plugin path,
-  # preserving their relative path so the CMake layout stays correct.
-  $RiveBuild = "$Root\app\build\rive_native\native\build\windows\bin"
-  if (Test-Path $RiveBuild) {
-    $RiveFiles = Get-ChildItem -Path $RiveBuild -Recurse -File -ErrorAction SilentlyContinue
-    Write-Host "rive_native build dir: $RiveBuild"
-    foreach ($f in $RiveFiles) {
-      Write-Host "  found: $($f.FullName)"
-    }
-    $RiveTargets = @()
-    $PubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
-    Get-ChildItem -Path (Join-Path $PubCache "hosted\pub.dev") -Directory -Filter "rive_native-*" -ErrorAction SilentlyContinue | ForEach-Object {
-      $RiveTargets += (Join-Path $_.FullName "windows\bin")
-    }
-    $RiveTargets += "$Root\app\windows\flutter\ephemeral\.plugin_symlinks\rive_native\windows\bin"
-    foreach ($RivePkgBin in $RiveTargets) {
-      if (!(Test-Path (Join-Path $RivePkgBin "lib\release\rive_native.lib"))) {
-        Write-Host "repairing rive_native windows libs: $RivePkgBin"
-        New-Item -ItemType Directory -Force -Path $RivePkgBin | Out-Null
-        foreach ($f in $RiveFiles) {
-          $rel = $f.FullName.Substring($RiveBuild.Length).TrimStart('\')
-          $dst = Join-Path $RivePkgBin $rel
-          New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
-          Copy-Item $f.FullName $dst -Force
-        }
+  # rive_native's setup is supposed to download the prebuilt libs into the
+  # pub-cache package (windows/bin/lib/<config>) and copy them into the app
+  # build dir. On cold GitHub runners that download/unzip can end up empty and
+  # the plugin link then fails with LNK1181 rive_native.lib. Fetch the artifacts
+  # ourselves in that case (explicit URL from the package version.txt) and copy
+  # them into every location the plugin/build may read.
+  function Copy-RiveTree([string]$Src, [string]$Dst) {
+    New-Item -ItemType Directory -Force -Path $Dst | Out-Null
+    Get-ChildItem -Path $Src -Recurse -Force | ForEach-Object {
+      $rel = $_.FullName.Substring($Src.Length).TrimStart('\')
+      $target = Join-Path $Dst $rel
+      if ($_.PSIsContainer) {
+        New-Item -ItemType Directory -Force -Path $target | Out-Null
+      } else {
+        New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
+        Copy-Item $_.FullName $target -Force
       }
-      Write-Host "rive lib present at $RivePkgBin : $(Test-Path (Join-Path $RivePkgBin "lib\release\rive_native.lib"))"
+    }
+  }
+
+  $PubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
+  $RivePkg = Get-ChildItem -Path (Join-Path $PubCache "hosted\pub.dev") -Directory -Filter "rive_native-*" -ErrorAction SilentlyContinue | Sort-Object Name -Descending | Select-Object -First 1
+  if ($RivePkg -ne $null) {
+    $RivePkgBin = Join-Path $RivePkg.FullName "windows\bin"
+    $RiveLib = Join-Path $RivePkgBin "lib\release\rive_native.lib"
+    Write-Host "rive_native package: $($RivePkg.FullName)"
+    Write-Host "rive lib before repair: $(Test-Path $RiveLib)"
+    if (!(Test-Path $RiveLib)) {
+      $RiveVersion = (Get-Content (Join-Path $RivePkg.FullName "version.txt")).Trim()
+      $RiveUrl = "https://rive-flutter-artifacts.rive.app/rive_native_versions/$([Uri]::EscapeDataString($RiveVersion))/rive_native_artifacts_windows.zip"
+      Write-Host "downloading rive_native artifacts: $RiveUrl"
+      $RiveZip = Join-Path $env:TEMP "rive_native_windows_artifacts.zip"
+      Invoke-WebRequest -Uri $RiveUrl -OutFile $RiveZip -UseBasicParsing
+      New-Item -ItemType Directory -Force -Path $RivePkgBin | Out-Null
+      Expand-Archive -Path $RiveZip -DestinationPath $RivePkgBin -Force
+      Remove-Item $RiveZip -Force
+      Write-Host "rive lib after download: $(Test-Path $RiveLib)"
+    }
+    # The Flutter plugin reads the pub-cache package path; also keep the app
+    # build dir (used by flutter test) and the ephemeral plugin copy in sync.
+    $RiveBuild = "$Root\app\build\rive_native\native\build\windows\bin"
+    $RiveEph = "$Root\app\windows\flutter\ephemeral\.plugin_symlinks\rive_native\windows\bin"
+    foreach ($Target in @($RiveBuild, $RiveEph)) {
+      if (!(Test-Path (Join-Path $Target "lib\release\rive_native.lib"))) {
+        Write-Host "repairing rive_native libs: $Target"
+        Copy-RiveTree $RivePkgBin $Target
+      }
+      Write-Host "rive lib present at $Target : $(Test-Path (Join-Path $Target "lib\release\rive_native.lib"))"
     }
   }
 
