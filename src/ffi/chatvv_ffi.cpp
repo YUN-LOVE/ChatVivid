@@ -448,6 +448,9 @@ CHATVV_API int32_t chatvv_tts_synthesize_opts(
 
 chatvv_engine* chatvv_create(const char* config_json, char** error_json) {
   if (error_json) *error_json = nullptr;
+  // Must run before any llama_backend_init()/Vulkan device init; the embedding
+  // model loads on a background thread created later in this function.
+  configure_llama_vulkan_environment();
   if (!config_json) {
     set_error(error_json, "invalid_argument", "config_json is required");
     return nullptr;
