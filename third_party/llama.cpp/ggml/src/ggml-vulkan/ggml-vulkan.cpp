@@ -781,15 +781,6 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
         pipeline->pipeline = device->device.createComputePipeline(VK_NULL_HANDLE, compute_pipeline_create_info).value;
     } catch (const vk::SystemError& e) {
         GGML_LOG_ERROR("ggml_vulkan: compute pipeline creation failed for %s: %s\n", pipeline->name.c_str(), e.what());
-        // Adreno's Android driver refuses to build some optional shaders (e.g.
-        // mul_mat_vec_q8_0_f32_f32). When the MMVQ path is disabled via
-        // GGML_VK_DISABLE_MMVQ these pipelines are never selected, so treat
-        // their creation failure as non-fatal instead of aborting the whole
-        // Vulkan backend; required pipelines still throw.
-        if (pipeline->name.rfind("mul_mat_vec_", 0) == 0) {
-            GGML_LOG_WARN("ggml_vulkan: skipping optional MMVQ pipeline %s\n", pipeline->name.c_str());
-            return;
-        }
         throw;
     }
 
@@ -2933,6 +2924,14 @@ void ggml_vk_load_shaders(vk_device& device, vk_pipeline requested) {
 #define OCP_DMMV_DATA(NAME, REDUC) NAME ## _data[REDUC]
 #endif
 
+    // Adreno's Android driver cannot create some of the q8_0 dequant mat-vec
+    // compute pipelines (vk::Device::createComputePipeline: ErrorUnknown).
+    // When MMVQ is disabled (GGML_VK_DISABLE_MMVQ) these shaders are never
+    // selected, so do not even compile them; this keeps the whole Vulkan
+    // backend usable instead of aborting at startup.
+    if (device->mmvq_mode == -1) {
+        GGML_LOG_DEBUG("ggml_vulkan: MMVQ disabled; skipping dequant mul-mat-vec shaders\n");
+    } else {
     for (uint32_t w = 0; w < DMMV_WG_SIZE_COUNT; ++w) {
         const uint32_t wg_size_subgroup   = (w == DMMV_WG_SIZE_SUBGROUP) ? subgroup_size : (subgroup_size * 4);
         const uint32_t wg_size_subgroup16 = (w == DMMV_WG_SIZE_SUBGROUP) ? subgroup_size16 : (subgroup_size16 * 4);
@@ -3086,6 +3085,7 @@ void ggml_vk_load_shaders(vk_device& device, vk_pipeline requested) {
             ggml_vk_create_pipeline(device, device->pipeline_dequant_mul_mat_vec_id_q8_1_f32[w][GGML_TYPE_IQ4_XS], "mul_mat_vec_id_iq4_xs_q8_1_f32", arr_dmmv_id_iq4_xs_q8_1_f32_len[reduc], arr_dmmv_id_iq4_xs_q8_1_f32_data[reduc], "main", mul_mat_vec_id_num_bindings, sizeof(vk_mat_vec_id_push_constants), {rm_id(1*rm_stdq_int), 1, 1}, {wg_size_subgroup_int, rm_id(1*rm_stdq_int)}, 1, true, use_subgroups, subgroup_size_int);
         }
 #endif // GGML_VULKAN_INTEGER_DOT_GLSLC_SUPPORT
+    }
     }
 
 #undef OCP_DMMV_DATA
