@@ -13,6 +13,7 @@ import '../../data/skill.dart';
 import '../../data/prompt_injection.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
+import '../../theme/haptics.dart';
 import '../chat/file_upload_service.dart';
 import '../chat/tts_service.dart';
 import 'injection_editor.dart';
@@ -26,10 +27,17 @@ class SettingsScreen extends StatefulWidget {
     super.key,
     required this.settings,
     required this.backend,
+    this.onChanged,
   });
 
   final AppSettings settings;
   final ChatBackend backend;
+
+  /// Called for every edit (live), so settings (including TTS / layout fields
+  /// that don't recreate the chat) are persisted without a pop result. This
+  /// also keeps the route a normal pop-able route so Android predictive-back
+  /// animation works.
+  final ValueChanged<AppSettings>? onChanged;
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -106,20 +114,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _apply(AppSettings next) {
     setState(() => _settings = next);
+    widget.onChanged?.call(next);
   }
 
   void _close() {
-    Navigator.of(context).pop(_settings);
+    AppHaptics.selection();
+    Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _close();
-      },
-      child: Scaffold(
+    return Scaffold(
         backgroundColor: AppColors.backgroundTop,
         body: DecoratedBox(
           decoration: BoxDecoration(
@@ -161,18 +166,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             )
                           : _CategoryList(
                               settings: _settings,
-                              onOpen: (index) async {
-                                final result = await Navigator.of(context)
-                                    .push<AppSettings>(
+                              onOpen: (index) {
+                                AppHaptics.light();
+                                Navigator.of(context).push(
                                   MaterialPageRoute(
                                     builder: (_) => SettingsDetailPage(
                                       category: _categories[index],
                                       settings: _settings,
                                       backend: widget.backend,
+                                      onChanged: _apply,
                                     ),
                                   ),
                                 );
-                                if (result != null) _apply(result);
                               },
                             ),
                     ),
@@ -182,7 +187,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }
@@ -404,48 +408,38 @@ class _CategoryTile extends StatelessWidget {
   }
 }
 
-class SettingsDetailPage extends StatefulWidget {
+class SettingsDetailPage extends StatelessWidget {
   SettingsDetailPage({
     super.key,
     required this.category,
     required this.settings,
     required this.backend,
+    required this.onChanged,
   });
 
   final SettingsCategory category;
   final AppSettings settings;
   final ChatBackend backend;
-
-  @override
-  State<SettingsDetailPage> createState() => _SettingsDetailPageState();
-}
-
-class _SettingsDetailPageState extends State<SettingsDetailPage> {
-  late AppSettings _draft = widget.settings;
-
-  void _close() {
-    Navigator.of(context).pop(_draft);
-  }
+  final ValueChanged<AppSettings> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop) _close();
-      },
-      child: Scaffold(
-        backgroundColor: AppColors.backgroundTop,
-        appBar: AppBar(
-          title: Text(widget.category.title),
-          leading: BackButton(onPressed: _close),
+    return Scaffold(
+      backgroundColor: AppColors.backgroundTop,
+      appBar: AppBar(
+        title: Text(category.title),
+        leading: BackButton(
+          onPressed: () {
+            AppHaptics.selection();
+            Navigator.of(context).pop();
+          },
         ),
-        body: SettingsDetail(
-          category: widget.category,
-          settings: widget.settings,
-          backend: widget.backend,
-          onChanged: (next) => setState(() => _draft = next),
-        ),
+      ),
+      body: SettingsDetail(
+        category: category,
+        settings: settings,
+        backend: backend,
+        onChanged: onChanged,
       ),
     );
   }
@@ -517,6 +511,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   void _updateSettings(AppSettings next) {
+    AppHaptics.selection();
     setState(() => _settings = next);
     widget.onChanged(next);
   }
@@ -529,6 +524,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
     }
     _lastVersionTap = now;
     _versionTaps += 1;
+    AppHaptics.selection();
     // Replace the in-flight hint instead of queueing one per tap: rapid taps
     // used to leave stale "再连点 N 次" snackbars behind after enabling DEV.
     final messenger = ScaffoldMessenger.of(context);
@@ -545,6 +541,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
     }
     _versionTaps = 0;
     final enabled = !_settings.developerMode;
+    AppHaptics.medium();
     _updateSettings(_settings.copyWith(developerMode: enabled));
     messenger.showSnackBar(
       SnackBar(
@@ -554,6 +551,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   void _openSessionLog() {
+    AppHaptics.light();
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SessionLogScreen(
@@ -565,6 +563,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
   }
 
   Future<void> _testTts() async {
+    AppHaptics.light();
     final tts = _ttsTest ??= TtsService();
     tts.applySettings(_settings);
     await tts.init();
@@ -1206,7 +1205,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         ),
         SizedBox(height: 18),
         _ttsSlider(
-          label: '打字机速度',
+          label: '水墨显现速度',
           value: _settings.typewriterSpeed,
           min: 0.5,
           max: 3.0,
@@ -1216,7 +1215,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
               _updateSettings(_settings.copyWith(typewriterSpeed: value)),
         ),
         Text(
-          '仅影响流式回复的逐字显示速度（1.0× = 45 字/秒）。',
+          '仅影响聊天输出框的水墨晕染速度（数值越大晕染越快）。',
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.6),
             fontSize: 10,
@@ -1261,7 +1260,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
             controller: _ttsVoice,
             style: TextStyle(color: AppColors.text, fontSize: 13),
             decoration: InputDecoration(
-              hintText: 'zh-CN-XiaoxiaoNeural',
+              hintText: 'zh-CN-XiaomengNeural',
               hintStyle: TextStyle(
                 color: AppColors.muted.withValues(alpha: 0.45),
                 fontSize: 12,
@@ -1277,7 +1276,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           ),
           SizedBox(height: 4),
           Text(
-            '填 Microsoft Edge 音色短名，例如 zh-CN-XiaoxiaoNeural；留空使用默认音色。',
+            '填 Microsoft Edge 音色短名，例如 zh-CN-XiaomengNeural；留空使用默认音色。',
             style: TextStyle(
               color: AppColors.muted.withValues(alpha: 0.6),
               fontSize: 10,
@@ -1298,9 +1297,9 @@ class _SettingsDetailState extends State<SettingsDetail> {
         _ttsSlider(
           label: '语速',
           value: settings.ttsRate,
-          min: 0.5,
+          min: 0.3,
           max: 2.0,
-          divisions: 15,
+          divisions: 17,
           format: (value) => '${value.toStringAsFixed(2)}×',
           onChanged: (value) =>
               _updateSettings(settings.copyWith(ttsRate: value)),

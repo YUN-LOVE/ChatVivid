@@ -247,6 +247,16 @@ void Live2DModel::Update()
     if (_pose)
         _pose->UpdateParameters(_model, deltaTime);
 
+    // App-side parameter overrides (gaze/blink/mouth/tail via setParameter).
+    // Applied last so motion, drag look-at, eye blink and physics cannot
+    // overwrite them before the model parameters are baked into drawables.
+    for (auto it = _parameterOverrides.Begin(); it != _parameterOverrides.End(); ++it)
+    {
+        const CubismId* id =
+            CubismFramework::GetIdManager()->GetId(it->First.GetRawString());
+        _model->SetParameterValue(id, it->Second);
+    }
+
     _model->Update();
 }
 
@@ -311,8 +321,10 @@ void Live2DModel::ResizeMaskBuffer(int width, int height)
 
 void Live2DModel::SetParameterValue(const Csm::csmChar* parameterId, Csm::csmFloat32 value)
 {
-    const CubismId* id = CubismFramework::GetIdManager()->GetId(parameterId);
-    _model->SetParameterValue(id, value);
+    if (!parameterId || !*parameterId) return;
+    // Store instead of writing immediately: Update() would overwrite the value
+    // from the playing motion/physics before Draw().
+    _parameterOverrides[parameterId] = value;
 }
 
 void Live2DModel::SetMotionSpeed(Csm::csmFloat32 speed)

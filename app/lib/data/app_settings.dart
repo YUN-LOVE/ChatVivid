@@ -124,7 +124,7 @@ class AppSettings {
       agentEnabled: false,
       onboardingComplete: false,
       ttsEngine: TtsEngine.edge,
-      ttsVoice: 'zh-CN-XiaoxiaoNeural',
+      ttsVoice: 'zh-CN-XiaomengNeural',
       ttsRate: 1.0,
       ttsPitchHz: 0,
       ttsVolume: 1.0,

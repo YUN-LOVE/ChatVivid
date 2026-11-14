@@ -111,7 +111,7 @@ class TtsService {
         'volume': _edgeVolume(settings.ttsVolume),
       });
       final voice = settings.ttsVoice.trim().isEmpty
-          ? 'zh-CN-XiaoxiaoNeural'
+          ? 'zh-CN-XiaomengNeural'
           : settings.ttsVoice.trim();
       final error = await Isolate.run(
         () => _edgeSynthesize(clean, voice, options, path),
@@ -207,8 +207,17 @@ class TtsService {
     return 'zh-CN';
   }
 
-  /// UI rate multiplier (0.5–2.0, 1.0 = normal) to read_aloud's relative rate.
-  double _edgeRate(double rate) => (rate - 1.0).clamp(-0.9, 1.0);
+  /// UI rate multiplier (0.3–2.0, 1.0 = service default) to read_aloud's
+  /// relative rate in -1..1. The down side is stretched so 0.5 is clearly
+  /// slower instead of barely noticeable.
+  double _edgeRate(double rate) {
+    if (rate < 1.0) {
+      // 1.0 -> 0.0, 0.3 -> -1.0
+      return ((rate - 1.0) / 0.7).clamp(-1.0, 0.0);
+    }
+    // 1.0 -> 0.0, 2.0 -> +0.9
+    return ((rate - 1.0) * 0.9).clamp(0.0, 1.0);
+  }
 
   /// UI volume (0–1) to read_aloud's relative volume offset.
   double _edgeVolume(double volume) => (volume - 1.0).clamp(-1.0, 0.0);

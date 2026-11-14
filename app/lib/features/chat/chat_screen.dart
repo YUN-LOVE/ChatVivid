@@ -12,6 +12,7 @@ import '../../data/prompt_injection.dart';
 import '../settings/settings_screen.dart';
 import '../../theme/app_theme.dart';
 import '../../theme/glass.dart';
+import '../../theme/haptics.dart';
 import '../character/character_stage.dart';
 import 'chat_attachment.dart';
 import 'markdown_message.dart';
@@ -101,6 +102,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   void _setEditMode(bool value) {
+    AppHaptics.selection();
     setState(() {
       _editMode = value;
       if (value) {
@@ -124,6 +126,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Future<void> _onCharacterScaleEnd(ScaleEndDetails details) async {
+    AppHaptics.light();
     await widget.onSettingsChanged(
       widget.settings.copyWith(
         characterScale: _editScale,
@@ -233,6 +236,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   void _removeAttachment(int index) {
+    AppHaptics.selection();
     setState(() => _attachments.removeAt(index));
   }
 
@@ -242,6 +246,7 @@ class _ChatScreenState extends State<ChatScreen>
     final attachments = List<ChatAttachment>.of(_attachments);
     final text = _input.text.trim();
     if (text.isEmpty && attachments.isEmpty) return;
+    AppHaptics.light();
     final injections = <PromptInjection>[
       for (var i = 0; i < attachments.length; i++)
         PromptInjection(
@@ -268,19 +273,20 @@ class _ChatScreenState extends State<ChatScreen>
   Future<void> _openSettings() async {
     final chat = _chat;
     if (chat == null) return;
-    final updated = await Navigator.of(context).push<AppSettings>(
+    AppHaptics.light();
+    await Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => SettingsScreen(
           settings: widget.settings,
           backend: chat.api,
+          // Live persistence: TTS / layout fields are excluded from cacheKey
+          // (they must not recreate the chat) so they need this callback.
+          onChanged: (updated) {
+            unawaited(widget.onSettingsChanged(updated));
+          },
         ),
       ),
     );
-    if (!mounted || updated == null) return;
-    await chat.initialize();
-    if (updated.cacheKey != widget.settings.cacheKey) {
-      await widget.onSettingsChanged(updated);
-    }
   }
 
   bool _onHardwareKey(KeyEvent event) {
@@ -360,6 +366,7 @@ class _ChatScreenState extends State<ChatScreen>
 
   void _onHistoryDragEnd() {
     if (_historyOpen) return;
+    if (_drawer.value >= 0.22) AppHaptics.selection();
     _settleDrawer(open: _drawer.value >= 0.22);
   }
 
@@ -370,11 +377,13 @@ class _ChatScreenState extends State<ChatScreen>
 
   void _onHistoryCloseDragEnd() {
     if (!_historyOpen) return;
+    if (_drawer.value <= 0.72) AppHaptics.selection();
     _settleDrawer(open: _drawer.value > 0.72);
   }
 
   void _setLive(bool value) {
     if (_liveMode == value) return;
+    AppHaptics.medium();
     setState(() => _liveMode = value);
     if (value) {
       _livePulse.repeat();
@@ -385,12 +394,14 @@ class _ChatScreenState extends State<ChatScreen>
 
   void _startVoice() {
     if (_voiceActive || _liveMode) return;
+    AppHaptics.light();
     setState(() => _voiceActive = true);
     _showMessage('语音输入已开启：X-ASR / Whisper 模型接入中');
   }
 
   void _stopVoice() {
     if (!_voiceActive) return;
+    AppHaptics.selection();
     setState(() => _voiceActive = false);
   }
 
@@ -428,6 +439,7 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Future<void> _toggleSpeech() async {
+    AppHaptics.light();
     if (_tts.speaking.value) {
       await _tts.stop();
     } else {
@@ -460,7 +472,24 @@ class _ChatScreenState extends State<ChatScreen>
         onRetry: _bootstrap,
       );
     }
-    return Scaffold(
+    final overlayOpen =
+        _historyOpen || _editMode || _liveMode || _voiceActive;
+    return PopScope(
+      canPop: !overlayOpen,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_historyOpen) {
+          AppHaptics.selection();
+          unawaited(_closeHistory());
+        } else if (_editMode) {
+          _setEditMode(false);
+        } else if (_liveMode) {
+          _setLive(false);
+        } else if (_voiceActive) {
+          _stopVoice();
+        }
+      },
+      child: Scaffold(
       // The stage must not resize when the soft keyboard opens. The composer
       // is lifted manually below using MediaQuery.viewInsets.
       resizeToAvoidBottomInset: false,
@@ -626,6 +655,7 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ),
         ],
+        ),
       ),
     );
   }
@@ -978,9 +1008,10 @@ class _EditModeBar extends StatelessWidget {
 
 /// Bottom-of-stage chat output card.
 ///
-/// Shows the latest reply with the configured typewriter effect (this is the
-/// "chat box"; the history drawer renders complete messages immediately) and a
-/// subtle gaussian blur so the text sits on the glass surface.
+/// The reply is revealed with a layered gaussian-blur "ink bleed": instead of
+/// popping character by character, the newly arrived text appears through two
+/// blurred copies that fade while the sharp layer settles in. The panel uses
+/// the premium (HyperOS-like) glass material.
 class _DialogueCard extends StatefulWidget {
   _DialogueCard({
     required this.text,
@@ -994,6 +1025,8 @@ class _DialogueCard extends StatefulWidget {
   final String text;
   final bool collapsed;
   final bool speaking;
+
+  /// Reused as the ink-reveal speed multiplier (0.5 = slower bloom).
   final double typewriterSpeed;
   final VoidCallback onSpeak;
   final VoidCallback onToggle;
@@ -1002,83 +1035,87 @@ class _DialogueCard extends StatefulWidget {
   State<_DialogueCard> createState() => _DialogueCardState();
 }
 
-class _DialogueCardState extends State<_DialogueCard> {
-  Timer? _timer;
-  String _visible = '';
+class _DialogueCardState extends State<_DialogueCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ink = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
+    value: 1.0,
+  );
 
   @override
   void initState() {
     super.initState();
-    // Existing text (e.g. the last reply when the screen opens) is shown
-    // immediately; only new streaming content is typed out.
-    _visible = widget.text;
+    _ink.value = 1.0;
   }
 
   @override
   void didUpdateWidget(covariant _DialogueCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.text == oldWidget.text) return;
-    if (!widget.text.startsWith(_visible)) {
-      // A different reply replaced the current one: restart from the beginning.
-      _visible = '';
+    if (widget.text.isEmpty) {
+      _ink.value = 1.0;
+      return;
     }
-    _startTimer();
+    final duration = Duration(
+      milliseconds: (460 / widget.typewriterSpeed.clamp(0.2, 4.0)).round(),
+    );
+    _ink.duration = duration;
+    // Keep a residual bloom while tokens keep streaming in; the last chunk
+    // settles to sharp over the full duration.
+    _ink.forward(from: _ink.value > 0.18 ? 0.18 : 0.0);
   }
-
-  double get _speed => widget.typewriterSpeed.clamp(0.2, 4.0);
-
-  void _startTimer() {
-    if (_timer != null) return;
-    final intervalMs = (1000.0 / (90.0 * _speed)).round().clamp(8, 160);
-    _timer = Timer.periodic(Duration(milliseconds: intervalMs), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        _timer = null;
-        return;
-      }
-      final target = widget.text;
-      if (!target.startsWith(_visible)) _visible = '';
-      if (_visible.length >= target.length) {
-        if (_visible != target) setState(() => _visible = target);
-        timer.cancel();
-        _timer = null;
-        return;
-      }
-      final lag = target.length - _visible.length;
-      // Catch up when the network streams faster than the typewriter so the
-      // card never trails far behind the real text.
-      var step = 1 + (lag > 24 ? 1 : 0) + (lag > 60 ? 3 : 0);
-      if (_speed >= 2.0) step += 1;
-      var nextLen = ( _visible.length + step ).clamp(0, target.length);
-      if (nextLen < target.length &&
-          nextLen > 0 &&
-          _isHighSurrogate(target.codeUnitAt(nextLen - 1))) {
-        nextLen = (nextLen + 1).clamp(0, target.length);
-      }
-      setState(() => _visible = target.substring(0, nextLen));
-    });
-  }
-
-  bool _isHighSurrogate(int codeUnit) =>
-      codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _ink.dispose();
     super.dispose();
+  }
+
+  TextStyle _textStyle() => TextStyle(
+        color: widget.speaking
+            ? AppColors.primary
+            : AppColors.onPrimaryContainer,
+        fontSize: 12.5,
+        height: 1.55,
+      );
+
+  Widget _blurLayer({
+    required String text,
+    required double sigma,
+    required double opacity,
+  }) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Opacity(
+          opacity: opacity,
+          child: ImageFiltered(
+            imageFilter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+            child: Align(
+              alignment: Alignment.topLeft,
+              child: Text(
+                text,
+                maxLines: 4,
+                overflow: TextOverflow.ellipsis,
+                style: _textStyle(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final revealing = _timer != null && _visible.length < widget.text.length;
-    final display = '$_visible${revealing ? '▍' : ''}';
     return AnimatedSize(
-      duration: Duration(milliseconds: 240),
+      duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
       alignment: Alignment.topCenter,
       child: GlassPanel(
         radius: 16,
         blur: 18,
+        premium: true,
         padding: EdgeInsets.zero,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxHeight: widget.collapsed ? 28 : 156),
@@ -1089,7 +1126,7 @@ class _DialogueCardState extends State<_DialogueCard> {
                 height: 28,
                 child: Row(
                   children: [
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Container(
                       width: 3,
                       height: 12,
@@ -1098,7 +1135,7 @@ class _DialogueCardState extends State<_DialogueCard> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Text(
                       '大肥鱼',
                       style: TextStyle(
@@ -1108,7 +1145,7 @@ class _DialogueCardState extends State<_DialogueCard> {
                         letterSpacing: 0.8,
                       ),
                     ),
-                    Spacer(),
+                    const Spacer(),
                     IconButton(
                       onPressed: widget.onSpeak,
                       padding: EdgeInsets.zero,
@@ -1124,7 +1161,7 @@ class _DialogueCardState extends State<_DialogueCard> {
                         color: AppColors.primary,
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     GestureDetector(
                       onTap: widget.onToggle,
                       child: Icon(
@@ -1135,35 +1172,50 @@ class _DialogueCardState extends State<_DialogueCard> {
                         color: AppColors.muted,
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                   ],
                 ),
               ),
               if (!widget.collapsed)
                 Flexible(
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(14, 0, 14, 10),
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
                     child: Align(
                       alignment: Alignment.topLeft,
-                      // heightFactor: 1 keeps the card as short as its content.
                       heightFactor: 1,
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: widget.speaking ? 0.35 : 0.18,
-                          sigmaY: widget.speaking ? 0.35 : 0.18,
-                        ),
-                        child: Text(
-                          display,
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: widget.speaking
-                                ? AppColors.primary
-                                : AppColors.onPrimaryContainer,
-                            fontSize: 12.5,
-                            height: 1.55,
-                          ),
-                        ),
+                      child: AnimatedBuilder(
+                        animation: _ink,
+                        builder: (context, _) {
+                          final t = Curves.easeOutCubic.transform(_ink.value);
+                          final bloom = 1.0 - t;
+                          return Stack(
+                            alignment: Alignment.topLeft,
+                            children: [
+                              Text(
+                                widget.text,
+                                maxLines: 4,
+                                overflow: TextOverflow.ellipsis,
+                                style: _textStyle().copyWith(
+                                  color: (_textStyle().color ??
+                                          AppColors.onPrimaryContainer)
+                                      .withValues(alpha: 0.62 + 0.38 * t),
+                                ),
+                              ),
+                              if (bloom > 0.02) ...[
+                                _blurLayer(
+                                  text: widget.text,
+                                  sigma: 6.5 * bloom + 0.8,
+                                  opacity: 0.34 * bloom,
+                                ),
+                                _blurLayer(
+                                  text: widget.text,
+                                  sigma: 2.4 * bloom + 0.4,
+                                  opacity: 0.5 * bloom,
+                                ),
+                              ],
+                            ],
+                          );
+                        },
                       ),
                     ),
                   ),
@@ -1526,7 +1578,8 @@ class _Composer extends StatelessWidget {
               children: [
                 GlassPanel(
                   radius: 28,
-                  blur: 24,
+                  blur: 26,
+                  premium: true,
                   padding: EdgeInsets.fromLTRB(8, 6, 6, 2),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,

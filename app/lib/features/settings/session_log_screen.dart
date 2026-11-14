@@ -9,6 +9,7 @@ import '../../data/app_settings.dart';
 import '../../data/chat_backend.dart';
 import '../../data/memory_entry.dart';
 import '../../theme/app_theme.dart';
+import '../../theme/haptics.dart';
 import '../chat/chat_models.dart';
 
 /// Developer-mode diagnostics.
@@ -144,10 +145,12 @@ class _SessionLogScreenState extends State<SessionLogScreen>
   }
 
   Future<void> _refresh() async {
+    AppHaptics.light();
     await Future.wait([_loadLog(), _loadHistory(), _loadContext()]);
   }
 
   Future<void> _copyLog() async {
+    AppHaptics.medium();
     await Clipboard.setData(ClipboardData(text: _log));
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

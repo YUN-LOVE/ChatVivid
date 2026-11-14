@@ -60,3 +60,19 @@ Report the two packaging bugs upstream. Once a fixed version is published:
 delete this directory, point `app/pubspec.yaml` back at
 `live2d_flutter: ^x.y.z`, run `flutter pub get`, and verify
 `flutter analyze` plus an Android device build (shader/model render).
+
+## 3. Changed: Android native parameter overrides (`Live2DModel.{hpp,cpp}`)
+
+`nativeSetParameter` used to write the Cubism parameter immediately, but
+`nativeOnDrawFrame` then calls `LAppModel::Update()`, which runs the motion
+manager, drag look-at, eye blink, expressions and physics — overwriting every
+app-side value before the draw. On Android (and only here, because it is where
+the render thread is implemented in this fork) this made `setParameter` a no-op:
+gaze (`ParamEyeBallX/Y`, `ParamAngleX/Y/Z`), the mouth (`ParamMouthOpenY`) and
+the tail/idle `Param*` overrides never showed.
+
+Fix: `Live2DModel::SetParameterValue()` now records the value in
+`_parameterOverrides`; `Live2DModel::Update()` applies those overrides after
+motion/drag/eye-blink/expression/physics/pose and immediately before
+`CubismModel::Update()`, so app-driven parameters win for that frame while the
+idle motion still drives everything the app does not override.

@@ -20,6 +20,10 @@ public:
 
     void StartMotion(const Csm::csmChar* group, Csm::csmInt32 index, Csm::csmInt32 priority);
     void SetExpression(Csm::csmInt32 index);
+    /// Records a parameter override applied *after* motion/physics/eye-blink/
+    /// physics updates and immediately before CubismModel::Update(), so app-side
+    /// animations (gaze, blink, mouth, tail sway) are not overwritten every
+    /// frame by the idle motion or drag look-at.
     void SetParameterValue(const Csm::csmChar* parameterId, Csm::csmFloat32 value);
 
     /// Sets the motion playback speed multiplier (default 1.0).
@@ -54,6 +58,7 @@ private:
 
     Csm::csmVector<Csm::CubismIdHandle> _lipSyncIds;
     Csm::csmMap<Csm::csmString, Csm::ACubismMotion*> _motions;
+    Csm::csmMap<Csm::csmString, Csm::csmFloat32> _parameterOverrides;
     Csm::csmMap<Csm::csmString, Csm::ACubismMotion*> _expressions;
 
     const Csm::CubismId* _idParamAngleX;
