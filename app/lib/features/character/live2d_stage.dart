@@ -53,6 +53,10 @@ class _Live2DStageState extends State<Live2DStage> {
   bool _failed = false;
   bool _blinking = false;
   double _mouth = 0;
+  Timer? _gazeTimer;
+  Offset _gazeTarget = Offset.zero;
+  Offset _gaze = Offset.zero;
+  DateTime? _lastPointerAt;
 
   @override
   void initState() {
@@ -83,6 +87,7 @@ class _Live2DStageState extends State<Live2DStage> {
           _startBlink();
           _startMouth();
           _startTail();
+          _startGaze();
           _syncSpeakingMotion();
         }
       } catch (error) {
@@ -143,6 +148,48 @@ class _Live2DStageState extends State<Live2DStage> {
     }
   }
 
+  /// Restores gaze tracking: the eyes (ParamEyeBallX/Y) and head
+  /// (ParamAngleX/Y/Z) follow the pointer, with an idle auto-sway when the user
+  /// has not touched the stage for a while.
+  void _startGaze() {
+    _gazeTimer?.cancel();
+    _gazeTimer = Timer.periodic(const Duration(milliseconds: 50), (_) {
+      if (!_loaded) return;
+      final now = DateTime.now();
+      final last = _lastPointerAt;
+      if (last == null || now.difference(last) > const Duration(milliseconds: 2500)) {
+        final phase = now.millisecondsSinceEpoch / 2400.0;
+        _gazeTarget = Offset(
+          math.sin(phase) * 0.32,
+          math.sin(now.millisecondsSinceEpoch / 3800.0) * 0.18,
+        );
+      }
+      _gaze = Offset(
+        _gaze.dx + (_gazeTarget.dx - _gaze.dx) * 0.22,
+        _gaze.dy + (_gazeTarget.dy - _gaze.dy) * 0.22,
+      );
+      _applyGaze(_gaze);
+    });
+  }
+
+  void _updateGazeTarget(Offset localPosition, Size size) {
+    if (size.width <= 0 || size.height <= 0) return;
+    final dx = (localPosition.dx / size.width) * 2 - 1;
+    final dy = (localPosition.dy / size.height) * 2 - 1;
+    _gazeTarget = Offset(dx.clamp(-1.0, 1.0), dy.clamp(-1.0, 1.0));
+    _lastPointerAt = DateTime.now();
+  }
+
+  void _applyGaze(Offset gaze) {
+    final eyeX = gaze.dx;
+    final eyeY = -gaze.dy;
+    _controller.setParameter('ParamEyeBallX', eyeX).catchError((_) {});
+    _controller.setParameter('ParamEyeBallY', eyeY).catchError((_) {});
+    _controller.setParameter('ParamAngleX', gaze.dx * 22).catchError((_) {});
+    _controller.setParameter('ParamAngleY', -gaze.dy * 14).catchError((_) {});
+    _controller.setParameter('ParamAngleZ', gaze.dx * -4).catchError((_) {});
+  }
+
   void _startTail() {
     _tailTimer?.cancel();
     _tailTimer = Timer.periodic(const Duration(milliseconds: 90), (_) {
@@ -189,6 +236,7 @@ class _Live2DStageState extends State<Live2DStage> {
     _mouthTimer?.cancel();
     _tailTimer?.cancel();
     _drawTimer?.cancel();
+    _gazeTimer?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -196,6 +244,23 @@ class _Live2DStageState extends State<Live2DStage> {
   @override
   Widget build(BuildContext context) {
     if (_failed) return widget.fallback ?? SizedBox.shrink();
+    return LayoutBuilder(
+      builder: (context, constraints) => Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (event) =>
+            _updateGazeTarget(event.localPosition, constraints.biggest),
+        onPointerMove: (event) =>
+            _updateGazeTarget(event.localPosition, constraints.biggest),
+        child: MouseRegion(
+          onHover: (event) =>
+              _updateGazeTarget(event.localPosition, constraints.biggest),
+          child: _buildStage(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStage() {
     return Stack(
       fit: StackFit.expand,
       children: [

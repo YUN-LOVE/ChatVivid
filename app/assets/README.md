@@ -11,10 +11,14 @@
   - 许可：**CC BY-NC-SA 4.0**，署名 **上善无形 / ZipZipPipe / 氵六青**。
   - 详见 [live2d/whale-girl/README.md](live2d/whale-girl/README.md) 与 [MODEL-LICENSE.md](live2d/whale-girl/MODEL-LICENSE.md)。
 
+- `mascot/avatar.jpg`：1080×1080 圆形头像（当前唯一头像素材，用于空状态、
+  Onboarding、设置页、消息头像、Rive 加载占位与角色舞台回退）。
+  旧的 `mascot/avatar.png` / `mascot/full.png` 已弃用删除。
+- `mascot/dafeiyu-front.png` / `mascot/dafeiyu-alt.png`：静态立绘（角色舞台
+  「立绘」模式），由 `dafeiyu-chibi-character-sheet.png` 裁剪/去底。
+
 ## 计划
 
-- `mascot/avatar.webp`：256×256，透明，来自 `reference/deepseek-mascot/crops/avatar.png`。
-- `mascot/full.webp`：512×512，透明，空状态/Onboarding。
 - `mascot/hanfu.webp`：512×512，古风皮肤/季节限定。
 - `fonts/`：Noto Sans SC / Noto Serif SC 子集（400/500/600）。
 - `icons/`：Material Symbols 只保留用到的图标（或用 `material_symbols_icons` 按需 tree-shake）。

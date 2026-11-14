@@ -316,7 +316,7 @@ class _SummaryCard extends StatelessWidget {
       padding: EdgeInsets.all(16),
       child: Row(
         children: [
-          Image.asset('assets/mascot/avatar.png', width: 52, height: 52),
+          Image.asset('assets/mascot/avatar.jpg', width: 52, height: 52),
           SizedBox(width: 14),
           Expanded(
             child: Column(
@@ -953,6 +953,16 @@ class _SettingsDetailState extends State<SettingsDetail> {
     );
   }
 
+  Future<void> _resetCharacterLayout() async {
+    _updateSettings(
+      _settings.copyWith(
+        characterScale: 1.0,
+        characterOffsetX: 0.0,
+        characterOffsetY: 0.0,
+      ),
+    );
+  }
+
   Future<void> _importRive() async {
     try {
       final picked = await pickRiveFile();
@@ -1104,6 +1114,23 @@ class _SettingsDetailState extends State<SettingsDetail> {
               : Icon(Icons.chevron_right_rounded),
           onTap: _importRive,
         ),
+        SizedBox(height: 10),
+        _SettingCard(
+          icon: Icons.open_with_rounded,
+          title: '编辑角色位置',
+          subtitle: '聊天页右上角「编辑」按钮：拖动/双指缩放，自动保存',
+          trailing: Icon(Icons.chevron_right_rounded),
+          onTap: null,
+        ),
+        SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: _resetCharacterLayout,
+            icon: Icon(Icons.restore_rounded, size: 16),
+            label: Text('还原角色布局'),
+          ),
+        ),
         if (_settings.characterRivePath.isNotEmpty) ...[
           SizedBox(height: 8),
           Align(
@@ -1169,6 +1196,25 @@ class _SettingsDetailState extends State<SettingsDetail> {
           subtitle: '跟随系统 Reduce Motion',
           trailing: Icon(Icons.chevron_right_rounded),
           onTap: null,
+        ),
+        SizedBox(height: 18),
+        _ttsSlider(
+          label: '打字机速度',
+          value: _settings.typewriterSpeed,
+          min: 0.5,
+          max: 3.0,
+          divisions: 25,
+          format: (value) => '${value.toStringAsFixed(2)}×',
+          onChanged: (value) =>
+              _updateSettings(_settings.copyWith(typewriterSpeed: value)),
+        ),
+        Text(
+          '仅影响流式回复的逐字显示速度（1.0× = 45 字/秒）。',
+          style: TextStyle(
+            color: AppColors.muted.withValues(alpha: 0.6),
+            fontSize: 10,
+            height: 1.4,
+          ),
         ),
       ],
     );

@@ -58,6 +58,12 @@ class _ChatScreenState extends State<ChatScreen>
   bool _liveMode = false;
   bool _voiceActive = false;
   String? _lastSpokenId;
+  bool _editMode = false;
+  double _editScale = 1.0;
+  Offset _editOffset = Offset.zero;
+  double _editStartScale = 1.0;
+  Offset _editStartOffset = Offset.zero;
+  Offset _editStartFocal = Offset.zero;
   final TtsService _tts = TtsService();
 
   @override
@@ -65,6 +71,11 @@ class _ChatScreenState extends State<ChatScreen>
     super.initState();
     HardwareKeyboard.instance.addHandler(_onHardwareKey);
     _tts.applySettings(widget.settings);
+    _editScale = widget.settings.characterScale;
+    _editOffset = Offset(
+      widget.settings.characterOffsetX,
+      widget.settings.characterOffsetY,
+    );
     _tts.speaking.addListener(_onTtsChanged);
     unawaited(_tts.init());
     unawaited(_bootstrap());
@@ -76,6 +87,60 @@ class _ChatScreenState extends State<ChatScreen>
     // TTS settings are UI-only (excluded from cacheKey), so the same
     // ChatScreen state survives a settings change; re-apply them here.
     _tts.applySettings(widget.settings);
+    if (!_editMode) {
+      _editScale = widget.settings.characterScale;
+      _editOffset = Offset(
+        widget.settings.characterOffsetX,
+        widget.settings.characterOffsetY,
+      );
+    }
+  }
+
+  void _setEditMode(bool value) {
+    setState(() {
+      _editMode = value;
+      if (value) {
+        _editStartScale = _editScale;
+        _editStartOffset = _editOffset;
+      }
+    });
+  }
+
+  void _onCharacterScaleStart(ScaleStartDetails details) {
+    _editStartScale = _editScale;
+    _editStartOffset = _editOffset;
+    _editStartFocal = details.focalPoint;
+  }
+
+  void _onCharacterScaleUpdate(ScaleUpdateDetails details) {
+    setState(() {
+      _editScale = (_editStartScale * details.scale).clamp(0.5, 2.5);
+      _editOffset = _editStartOffset + (details.focalPoint - _editStartFocal);
+    });
+  }
+
+  Future<void> _onCharacterScaleEnd(ScaleEndDetails details) async {
+    await widget.onSettingsChanged(
+      widget.settings.copyWith(
+        characterScale: _editScale,
+        characterOffsetX: _editOffset.dx,
+        characterOffsetY: _editOffset.dy,
+      ),
+    );
+  }
+
+  Future<void> _resetCharacterLayout() async {
+    setState(() {
+      _editScale = 1.0;
+      _editOffset = Offset.zero;
+    });
+    await widget.onSettingsChanged(
+      widget.settings.copyWith(
+        characterScale: 1.0,
+        characterOffsetX: 0.0,
+        characterOffsetY: 0.0,
+      ),
+    );
   }
 
   Future<void> _bootstrap() async {
@@ -254,15 +319,54 @@ class _ChatScreenState extends State<ChatScreen>
     return false;
   }
 
-  void _openHistory() {
-    if (_historyOpen) return;
-    setState(() => _historyOpen = true);
-    _drawer.forward();
+  Future<void> _closeHistory() async {
+    if (!_historyOpen) {
+      if (_drawer.value > 0) {
+        await _drawer.animateTo(
+          0,
+          duration: Duration(milliseconds: (80 + 380 * _drawer.value).round()),
+          curve: Curves.easeOutCubic,
+        );
+      }
+      return;
+    }
+    await _settleDrawer(open: false);
   }
 
-  Future<void> _closeHistory() async {
-    await _drawer.reverse();
-    if (mounted) setState(() => _historyOpen = false);
+  Future<void> _settleDrawer({required bool open}) async {
+    final target = open ? 1.0 : 0.0;
+    final remaining = (target - _drawer.value).abs();
+    if (open) setState(() => _historyOpen = true);
+    if (remaining <= 0.001) {
+      _drawer.value = target;
+    } else {
+      await _drawer.animateTo(
+        target,
+        duration: Duration(milliseconds: (80 + 380 * remaining).round()),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (!open && mounted) setState(() => _historyOpen = false);
+  }
+
+  void _onHistoryDragUpdate(double dy) {
+    if (_historyOpen) return;
+    _drawer.value = (_drawer.value + dy / 340).clamp(0.0, 1.0);
+  }
+
+  void _onHistoryDragEnd() {
+    if (_historyOpen) return;
+    _settleDrawer(open: _drawer.value >= 0.22);
+  }
+
+  void _onHistoryCloseDragUpdate(double dy) {
+    if (!_historyOpen) return;
+    _drawer.value = (_drawer.value + dy / 340).clamp(0.0, 1.0);
+  }
+
+  void _onHistoryCloseDragEnd() {
+    if (!_historyOpen) return;
+    _settleDrawer(open: _drawer.value > 0.72);
   }
 
   void _setLive(bool value) {
@@ -362,15 +466,43 @@ class _ChatScreenState extends State<ChatScreen>
           Positioned.fill(
             child: ListenableBuilder(
               listenable: chat,
-              builder: (context, _) => CharacterStage(
-                customRivePath: widget.settings.characterRivePath,
-                characterMode: widget.settings.characterMode,
-                speaking: chat.busy || _tts.speaking.value,
-                live2dDir: widget.settings.live2dDir,
-                live2dModel: widget.settings.live2dModel,
+              builder: (context, _) => Transform.translate(
+                offset: _editOffset,
+                child: Transform.scale(
+                  scale: _editScale,
+                  alignment: Alignment.bottomCenter,
+                  child: CharacterStage(
+                    customRivePath: widget.settings.characterRivePath,
+                    characterMode: widget.settings.characterMode,
+                    speaking: chat.busy || _tts.speaking.value,
+                    live2dDir: widget.settings.live2dDir,
+                    live2dModel: widget.settings.live2dModel,
+                  ),
+                ),
               ),
             ),
           ),
+          if (_editMode)
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: _historyOpen,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onScaleStart: _onCharacterScaleStart,
+                  onScaleUpdate: _onCharacterScaleUpdate,
+                  onScaleEnd: _onCharacterScaleEnd,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: AppColors.primary.withValues(alpha: 0.55),
+                        width: 1.5,
+                      ),
+                      color: AppColors.primary.withValues(alpha: 0.04),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (!_historyOpen)
             Positioned(
               left: 0,
@@ -381,8 +513,11 @@ class _ChatScreenState extends State<ChatScreen>
                 child: _StageTopBar(
                   chat: chat,
                   onSettings: _openSettings,
-                  onOpenHistory: _openHistory,
+                  onDragUpdate: _onHistoryDragUpdate,
+                  onDragEnd: _onHistoryDragEnd,
                   onEyeTap: () => _showMessage('YOLO 视觉识别即将接入'),
+                  editing: _editMode,
+                  onToggleEdit: () => _setEditMode(!_editMode),
                 ),
               ),
             ),
@@ -394,6 +529,9 @@ class _ChatScreenState extends State<ChatScreen>
                 chat: chat,
                 scroll: _scroll,
                 onClose: _closeHistory,
+                onCloseDragUpdate: _onHistoryCloseDragUpdate,
+                onCloseDragEnd: _onHistoryCloseDragEnd,
+                typewriterSpeed: widget.settings.typewriterSpeed,
               ),
             ),
           ),
@@ -407,6 +545,13 @@ class _ChatScreenState extends State<ChatScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    if (_editMode) ...[
+                      _EditModeBar(
+                        onReset: _resetCharacterLayout,
+                        onDone: () => _setEditMode(false),
+                      ),
+                      SizedBox(height: 8),
+                    ],
                     AnimatedBuilder(
                       animation: chat,
                       builder: (context, _) => _DialogueCard(
@@ -481,7 +626,7 @@ class _BootstrapScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset(
-                  'assets/mascot/avatar.png',
+                  'assets/mascot/avatar.jpg',
                   width: 96,
                   height: 96,
                 ),
@@ -530,22 +675,29 @@ class _StageTopBar extends StatelessWidget {
   _StageTopBar({
     required this.chat,
     required this.onSettings,
-    required this.onOpenHistory,
+    required this.onDragUpdate,
+    required this.onDragEnd,
     required this.onEyeTap,
+    required this.editing,
+    required this.onToggleEdit,
   });
 
   final ChatController chat;
   final VoidCallback onSettings;
-  final VoidCallback onOpenHistory;
+  final ValueChanged<double> onDragUpdate;
+  final VoidCallback onDragEnd;
   final VoidCallback onEyeTap;
+  final bool editing;
+  final VoidCallback onToggleEdit;
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onVerticalDragUpdate: (details) {
-        if (details.delta.dy > 2.5) onOpenHistory();
+        if (details.delta.dy > 0) onDragUpdate(details.delta.dy);
       },
+      onVerticalDragEnd: (_) => onDragEnd(),
       child: ClipRRect(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
         child: BackdropFilter(
@@ -571,8 +723,9 @@ class _StageTopBar extends StatelessWidget {
                   Expanded(
                     child: GestureDetector(
                       onVerticalDragUpdate: (details) {
-                        if (details.delta.dy > 2.5) onOpenHistory();
+                        if (details.delta.dy > 0) onDragUpdate(details.delta.dy);
                       },
+                      onVerticalDragEnd: (_) => onDragEnd(),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -601,6 +754,15 @@ class _StageTopBar extends StatelessWidget {
                     ),
                   ),
                   IconButton(
+                    onPressed: onToggleEdit,
+                    tooltip: editing ? '完成编辑' : '编辑角色位置',
+                    icon: Icon(
+                      editing ? Icons.check_rounded : Icons.open_with_rounded,
+                      size: 20,
+                      color: editing ? AppColors.primary : null,
+                    ),
+                  ),
+                  IconButton(
                     onPressed: onSettings,
                     tooltip: '设置',
                     icon: Icon(Icons.tune_rounded, size: 20),
@@ -621,12 +783,18 @@ class _HistoryDrawer extends StatelessWidget {
     required this.chat,
     required this.scroll,
     required this.onClose,
+    required this.onCloseDragUpdate,
+    required this.onCloseDragEnd,
+    required this.typewriterSpeed,
   });
 
   final Animation<double> animation;
   final ChatController chat;
   final ScrollController scroll;
   final Future<void> Function() onClose;
+  final ValueChanged<double> onCloseDragUpdate;
+  final VoidCallback onCloseDragEnd;
+  final double typewriterSpeed;
 
   @override
   Widget build(BuildContext context) {
@@ -686,12 +854,21 @@ class _HistoryDrawer extends StatelessWidget {
                   ],
                 ),
               ),
-              Expanded(child: _ChatSurface(chat: chat, scroll: scroll)),
+              Expanded(
+                child: _ChatSurface(
+                  chat: chat,
+                  scroll: scroll,
+                  typewriterSpeed: typewriterSpeed,
+                ),
+              ),
               GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onVerticalDragUpdate: (details) {
-                  if (details.delta.dy < -3) onClose();
+                  if (details.delta.dy < 0) {
+                    onCloseDragUpdate(details.delta.dy);
+                  }
                 },
+                onVerticalDragEnd: (_) => onCloseDragEnd(),
                 child: Container(
                   height: 54,
                   alignment: Alignment.center,
@@ -725,6 +902,53 @@ class _HistoryDrawer extends StatelessWidget {
   }
 }
 
+class _EditModeBar extends StatelessWidget {
+  _EditModeBar({required this.onReset, required this.onDone});
+
+  final Future<void> Function() onReset;
+  final VoidCallback onDone;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassPanel(
+      radius: 16,
+      blur: 16,
+      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      child: Row(
+        children: [
+          Icon(
+            Icons.open_with_rounded,
+            size: 16,
+            color: AppColors.primary,
+          ),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '编辑模式 · 拖动移动，双指缩放角色/立绘',
+              style: TextStyle(
+                color: AppColors.muted,
+                fontSize: 10.5,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: onReset,
+            child: Text('重置', style: TextStyle(fontSize: 11)),
+          ),
+          FilledButton.tonal(
+            onPressed: onDone,
+            style: FilledButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.symmetric(horizontal: 12),
+            ),
+            child: Text('完成', style: TextStyle(fontSize: 11)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _DialogueCard extends StatelessWidget {
   _DialogueCard({
     required this.text,
@@ -742,18 +966,21 @@ class _DialogueCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: Duration(milliseconds: 260),
+    return AnimatedSize(
+      duration: Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
-      height: collapsed ? 28 : 82,
+      alignment: Alignment.topCenter,
       child: GlassPanel(
         radius: 16,
         blur: 18,
         padding: EdgeInsets.zero,
-        child: Column(
-          children: [
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: collapsed ? 28 : 156),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
             SizedBox(
-                height: 26,
+                height: 28,
                 child: Row(
                   children: [
                     SizedBox(width: 12),
@@ -807,7 +1034,7 @@ class _DialogueCard extends StatelessWidget {
                 ),
             ),
             if (!collapsed)
-              Expanded(
+              Flexible(
                 child: Padding(
                   padding: EdgeInsets.fromLTRB(14, 0, 14, 10),
                   child: Align(
@@ -815,36 +1042,35 @@ class _DialogueCard extends StatelessWidget {
                     child: ShaderMask(
                       blendMode: BlendMode.dstIn,
                       shaderCallback: (rect) => LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
                         colors: [
-                          AppColors.onPrimaryContainer.withValues(alpha: 0.18),
                           AppColors.onPrimaryContainer,
                           AppColors.onPrimaryContainer,
+                          AppColors.onPrimaryContainer.withValues(alpha: 0.0),
                         ],
-                        stops: const [0.0, 0.16, 1.0],
+                        stops: const [0.0, 0.72, 1.0],
                       ).createShader(rect),
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(
-                          sigmaX: speaking ? 0.35 : 0.18,
-                          sigmaY: speaking ? 0.35 : 0.18,
-                        ),
-                        child: Text(
-                          text,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: AppColors.onPrimaryContainer,
-                            fontSize: 12.5,
-                            height: 1.55,
-                          ),
+                      child: Text(
+                        text,
+                        // Sharp text (no gaussian blur); the box grows with the
+                        // content up to the AnimatedSize/Constraint max height.
+                        maxLines: 4,
+                        overflow: TextOverflow.fade,
+                        style: TextStyle(
+                          color: speaking
+                              ? AppColors.primary
+                              : AppColors.onPrimaryContainer,
+                          fontSize: 12.5,
+                          height: 1.55,
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -852,10 +1078,15 @@ class _DialogueCard extends StatelessWidget {
 }
 
 class _ChatSurface extends StatelessWidget {
-  _ChatSurface({required this.chat, required this.scroll});
+  _ChatSurface({
+    required this.chat,
+    required this.scroll,
+    required this.typewriterSpeed,
+  });
 
   final ChatController chat;
   final ScrollController scroll;
+  final double typewriterSpeed;
 
   @override
   Widget build(BuildContext context) {
@@ -891,6 +1122,7 @@ class _ChatSurface extends StatelessWidget {
                   itemCount: messages.length,
                   itemBuilder: (context, index) => _MessageTile(
                     message: messages[index],
+                    typewriterSpeed: typewriterSpeed,
                   ),
                 );
               },
@@ -917,9 +1149,10 @@ class _ChatSurface extends StatelessWidget {
 }
 
 class _MessageTile extends StatelessWidget {
-  _MessageTile({required this.message});
+  _MessageTile({required this.message, required this.typewriterSpeed});
 
   final ChatMessage message;
+  final double typewriterSpeed;
 
   @override
   Widget build(BuildContext context) {
@@ -965,7 +1198,7 @@ class _MessageTile extends StatelessWidget {
           CircleAvatar(
             radius: 16,
             backgroundColor: AppColors.surfaceHigh,
-            backgroundImage: AssetImage('assets/mascot/avatar.png'),
+            backgroundImage: AssetImage('assets/mascot/avatar.jpg'),
           ),
           SizedBox(width: 10),
           Expanded(
@@ -1001,6 +1234,7 @@ class _MessageTile extends StatelessWidget {
                   MarkdownMessage(
                     data: body,
                     streaming: message.streaming,
+                    typewriterSpeed: typewriterSpeed,
                   ),
               ],
             ),
@@ -1065,6 +1299,63 @@ class _OfflinePill extends StatelessWidget {
   }
 }
 
+/// Thumbnail preview for image attachments (stickers/emoji MCP or pasted
+/// images): the composer renders the picture instead of a file-name chip.
+class _ImageAttachmentChip extends StatelessWidget {
+  _ImageAttachmentChip({required this.attachment, required this.onRemove});
+
+  final ChatAttachment attachment;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.memory(
+            attachment.imageBytes!,
+            width: 56,
+            height: 56,
+            fit: BoxFit.cover,
+            gaplessPlayback: true,
+            errorBuilder: (context, error, stackTrace) => Container(
+              width: 56,
+              height: 56,
+              alignment: Alignment.center,
+              color: AppColors.surfaceHigh,
+              child: Icon(
+                Icons.broken_image_outlined,
+                size: 18,
+                color: AppColors.muted,
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          top: -6,
+          right: -6,
+          child: GestureDetector(
+            onTap: onRemove,
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.backgroundTop,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.cancel_rounded,
+                size: 18,
+                color: AppColors.muted,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _EmptyChat extends StatelessWidget {
   _EmptyChat();
 
@@ -1074,7 +1365,7 @@ class _EmptyChat extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Image.asset('assets/mascot/avatar.png', width: 88, height: 88),
+          Image.asset('assets/mascot/avatar.jpg', width: 88, height: 88),
           SizedBox(height: 12),
           Text(
             '记忆体已就绪',
@@ -1157,14 +1448,20 @@ class _Composer extends StatelessWidget {
                             runSpacing: 6,
                             children: [
                               for (var i = 0; i < attachments.length; i++)
-                                InputChip(
-                                  label: Text(
-                                    attachments[i].name,
-                                    overflow: TextOverflow.ellipsis,
+                                if (attachments[i].isImage)
+                                  _ImageAttachmentChip(
+                                    attachment: attachments[i],
+                                    onRemove: () => onRemoveAttachment(i),
+                                  )
+                                else
+                                  InputChip(
+                                    label: Text(
+                                      attachments[i].name,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    onDeleted: () => onRemoveAttachment(i),
+                                    visualDensity: VisualDensity.compact,
                                   ),
-                                  onDeleted: () => onRemoveAttachment(i),
-                                  visualDensity: VisualDensity.compact,
-                                ),
                             ],
                           ),
                         ),

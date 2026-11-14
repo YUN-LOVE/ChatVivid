@@ -1,21 +1,103 @@
 // ignore_for_file: prefer_const_constructors_in_immutables
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import '../../theme/app_theme.dart';
 
-class MarkdownMessage extends StatelessWidget {
+/// Renders Markdown and, while [streaming] is true, reveals the incoming text
+/// with a configurable typewriter effect ([typewriterSpeed], 1.0 = normal).
+class MarkdownMessage extends StatefulWidget {
   MarkdownMessage({
     super.key,
     required this.data,
     required this.streaming,
+    this.typewriterSpeed = 1.0,
   });
 
   final String data;
   final bool streaming;
+  final double typewriterSpeed;
+
+  @override
+  State<MarkdownMessage> createState() => _MarkdownMessageState();
+}
+
+class _MarkdownMessageState extends State<MarkdownMessage> {
+  Timer? _timer;
+  String _visible = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _visible = widget.streaming ? '' : widget.data;
+    _syncTimer();
+  }
+
+  @override
+  void didUpdateWidget(MarkdownMessage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.streaming) {
+      _timer?.cancel();
+      _timer = null;
+      if (_visible != widget.data) {
+        // Final text arrives in one piece: drop the cursor and show it whole.
+        setState(() => _visible = widget.data);
+      }
+      return;
+    }
+    _syncTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  double get _speed => widget.typewriterSpeed.clamp(0.2, 4.0);
+
+  void _syncTimer() {
+    if (!widget.streaming) return;
+    if (_timer != null) return;
+    // 45 chars/second at 1.0x. A periodic timer (instead of per-char futures)
+    // keeps the reveal rate independent of frame drops/large deltas.
+    final intervalMs = (1000.0 / (45.0 * _speed)).round().clamp(8, 160);
+    _timer = Timer.periodic(Duration(milliseconds: intervalMs), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        _timer = null;
+        return;
+      }
+      final target = widget.data;
+      if (_visible.length >= target.length) {
+        if (!widget.streaming) {
+          timer.cancel();
+          _timer = null;
+        }
+        return;
+      }
+      final step = _speed >= 2.0 ? 2 : 1;
+      var nextLen = math.min(target.length, _visible.length + step);
+      // Never split a surrogate pair (emoji) in half.
+      if (nextLen < target.length &&
+          nextLen > 0 &&
+          _isHighSurrogate(target.codeUnitAt(nextLen - 1))) {
+        nextLen = math.min(target.length, nextLen + 1);
+      }
+      setState(() => _visible = target.substring(0, nextLen));
+    });
+  }
+
+  bool _isHighSurrogate(int codeUnit) =>
+      codeUnit >= 0xD800 && codeUnit <= 0xDBFF;
 
   @override
   Widget build(BuildContext context) {
+    final data = _visible;
+    final streaming = widget.streaming || _visible.length < widget.data.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

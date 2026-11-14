@@ -141,7 +141,7 @@ class _CharacterStageState extends State<CharacterStage> {
 
     if (_riveLoader == null) {
       return Image.asset(
-        'assets/mascot/full.png',
+        'assets/mascot/avatar.jpg',
         fit: BoxFit.contain,
         filterQuality: FilterQuality.medium,
       );
@@ -157,12 +157,12 @@ class _CharacterStageState extends State<CharacterStage> {
       },
       builder: (context, state) => switch (state) {
         RiveLoading() => Image.asset(
-          'assets/mascot/full.png',
+          'assets/mascot/avatar.jpg',
           fit: BoxFit.contain,
           filterQuality: FilterQuality.medium,
         ),
         RiveFailed() => Image.asset(
-          'assets/mascot/full.png',
+          'assets/mascot/avatar.jpg',
           fit: BoxFit.contain,
           filterQuality: FilterQuality.medium,
         ),
