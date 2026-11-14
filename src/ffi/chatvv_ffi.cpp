@@ -41,10 +41,9 @@ void configure_llama_vulkan_environment() {
   static bool configured = false;
   if (configured) return;
   configured = true;
-  // Adreno 725's Android driver rejects the q8_0 dequant mat-vec shader; the
-  // matvec (MMVQ) path is optional and disabling it keeps everything on the
-  // regular matmul shaders while still running on the Vulkan GPU.
-  setenv("GGML_VK_DISABLE_MMVQ", "1", 0);
+  // Adreno 725's Android driver rejects the q8_0 dequant mat-vec shader; with
+  // the f16 embedding model those shaders are unused, so only their pipeline
+  // creation failures are tolerated (see ggml-vulkan).
 #endif
 }
 
