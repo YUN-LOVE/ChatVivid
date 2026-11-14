@@ -31,28 +31,39 @@ try {
   flutter pub get
   dart run rive_native:setup --verbose -p windows
 
-  # rive_native's setup unzips the prebuilt libs into the pub-cache package
-  # (windows/bin/lib/<config>). On a cold pub cache that can leave the package
-  # copy without libs even though the app build directory has them (seen on a
-  # fresh GitHub runner: LNK1181 rive_native.lib). Repair the package copy from
-  # the build directory so the plugin CMake always finds it.
+  # rive_native's setup downloads the prebuilt libs into the pub-cache package
+  # (windows/bin/lib/<config>) and copies them into
+  # app/build/rive_native/native/build/windows/bin. A cold pub cache can still
+  # leave the path read by the plugin CMake
+  # (windows/flutter/ephemeral/.plugin_symlinks/rive_native/windows/bin) without
+  # lib/release/rive_native.lib (fresh-runner LNK1181). Locate the libs anywhere
+  # under the app build dir and copy them into every candidate plugin path,
+  # preserving their relative path so the CMake layout stays correct.
   $RiveBuild = "$Root\app\build\rive_native\native\build\windows\bin"
   if (Test-Path $RiveBuild) {
+    $RiveFiles = Get-ChildItem -Path $RiveBuild -Recurse -File -ErrorAction SilentlyContinue
+    Write-Host "rive_native build dir: $RiveBuild"
+    foreach ($f in $RiveFiles) {
+      Write-Host "  found: $($f.FullName)"
+    }
     $RiveTargets = @()
     $PubCache = if ($env:PUB_CACHE) { $env:PUB_CACHE } else { "$env:LOCALAPPDATA\Pub\Cache" }
     Get-ChildItem -Path (Join-Path $PubCache "hosted\pub.dev") -Directory -Filter "rive_native-*" -ErrorAction SilentlyContinue | ForEach-Object {
       $RiveTargets += (Join-Path $_.FullName "windows\bin")
     }
-    # Flutter may materialize the plugin under windows/flutter/ephemeral as a
-    # copy (created by `flutter pub get`, before setup ran). Repair every candidate
-    # location; only the ones the plugin CMake actually reads matter.
     $RiveTargets += "$Root\app\windows\flutter\ephemeral\.plugin_symlinks\rive_native\windows\bin"
     foreach ($RivePkgBin in $RiveTargets) {
       if (!(Test-Path (Join-Path $RivePkgBin "lib\release\rive_native.lib"))) {
         Write-Host "repairing rive_native windows libs: $RivePkgBin"
         New-Item -ItemType Directory -Force -Path $RivePkgBin | Out-Null
-        Copy-Item "$RiveBuild\*" $RivePkgBin -Recurse -Force
+        foreach ($f in $RiveFiles) {
+          $rel = $f.FullName.Substring($RiveBuild.Length).TrimStart('\')
+          $dst = Join-Path $RivePkgBin $rel
+          New-Item -ItemType Directory -Force -Path (Split-Path $dst -Parent) | Out-Null
+          Copy-Item $f.FullName $dst -Force
+        }
       }
+      Write-Host "rive lib present at $RivePkgBin : $(Test-Path (Join-Path $RivePkgBin "lib\release\rive_native.lib"))"
     }
   }
 
