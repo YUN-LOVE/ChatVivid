@@ -36,13 +36,18 @@ void ggml_log_to_app(enum ggml_log_level level, const char * text, void *) {
                                                   : ANDROID_LOG_INFO;
   __android_log_print(prio, "chatvv-ggml", "%s", line.c_str());
 #endif
+  // INFO is extremely chatty (one line per tensor); keep it in logcat only so
+  // chatvv.log stays small. Warnings and errors go to both.
   if (level == GGML_LOG_LEVEL_ERROR) {
     log_error("ggml.native", {{"text", line}});
   } else if (level == GGML_LOG_LEVEL_WARN) {
     log_warn("ggml.native", {{"text", line}});
-  } else {
+  }
+#if !defined(__ANDROID__)
+  else {
     log_info("ggml.native", {{"text", line}});
   }
+#endif
 }
 
 void install_native_logging() {

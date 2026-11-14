@@ -23,6 +23,21 @@ Licenses: MIT (nlohmann, httplib), MIT (toml++).
 | `read_aloud/` | https://github.com/naskopw/read_aloud | v0.3.3 | GPL-3.0 | Rust TTS backend with C ABI; built with cargo |
 | `live2d_flutter/` | https://github.com/hunmer/flutter_live2d | 1.0.3 | BSD-3-Clause + Live2D Cubism Core (proprietary) | vendored Flutter plugin with local packaging fixes; see `PATCHES.md` |
 
+### Local patches to the llama.cpp snapshot
+
+Keep these when updating the snapshot (re-apply on top of the new checkout):
+
+- `ggml/src/ggml-vulkan/ggml-vulkan.cpp`: after `vkCreateDevice`, re-initialise
+  the Vulkan-Hpp dynamic dispatcher with the device (`vkGetDeviceProcAddr`) and,
+  if `vkGetBufferDeviceAddress` is still missing, set
+  `device->buffer_device_address = false`. Android's loader can return NULL from
+  `vkGetInstanceProcAddr()` for device commands promoted after Vulkan 1.0; the
+  NULL dispatcher entry crashed `ggml_vk_create_buffer()` with `pc=0` on
+  Adreno/Pixel 6a when loading the RAG embedding model.
+- `ggml/src/ggml-backend.cpp`: `ggml_backend_buft_alloc_buffer[_n]()` log and
+  return NULL instead of calling a NULL buffer-type `alloc_buffer` (defensive;
+  turns a native crash into a normal allocation error).
+
 Provenance, pinned hashes and update procedures are documented next to each
 directory (`whisper.cpp/UPSTREAM.md`, `read_aloud/VENDORED.chatvv.md`,
 `live2d_flutter/PATCHES.md`) and in `docs/asr.md` / `docs/read-aloud.md`.

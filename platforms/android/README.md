@@ -69,6 +69,15 @@ debug 与 release、本机与 CI 全部用**同一张证书**，否则手机上�
     所以 `build-ffi.sh` 默认用 host 的 `/usr/include`（`libvulkan-dev` 含 vulkan.hpp）
     并显式 `-DVulkan_LIBRARY=<NDK sysroot>/libvulkan.so`，可通过 `ANDROID_VULKAN_INCLUDE_DIR` 覆盖。
 - 已知风险：Android 交叉 configure 时 `FindVulkan` 可能错误找到 host x86_64 的 libvulkan/headers。
+- **Android loader 的 promote 命令坑**：Android 的 Vulkan loader 可能对 1.1+ 提升为
+  core 的 device 命令（实测 `vkGetBufferDeviceAddress`，Adreno 725 / Android 16）从
+  `vkGetInstanceProcAddr()` 返回 NULL。ggml 用的是 Vulkan-Hpp 动态 dispatcher，只
+  `init(instance)` 时该表项为 NULL，第一次 `ggml_vk_create_buffer()`（llama.cpp 为 RAG
+  embedding 模型分配 Vulkan_Host 权重 buffer）就会 `blr NULL` → SIGSEGV（pc=0）。
+  vendored llama.cpp 里已打本地补丁：`vkCreateDevice` 之后用
+  `vkGetDeviceProcAddr` 重新解析全部 device 入口；若 `vkGetBufferDeviceAddress` 仍缺失，
+  则关闭 `buffer_device_address` 而不是崩溃。更新 llama.cpp 快照时要保留该补丁，
+  见 `third_party/README.md`。
   若 CI 报这个错，用 `ANDROID_VULKAN_CMAKE_ARGS` 显式覆盖（脚本已支持）：
 
   ```bash
