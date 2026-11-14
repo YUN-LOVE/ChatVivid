@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: ''
+      profile:
+        description: '额外构建 Android profile APK（性能测试用）'
+        required: false
+        type: boolean
+        default: false''
 
 permissions:
   contents: read
@@ -488,6 +493,17 @@ jobs:
             Write-Output "::error::package failed (exit $rc):%0A$($lines -join '%0A')"
             exit 1
           }
+      - name: Build Android profile APK (performance testing)
+        if: matrix.platform == 'android' && inputs.profile == true
+        working-directory: app
+        shell: bash
+        run: flutter build apk --profile --target-platform android-arm64
+      - uses: actions/upload-artifact@v4
+        if: matrix.platform == 'android' && inputs.profile == true
+        with:
+          name: ${{ matrix.artifact }}-profile
+          path: app/build/app/outputs/flutter-apk/app-profile.apk
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}

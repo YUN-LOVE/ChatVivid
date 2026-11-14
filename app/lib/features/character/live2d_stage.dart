@@ -188,8 +188,8 @@ class _Live2DStageState extends State<Live2DStage>
       if (last == null || now.difference(last) > const Duration(milliseconds: 2500)) {
         final phase = now.millisecondsSinceEpoch / 2400.0;
         _gazeTarget = Offset(
-          math.sin(phase) * 0.32,
-          math.sin(now.millisecondsSinceEpoch / 3800.0) * 0.18,
+          math.sin(phase) * 0.45,
+          math.sin(now.millisecondsSinceEpoch / 3800.0) * 0.25,
         );
       }
       _gaze = Offset(
@@ -206,19 +206,24 @@ class _Live2DStageState extends State<Live2DStage>
     // Native side lerps towards these targets on every rendered frame, so the
     // 12.5 Hz pointer sampling above does not show up as stepping.
     _controller
-        .setParameterTarget('ParamEyeBallX', eyeX, speed: 18)
+        .setParameterTarget('ParamEyeBallX', eyeX, speed: 20)
         .catchError((_) {});
     _controller
-        .setParameterTarget('ParamEyeBallY', eyeY, speed: 18)
+        .setParameterTarget('ParamEyeBallY', eyeY, speed: 20)
+        .catchError((_) {});
+    // Exaggerated feedback: a full-screen-width touch turns the head enough to
+    // read at a glance (the model's rig clamps these internally anyway).
+    _controller
+        .setParameterTarget('ParamAngleX', gaze.dx * 40, speed: 14)
         .catchError((_) {});
     _controller
-        .setParameterTarget('ParamAngleX', gaze.dx * 22, speed: 12)
+        .setParameterTarget('ParamAngleY', -gaze.dy * 24, speed: 14)
         .catchError((_) {});
     _controller
-        .setParameterTarget('ParamAngleY', -gaze.dy * 14, speed: 12)
+        .setParameterTarget('ParamAngleZ', gaze.dx * -9, speed: 14)
         .catchError((_) {});
     _controller
-        .setParameterTarget('ParamAngleZ', gaze.dx * -4, speed: 12)
+        .setParameterTarget('ParamBodyAngleX', gaze.dx * 14, speed: 10)
         .catchError((_) {});
   }
 

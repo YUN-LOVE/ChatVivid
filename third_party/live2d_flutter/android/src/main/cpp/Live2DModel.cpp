@@ -250,7 +250,7 @@ void Live2DModel::Update()
     // Smooth app-driven parameter targets: Flutter only sends sparse updates
     // (12-15 Hz); lerp towards the target every rendered frame here so the
     // gaze/tail/mouth motion is smooth even at low update rates.
-    if (!_parameterTargets.IsEmpty())
+    if (_parameterTargets.GetSize() > 0)
     {
         const csmFloat32 lerpUnit = deltaTime > 0.0f ? deltaTime : 1.0f / 60.0f;
         for (auto it = _parameterTargets.Begin(); it != _parameterTargets.End(); ++it)
