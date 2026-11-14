@@ -1,3 +1,6 @@
+# Vendored copy of pub.dev live2d_flutter 1.0.3 with local packaging fixes.
+# Used via a path dependency from ../app/pubspec.yaml; do not publish.
+# See PATCHES.md for the exact diff from the published archive.
 name: live2d_flutter
 description: >-
   A Flutter plugin that renders Live2D Cubism models inside Android, iOS,
@@ -26,6 +29,11 @@ dev_dependencies:
     sdk: flutter
 
 flutter:
+  # The published 1.0.3 archive declares
+  #   assets: [assets/web/flutter_live2d_web.js, assets/web/shaders/]
+  # but ships neither file, which makes `flutter build` fail. Web is not a
+  # chatvv target (the old Web frontend is archived), so the block is dropped;
+  # see PATCHES.md §2. Restore it only together with the actual files.
   plugin:
     platforms:
       android:

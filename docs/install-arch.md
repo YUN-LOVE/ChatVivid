@@ -17,10 +17,13 @@
 ```bash
 sudo pacman -Syu --needed \
   base-devel clang cmake ninja git curl openssl sqlite pkgconf \
-  python jq github-cli unzip zip
+  python jq github-cli unzip zip rustup \
+  vulkan-devel shaderc   # 可选：ggml Vulkan 后端（没有则回退 CPU）
 ```
 
 - 后端用系统库：`sqlite`（头文件）、`curl`、`openssl`；CMake 会 `find_package`。
+- `rustup`：编译 vendored 的 `read_aloud` TTS（cargo 原生构建即可，本机无需交叉 target）。
+- `vulkan-devel` + `shaderc`：ggml 的 Vulkan 后端；不装则 `CHATVV_VULKAN=AUTO` 自动回退 CPU。
 - 不需要 vcpkg（Linux/macOS）；vcpkg 只在 Windows CI/交叉编译时用。
 - `clang` + `ninja` 与 `CMakePresets.json` 一致。
 

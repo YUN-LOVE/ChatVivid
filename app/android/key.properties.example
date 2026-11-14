@@ -1,4 +1,11 @@
-storeFile=../chatvivid-release.jks
+# Unified chatvv Android signing key (debug and release use the same key).
+# Do NOT commit key.properties or the keystore (both gitignored).
+#
+# Generate once:  platforms/android/make-keystore.sh
+# CI:             platforms/android/setup-signing.sh --required (reads secrets)
+#
+# storeFile is resolved by Gradle relative to app/android/app/.
+storeFile=../chatvv-release.jks
 storePassword=change-me
-keyAlias=chatvivid
+keyAlias=chatvv
 keyPassword=change-me

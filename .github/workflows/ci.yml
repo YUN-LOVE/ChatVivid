@@ -1,5 +1,7 @@
 name: CI
 
+# Path-aware CI: `detect` classifies the diff, then only the affected backend
+# and Flutter app platforms run. See docs/ci-cd.md for the trigger matrix.
 on:
   push:
     branches:
@@ -13,6 +15,12 @@ on:
       - dev
       - main
   workflow_dispatch:
+    inputs:
+      platforms:
+        description: '逗号分隔平台子集（android,ios,linux,macos,windows）；留空=按改动检测'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -22,44 +30,129 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend-linux-x64:
-    name: backend / linux x64
+  # ---------------------------------------------------------------------------
+  # Detect affected platforms (path classification, see platforms/common/ci/).
+  # ---------------------------------------------------------------------------
+  detect:
+    name: detect affected platforms
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
+    outputs:
+      mode: ${{ steps.detect.outputs.mode }}
+      reason: ${{ steps.detect.outputs.reason }}
+      changed_count: ${{ steps.detect.outputs.changed_count }}
+      platforms: ${{ steps.detect.outputs.platforms }}
+      backend_platforms: ${{ steps.detect.outputs.backend_platforms }}
+      app_platforms: ${{ steps.detect.outputs.app_platforms }}
+      app_matrix: ${{ steps.detect.outputs.app_matrix }}
+      run_backend: ${{ steps.detect.outputs.run_backend }}
+      run_app: ${{ steps.detect.outputs.run_app }}
+      light_only: ${{ steps.detect.outputs.light_only }}
+      backend_linux: ${{ steps.detect.outputs.backend_linux }}
+      backend_macos: ${{ steps.detect.outputs.backend_macos }}
+      backend_windows: ${{ steps.detect.outputs.backend_windows }}
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
+        with:
+          fetch-depth: 0
+      - name: Classify changed paths
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+          DISPATCH_PLATFORMS: ${{ inputs.platforms }}
+          # Hosted macOS runners are billed at 10x; enable with the repo variable.
+          CHATVV_ENABLE_MACOS: ${{ vars.ENABLE_MACOS_RUNNERS }}
+        run: python3 platforms/common/ci/detect-changes.py
+      - name: Write job summary
+        if: always()
+        shell: bash
         run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build \
-            libsqlite3-dev libcurl4-openssl-dev libssl-dev
-      - name: Configure
-        run: cmake --preset dev
-      - name: Build
-        run: cmake --build --preset dev
-      - name: Test
-        run: ctest --preset dev
+          {
+            echo "### CI platform selection"
+            echo ""
+            echo "| key | value |"
+            echo "|---|---|"
+            echo "| mode | \`${{ steps.detect.outputs.mode }}\` |"
+            echo "| reason | ${{ steps.detect.outputs.reason }} |"
+            echo "| changed files | ${{ steps.detect.outputs.changed_count }} |"
+            echo "| platforms | \`${{ steps.detect.outputs.platforms }}\` |"
+            echo "| backend | \`${{ steps.detect.outputs.backend_platforms }}\` |"
+            echo "| app | \`${{ steps.detect.outputs.app_platforms }}\` |"
+            echo "| light only | \`${{ steps.detect.outputs.light_only }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-  backend-linux-arm64:
-    name: backend / linux arm64
-    # GitHub-hosted arm64 runner. If unavailable on your plan, replace with
-    # the arm64-cross preset + qemu, or a self-hosted arm64 runner.
-    runs-on: ubuntu-24.04-arm
-    timeout-minutes: 60
+  # ---------------------------------------------------------------------------
+  # Lightweight static checks: workflow YAML + shell scripts. Always runs, so
+  # docs-only changes still have a green required check.
+  # ---------------------------------------------------------------------------
+  lint:
+    name: lint / workflows & scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Install dependencies
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+      - name: Validate workflows and scripts
+        run: python3 platforms/common/ci/lint-workflows.py
+      - name: Install actionlint
+        run: python3 -m pip install --quiet actionlint-py
+      - name: actionlint (workflow expressions)
+        run: actionlint .github/workflows/*.yml
+
+  # ---------------------------------------------------------------------------
+  # C++ backend: Linux x64 + arm64 (native runners).
+  # ---------------------------------------------------------------------------
+  backend-linux:
+    name: backend / linux ${{ matrix.arch }}
+    needs: detect
+    if: needs.detect.outputs.backend_linux == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-latest
+            preset: dev
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            preset: linux-arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build + Vulkan dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build \
-            libsqlite3-dev libcurl4-openssl-dev libssl-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libsqlite3-dev libcurl4-openssl-dev libssl-dev \
+            libvulkan-dev glslc spirv-headers vulkan-tools
+          glslc --version | head -n 2
+          test -f /usr/include/vulkan/vulkan.h
+          test -f /usr/share/cmake/SPIRV-Headers/SPIRV-HeadersConfig.cmake
+      - name: Rust toolchain (read-aloud)
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('third_party/read_aloud/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
       - name: Configure
-        run: cmake --preset linux-arm64
+        run: cmake --preset ${{ matrix.preset }} -DCHATVV_VULKAN=ON
       - name: Build
-        run: cmake --build --preset linux-arm64
+        run: cmake --build --preset ${{ matrix.preset }}
       - name: Test
-        run: ctest --preset linux-arm64
-      - name: Test details
+        run: ctest --preset ${{ matrix.preset }}
+      - name: Test details (on failure)
         if: failure()
         shell: bash
         run: |
@@ -68,23 +161,29 @@ jobs:
             echo "::error::$(tr '\n' '%0A' < "$LOG" | head -c 3000)"
           fi
 
-  backend-macos-arm64:
+  # ---------------------------------------------------------------------------
+  # C++ backend: macOS arm64. Shared-path changes skip macOS unless the repo
+  # variable ENABLE_MACOS_RUNNERS=true (10x runner cost); an explicit
+  # platforms/macos/** edit or manual platforms=macos dispatch still runs it.
+  # ---------------------------------------------------------------------------
+  backend-macos:
     name: backend / macos arm64
-    # Temporarily disabled to avoid macOS runner overage.
-    if: false
+    needs: detect
+    if: needs.detect.outputs.backend_macos == 'true'
     runs-on: macos-14
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install dependencies
         run: brew install cmake ninja curl
-      - name: Configure
-        run: cmake --preset macos-arm64 -DCURL_ROOT="$(brew --prefix curl)"
+      - name: Configure (CPU/Metal, no Vulkan)
+        run: cmake --preset macos-arm64 -DCURL_ROOT="$(brew --prefix curl)" -DCHATVV_VULKAN=OFF
       - name: Build
         run: cmake --build --preset macos-arm64
       - name: Test
         run: ctest --preset macos-arm64
-      - name: Test details
+      - name: Test details (on failure)
         if: failure()
         shell: bash
         run: |
@@ -93,14 +192,36 @@ jobs:
             echo "::error::$(tr '\n' '%0A' < "$LOG" | head -c 3000)"
           fi
 
-  backend-windows-x64:
+  # ---------------------------------------------------------------------------
+  # C++ backend: Windows x64 (MSVC + vcpkg + Vulkan SDK).
+  # ---------------------------------------------------------------------------
+  backend-windows:
     name: backend / windows x64
+    needs: detect
+    if: needs.detect.outputs.backend_windows == 'true'
     runs-on: windows-2022
-    timeout-minutes: 75
+    timeout-minutes: 90
     env:
       VCPKG_ROOT: C:\vcpkg
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('third_party/read_aloud/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - name: Install Vulkan SDK
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          vulkan_version: latest
+          install_runtime: true
+          cache: true
       - name: Bootstrap vcpkg
         shell: pwsh
         run: |
@@ -108,11 +229,13 @@ jobs:
             git clone --depth 1 https://github.com/microsoft/vcpkg C:\vcpkg
           }
           C:\vcpkg\bootstrap-vcpkg.bat
-          C:\vcpkg\vcpkg.exe install --classic --triplet x64-windows curl sqlite3
+          # Static triplet: the test binary and chatvvd.exe stay self-contained
+          # (no libcurl/sqlite3 DLL lookup at ctest time).
+          C:\vcpkg\vcpkg.exe install --classic --triplet x64-windows-static curl sqlite3
       - name: Configure
         shell: pwsh
         run: |
-          cmake --preset windows-x64 *>&1 | Tee-Object -FilePath configure.log
+          cmake --preset windows-x64 -DCHATVV_VULKAN=ON -DVCPKG_TARGET_TRIPLET=x64-windows-static *>&1 | Tee-Object -FilePath configure.log
           if ($LASTEXITCODE -ne 0) {
             $lines = Get-Content configure.log
             $idx = ($lines | Select-String -Pattern "CMake Error|error:|Error" | Select-Object -First 1).LineNumber
@@ -124,140 +247,91 @@ jobs:
             exit 1
           }
       - name: Build
-        run: cmake --build --preset windows-x64
-      - name: Test
-        run: ctest --preset windows-x64
-
-  app-linux:
-    name: app / linux
-    needs: detect-app
-    if: needs.detect-app.outputs.has_app == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Install desktop dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config             libgtk-3-dev libsqlite3-dev libcurl4-openssl-dev libssl-dev
-      - name: Build and package
-        run: ./scripts/package-desktop-linux.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: chatvv-app-linux
-          path: artifacts/*
-          if-no-files-found: error
-
-  app-windows:
-    name: app / windows
-    needs: detect-app
-    if: needs.detect-app.outputs.has_app == 'true'
-    runs-on: windows-2022
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Build and package
         shell: pwsh
-        run: ./scripts/package-desktop-windows.ps1
-      - uses: actions/upload-artifact@v4
-        with:
-          name: chatvv-app-windows
-          path: artifacts/*
-          if-no-files-found: error
+        run: |
+          $rc = 0
+          try {
+            cmake --build --preset windows-x64 2>&1 | Tee-Object -FilePath build.log
+            $rc = $LASTEXITCODE
+          } catch {
+            $rc = 1
+            ($_ | Out-String) | Tee-Object -FilePath build.log -Append
+          }
+          if ($rc -ne 0) {
+            $lines = (Get-Content build.log -Tail 25) | ForEach-Object { $_ -replace '%', '%25' -replace "`r", '' }
+            Write-Output "::error::cmake build failed (exit $rc):%0A$($lines -join '%0A')"
+            exit 1
+          }
+      - name: Test
+        shell: pwsh
+        run: |
+          # Static vcpkg triplet, so the only non-system runtime dependency is
+          # vulkan-1.dll from the Vulkan SDK; make it and vcpkg bin discoverable.
+          $env:PATH = "C:\vcpkg\installed\x64-windows-static\bin;$env:VULKAN_SDK\Bin;$env:PATH"
+          Write-Host "VULKAN_SDK=$env:VULKAN_SDK"
+          $exeDir = "build\windows-x64\Release"
+          foreach ($dll in @("vulkan-1.dll", "MSVCP140.dll", "VCRUNTIME140.dll", "VCRUNTIME140_1.dll")) {
+            $hit = $null
+            foreach ($dir in $env:PATH.Split(';')) {
+              if ($dir -and (Test-Path (Join-Path $dir $dll))) { $hit = Join-Path $dir $dll; break }
+            }
+            if (-not $hit) {
+              $hit = (Get-ChildItem "C:\Windows\System32\$dll" -ErrorAction SilentlyContinue |
+                Select-Object -First 1 -ExpandProperty FullName)
+            }
+            Write-Host "$dll -> $hit"
+          }
+          # Locate vulkan-1.dll anywhere in the SDK (layout differs between SDK
+          # versions), then put it next to the test exe so ctest can load it.
+          $vk = Get-ChildItem "$env:VULKAN_SDK" -Recurse -Filter "vulkan-1.dll" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if ($vk) {
+            Copy-Item $vk.FullName $exeDir -Force
+            Write-Host "copied $($vk.FullName) next to chatvv_tests.exe"
+          } else {
+            Write-Warning "vulkan-1.dll not found under $env:VULKAN_SDK"
+          }
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          if (Test-Path $vswhere) {
+            $vs = & $vswhere -latest -property installationPath
+            $dumpbin = Get-ChildItem "$vs\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe" | Select-Object -First 1
+            if ($dumpbin) {
+              & $dumpbin.FullName /dependents build\windows-x64\Release\chatvv_tests.exe
+            }
+          }
+          ctest --preset windows-x64
 
-  app-macos:
-    name: app / macos
-    needs: detect-app
-    # Temporarily disabled to avoid macOS runner overage.
-    if: false
-    runs-on: macos-14
-    timeout-minutes: 40
+  # ---------------------------------------------------------------------------
+  # Flutter app: analyze + test (fast gate, no platform SDKs).
+  # ---------------------------------------------------------------------------
+  app-analyze:
+    name: app / analyze & test
+    needs: detect
+    if: needs.detect.outputs.run_app == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: '3.44.2'   # keep in sync with docs/install-arch.md
           channel: stable
           cache: true
-      - name: Install desktop dependencies
-        run: brew install cmake ninja curl
-      - name: Build and package
-        run: ./scripts/package-desktop-macos.sh
-      - uses: actions/upload-artifact@v4
-        with:
-          name: chatvv-app-macos
-          path: artifacts/*
-          if-no-files-found: error
-
-  detect-app:
-    name: detect app
-    runs-on: ubuntu-latest
-    outputs:
-      has_app: ${{ steps.check.outputs.has_app }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: check
-        shell: bash
-        run: |
-          if [ -f app/pubspec.yaml ]; then
-            echo "has_app=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "has_app=false" >> "$GITHUB_OUTPUT"
-          fi
-
-  app:
-    name: app / analyze & build
-    needs: detect-app
-    if: needs.detect-app.outputs.has_app == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          cache: true
-      - name: Android SDK packages
-        shell: bash
-        run: |
-          SDKMGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "$SDKMGR" ]; then SDKMGR="$(command -v sdkmanager)"; fi
-          yes | "$SDKMGR" --licenses >/dev/null || true
-          "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" \
-            "ndk;27.2.12479018" "cmake;3.22.1"
-      - name: Build Android embedded core
-        shell: bash
-        run: |
-          export ANDROID_NDK_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}/ndk/27.2.12479018"
-          ./scripts/build-android-ffi.sh
       - name: Pub get
         working-directory: app
         run: flutter pub get
-      - name: Rive native setup
-        working-directory: app
-        run: dart run rive_native:setup --verbose -p android
       - name: Analyze
         working-directory: app
-        run: flutter analyze
+        shell: bash
+        run: |
+          set +e
+          flutter analyze 2>&1 | tee /tmp/flutter-analyze.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            echo "::error::flutter analyze failed; first diagnostics:"
+            grep -E '^ *(error|warning|info) ' /tmp/flutter-analyze.log | head -n 15 | sed 's/^/::error::/'
+            exit "$rc"
+          fi
       - name: Test
         working-directory: app
         shell: bash
@@ -265,26 +339,157 @@ jobs:
           if [ -d test ]; then
             flutter test
           else
-            echo "No app tests yet"
+            echo "app/test does not exist yet; skipping"
           fi
-      - name: Build debug APK
-        working-directory: app
+
+  # ---------------------------------------------------------------------------
+  # Flutter app: build/package the platforms selected by `detect`.
+  # The matrix comes from `needs.detect.outputs.app_matrix`; an include-only
+  # matrix is valid and keeps per-platform runners/commands in one place.
+  # ---------------------------------------------------------------------------
+  app-package:
+    name: app / ${{ matrix.platform }}
+    needs: detect
+    if: needs.detect.outputs.run_app == 'true'
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.detect.outputs.app_matrix) }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: ${{ matrix.timeout }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Set up Java 17
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.2'   # keep in sync with docs/install-arch.md
+          channel: stable
+          cache: true
+      - name: Rust toolchain (read-aloud)
+        if: matrix.rust_targets != ''
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+      - name: Cache cargo registry
+        if: matrix.rust_targets != ''
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: cargo-${{ runner.os }}-${{ hashFiles('third_party/read_aloud/Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-
+      - name: Install cargo-ndk (Android fallback cross tool)
+        if: matrix.platform == 'android'
+        run: cargo install cargo-ndk --locked
+      - name: Install Vulkan SDK
+        if: matrix.platform == 'windows'
+        uses: jakoch/install-vulkan-sdk-action@v1
+        with:
+          vulkan_version: latest
+          install_runtime: true
+          cache: true
+      - name: Install Vulkan build dependencies
+        if: matrix.platform == 'linux' || matrix.platform == 'android'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libvulkan-dev glslc spirv-headers vulkan-tools
+          glslc --version | head -n 2
+      - name: Install Linux desktop dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config \
+            libgtk-3-dev libsqlite3-dev libcurl4-openssl-dev libssl-dev
+      - name: Install macOS desktop dependencies
+        if: matrix.platform == 'macos'
+        run: brew install cmake ninja curl
+      - name: Android SDK packages
+        if: matrix.platform == 'android'
         shell: bash
         run: |
-          COUNT=$(git rev-list --count HEAD)
-          SHA=$(git rev-parse --short HEAD)
-          VERSION="0.1.$COUNT"
-          flutter build apk --debug --target-platform android-arm64 \
-            --build-name="$VERSION" --build-number="$COUNT" \
-            --dart-define=APP_VERSION="$VERSION" \
-            --dart-define=BUILD_NUMBER="$COUNT" \
-            --dart-define=BUILD_COMMIT="$SHA"
-      - name: Verify Android 16 KB page size and signature
+          SDKMGR="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMGR" ]; then SDKMGR="$(command -v sdkmanager)"; fi
+          yes | "$SDKMGR" --licenses >/dev/null || true
+          "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" \
+            "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Build Android FFI + read-aloud
+        if: matrix.platform == 'android'
         shell: bash
+        env:
+          CHATVV_VULKAN: ${{ matrix.vulkan }}
+          CHATVV_READ_ALOUD_LINKAGE: shared
+        # Android target Vulkan headers/libs come from the NDK sysroot; the host
+        # glslc + SPIRV-Headers come from the apt packages above. Pin both so a
+        # cross-configure cannot pick up host x86_64 Vulkan libraries (known risk,
+        # see platforms/android/README.md).
         run: |
-          ./scripts/verify-android-apk.sh             app/build/app/outputs/flutter-apk/app-debug.apk
+          export ANDROID_VULKAN_CMAKE_ARGS=""
+          if [ -f /usr/share/cmake/SPIRV-Headers/SPIRV-HeadersConfig.cmake ]; then
+            ANDROID_VULKAN_CMAKE_ARGS="-DSPIRV-Headers_DIR=/usr/share/cmake/SPIRV-Headers"
+          fi
+          if command -v glslc >/dev/null; then
+            ANDROID_VULKAN_CMAKE_ARGS="$ANDROID_VULKAN_CMAKE_ARGS -DVulkan_GLSLC_EXECUTABLE=$(command -v glslc)"
+          fi
+          export ANDROID_VULKAN_CMAKE_ARGS
+          set +e
+          ./platforms/android/build-ffi.sh 2>&1 | tee /tmp/build-ffi.log
+          rc=${PIPESTATUS[0]}
+          if [ "$rc" -ne 0 ]; then
+            msg="$(tail -n 40 /tmp/build-ffi.log \
+              | sed -r 's/\x1B\[[0-9;]*[mK]//g' \
+              | tr -d '\r' \
+              | sed 's/%/%25/g' \
+              | awk 'BEGIN{ORS="%0A"} {print}' \
+              | head -c 7000)"
+            echo "::error::build-ffi.sh failed (exit $rc):%0A${msg}"
+            exit "$rc"
+          fi
+      - name: Configure Android signing (unified key)
+        if: matrix.platform == 'android'
+        shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+        run: ./platforms/android/setup-signing.sh --required
+      - name: Build and package (bash)
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          CHATVV_VULKAN: ${{ matrix.vulkan }}
+          ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+        run: ${{ matrix.command }}
+      - name: Build and package (pwsh)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          CHATVV_VULKAN: ${{ matrix.vulkan }}
+          ANDROID_CERT_SHA256: ${{ secrets.ANDROID_CERT_SHA256 }}
+        run: |
+          $rc = 0
+          try {
+            & ${{ matrix.command }} 2>&1 | Tee-Object -FilePath package.log
+            $rc = $LASTEXITCODE
+          } catch {
+            $rc = 1
+            ($_ | Out-String) | Tee-Object -FilePath package.log -Append
+          }
+          if ($rc -ne 0) {
+            $lines = (Get-Content package.log -Tail 25) | ForEach-Object { $_ -replace '%', '%25' -replace "`r", '' }
+            Write-Output "::error::package failed (exit $rc):%0A$($lines -join '%0A')"
+            exit 1
+          }
       - uses: actions/upload-artifact@v4
         with:
-          name: chatvv-app-android
-          path: app/build/app/outputs/flutter-apk/app-debug.apk
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact_path }}
           if-no-files-found: error

@@ -7,7 +7,7 @@
 
 - `live2d/whale-girl/`：**鲸鱼娘 Live2D Cubism 4 模型**，约 4.3 MB。
   - 44 表情、8 动作、物理、`ParamMouthOpenY` 口型参数。
-  - 入口：`c_0120.model3.json`；Flutter 用 `flutter_live2d`。
+  - 入口：`c_0120.model3.json`；Flutter 用 `live2d_flutter`。
   - 许可：**CC BY-NC-SA 4.0**，署名 **上善无形 / ZipZipPipe / 氵六青**。
   - 详见 [live2d/whale-girl/README.md](live2d/whale-girl/README.md) 与 [MODEL-LICENSE.md](live2d/whale-girl/MODEL-LICENSE.md)。
 
@@ -30,7 +30,7 @@
 - 图片统一 WebP、透明、sRGB；头像 ≤ 256，空状态 ≤ 768。
 - Live2D 模型是 CC BY-NC-SA 4.0，非商业；App 内必须展示完整署名与许可。
 - 商业分发前替换素材，或取得上善无形、ZipZipPipe、氵六青等权利人的授权。
-- 桌面没有 `flutter_live2d` 支持：用静态头像，或另做预渲染 WebP。
+- 桌面没有 `live2d_flutter` 支持：用静态头像，或另做预渲染 WebP。
 
 ## 署名
 

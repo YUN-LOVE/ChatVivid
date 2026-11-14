@@ -69,6 +69,11 @@ set(GGML_METAL OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
+# ggml backend selection (Vulkan where the toolchain supports it). whisper.cpp
+# reuses llama.cpp's ggml targets, so this one switch drives both.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/ggml-vulkan.cmake)
+
 add_subdirectory(third_party/llama.cpp EXCLUDE_FROM_ALL)
 # LTO across the large vendored llama/ggml graph is not worth the CI time.
 foreach(_llama_target llama ggml ggml-base ggml-cpu)
@@ -80,6 +85,13 @@ foreach(_llama_target llama ggml ggml-base ggml-cpu)
       CXX_EXTENSIONS OFF)
   endif()
 endforeach()
+
+# Speech-to-text: whisper.cpp is built against llama.cpp's ggml (single Vulkan
+# backend, no duplicate ggml symbols).
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/whisper.cmake)
+
+# Text-to-speech: read-aloud (Rust, C ABI) is built with cargo and linked.
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/readaloud.cmake)
 
 add_library(chatvv_core STATIC
   src/util/log.cpp
@@ -94,11 +106,24 @@ add_library(chatvv_core STATIC
   src/llm/responses_provider.cpp
   src/dialog/response_hub.cpp
   src/dialog/dialog_service.cpp
-  src/tts/edge_tts.cpp)
+  src/tts/synthesize.cpp
+  src/asr/asr.cpp)
+if(ANDROID)
+  # __android_log_print() used by the native logging bridge.
+  target_link_libraries(chatvv_core PUBLIC log)
+endif()
 target_include_directories(chatvv_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_include_directories(chatvv_core SYSTEM PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}/third_party/llama.cpp/include)
 target_link_libraries(chatvv_core PUBLIC chatvv_deps llama)
+if(TARGET chatvv::read_aloud)
+  target_link_libraries(chatvv_core PUBLIC chatvv::read_aloud)
+endif()
+if(TARGET whisper)
+  target_link_libraries(chatvv_core PUBLIC whisper)
+  target_include_directories(chatvv_core SYSTEM PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/whisper.cpp/include)
+endif()
 set_target_properties(chatvv_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 chatvv_warnings(chatvv_core)
 
@@ -137,6 +162,11 @@ target_compile_definitions(chatvv_tests PRIVATE
   CHATVV_TEST_MODEL="${CMAKE_CURRENT_SOURCE_DIR}/app/assets/models/bge-small-zh-v1.5-q8_0.gguf")
 chatvv_warnings(chatvv_tests)
 add_test(NAME core COMMAND chatvv_tests)
+
+add_executable(chatvv_tts_tests tests/test_tts.cpp)
+target_link_libraries(chatvv_tts_tests PRIVATE chatvv_core)
+chatvv_warnings(chatvv_tts_tests)
+add_test(NAME tts COMMAND chatvv_tts_tests)
 
 add_executable(chatvv_ffi_tests tests/test_ffi.cpp)
 target_include_directories(chatvv_ffi_tests

@@ -5,7 +5,12 @@
 #include <filesystem>
 #include <mutex>
 
+#include <ggml-backend.h>
 #include <llama.h>
+
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 
 #include "util/log.h"
 
@@ -13,6 +18,68 @@ namespace chatvv {
 namespace {
 
 std::once_flag g_backend_once;
+
+// Route llama.cpp/ggml diagnostics into the app log (chatvv.log) and logcat.
+// Native stderr is discarded on Android, so without this the Vulkan backend is
+// a black box on device.
+void ggml_log_to_app(enum ggml_log_level level, const char * text, void *) {
+  if (text == nullptr || *text == '\0') return;
+  std::string line(text);
+  while (!line.empty() && (line.back() == '\n' || line.back() == '\r')) {
+    line.pop_back();
+  }
+  if (line.empty()) return;
+  if (line.size() > 2000) line.resize(2000);
+#if defined(__ANDROID__)
+  const int prio = level == GGML_LOG_LEVEL_ERROR  ? ANDROID_LOG_ERROR
+                   : level == GGML_LOG_LEVEL_WARN ? ANDROID_LOG_WARN
+                                                  : ANDROID_LOG_INFO;
+  __android_log_print(prio, "chatvv-ggml", "%s", line.c_str());
+#endif
+  // INFO is extremely chatty (one line per tensor); keep it in logcat only so
+  // chatvv.log stays small. Warnings and errors go to both.
+  if (level == GGML_LOG_LEVEL_ERROR) {
+    log_error("ggml.native", {{"text", line}});
+  } else if (level == GGML_LOG_LEVEL_WARN) {
+    log_warn("ggml.native", {{"text", line}});
+  }
+#if !defined(__ANDROID__)
+  else {
+    log_info("ggml.native", {{"text", line}});
+  }
+#endif
+}
+
+void install_native_logging() {
+  static bool installed = false;
+  if (installed) return;
+  installed = true;
+  llama_log_set(ggml_log_to_app, nullptr);
+}
+
+void log_backend_inventory() {
+  const size_t count = ggml_backend_dev_count();
+  log_info("ggml.devices", {{"count", static_cast<int64_t>(count)}});
+  for (size_t i = 0; i < count; ++i) {
+    ggml_backend_dev_t dev = ggml_backend_dev_get(i);
+    if (dev == nullptr) continue;
+    const char * name = ggml_backend_dev_name(dev);
+    const char * desc = ggml_backend_dev_description(dev);
+    log_info("ggml.device",
+             {{"index", static_cast<int64_t>(i)},
+              {"name", name ? name : ""},
+              {"description", desc ? desc : ""},
+              {"type", static_cast<int64_t>(ggml_backend_dev_type(dev))}});
+    ggml_backend_buffer_type_t buft = ggml_backend_dev_buffer_type(dev);
+    if (buft != nullptr) {
+      const char * buft_name = ggml_backend_buft_name(buft);
+      log_info("ggml.device.buft",
+               {{"index", static_cast<int64_t>(i)},
+                {"buft", buft_name ? buft_name : ""},
+                {"alignment", static_cast<int64_t>(ggml_backend_buft_get_alignment(buft))}});
+    }
+  }
+}
 
 void normalize(std::vector<float>& values) {
   double norm = 0.0;
@@ -39,7 +106,9 @@ bool EmbeddingEngine::load(const std::string& model_path, int threads,
     if (error) *error = "embedding model not found: " + model_path;
     return false;
   }
+  install_native_logging();
   std::call_once(g_backend_once, [] { llama_backend_init(); });
+  log_backend_inventory();
 
   if (context_) {
     llama_free(context_);

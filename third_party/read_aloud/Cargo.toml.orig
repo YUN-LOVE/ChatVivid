@@ -1,0 +1,26 @@
+[package]
+name = "read-aloud"
+version = "0.3.3"
+edition = "2021"
+description = "A cross-platform text-to-speech library with C interface."
+license-file = "LICENSE"
+documentation = "https://docs.rs/read_aloud"
+homepage = "https://github.com/naskopw/read_aloud"
+repository = "https://github.com/naskopw/read_aloud"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+httpdate = "1.0.3"
+serde = "1.0.193"
+serde_json = "1.0.108"
+sha2 = "0.10.8"
+thiserror = "1.0.50"
+tungstenite = { version = "0.20.1", features = ["native-tls"] }
+url = "2.4.1"
+uuid = { version = "1.6.1", features = ["v4", "fast-rng"] }
+
+[build-dependencies]
+cbindgen = "0.26.0"
+current_platform = "0.2.0"

@@ -182,7 +182,7 @@ glass:
 
 - 手机键盘弹起：舞台折叠到 96–120dp 或隐藏，优先保证输入和消息可见。
 - 沉浸模式（可选）：点角色进入全屏舞台，聊天气泡浮在玻璃层上；再点退出。
-- 模型：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情 / 8 动作）；v1 Android/iOS 用 `flutter_live2d`。
+- 模型：`app/assets/live2d/whale-girl/`（Cubism 4，44 表情 / 8 动作）；v1 Android/iOS 用 `live2d_flutter`。
 - 口型：TTS RMS → `ParamMouthOpenY`；停止朗读归零。
 - 动作：空闲 `idle`；思考偏头；完成 `开心兴奋`/`自拍`；出错 `悲伤`/`晕晕`；摸头 `脸红`。
 - 触控：插件自带眼睛/头跟随；点击头/身体触发不同表情（HitAreas: Head/Body）。
@@ -238,7 +238,7 @@ glass:
 - **CC BY-NC-SA 4.0**，非商业。
 - 设定图署名：上善无形 / ZipZipPipe / YunYueSama / xiaoweigen，见 [ATTRIBUTION.md](../../reference/deepseek-mascot/ATTRIBUTION.md)。
 - **Live2D 模型署名：上善无形 / ZipZipPipe / 氵六青**；见 [LIVE2D.md](../../reference/avatar-tech/LIVE2D.md)。
-- `flutter_live2d` 插件 BSD-3；内置 Cubism Core 为 Live2D Inc. 专有许可，需在关于页一并列出。
+- `live2d_flutter` 插件 BSD-3；内置 Cubism Core 为 Live2D Inc. 专有许可，需在关于页一并列出。
 - App 内“关于 → 许可”必须可读地展示署名、来源、许可、修改说明。
 - 如果未来商业分发：替换为原创/委托角色，或取得各权利人商业授权。
 
@@ -280,5 +280,5 @@ glass:
 - 不要给每个卡片都加 blur；不要玻璃叠玻璃。
 - 不要照搬 RikkaHub 的多会话/Workspace/媒体功能。
 - 不要把 DeepSeek 官方 logo、RikkaHub 截图、AGPL 代码直接放进 app。
-- 移动端不要用 WebView 跑 Live2D；用原生 GL（`flutter_live2d`）。桌面如需要 WebView 兜底，作为独立 adapter。
+- 移动端不要用 WebView 跑 Live2D；用原生 GL（`live2d_flutter`）。桌面如需要 WebView 兜底，作为独立 adapter。
 - v1 先做好 2D Live2D；3D VRM 授权/渲染就绪后再接，但别让 18 MB 模型拖垮首版。

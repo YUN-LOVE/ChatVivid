@@ -14,7 +14,14 @@ dependencies:
   flutter_markdown_plus: ^1.0.12
   flutter_svg: 2.2.4
   rive: ^0.14.11
-  live2d_flutter: ^1.0.3
+  # Vendored from hunmer/flutter_live2d 1.0.3 (pub.dev name: live2d_flutter).
+  # Keep the path dependency for now instead of `live2d_flutter: ^1.0.3`:
+  # the published 1.0.3 archive (a) declares `assets/web/*` files that are
+  # missing from the package, so `flutter build` fails, and (b) omits the
+  # Android FrameworkShaders assets its native renderer loads from APK assets.
+  # See docs/live2d.md for the diff and the upstream plan.
+  live2d_flutter:
+    path: ../third_party/live2d_flutter
   archive: ^4.6.0
   dynamic_color: ^2.1.0
   palette_generator: ^0.3.3+7
@@ -35,7 +42,3 @@ flutter:
     - assets/live2d/whale-girl/c_0120.2048/
     - assets/live2d/whale-girl/motions/
     - assets/live2d/whale-girl/expressions/
-
-dependency_overrides:
-  live2d_flutter:
-    path: ../third_party/live2d_flutter

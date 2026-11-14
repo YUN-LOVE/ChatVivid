@@ -18,12 +18,13 @@
 #include <vector>
 
 #include "app/config.h"
+#include "asr/asr.h"
 #include "context/injections.h"
 #include "dialog/dialog_service.h"
 #include "dialog/response_hub.h"
 #include "llm/provider.h"
 #include "memory/embedding.h"
-#include "tts/edge_tts.h"
+#include "tts/synthesize.h"
 #include "store/db.h"
 #include "util/log.h"
 
@@ -193,6 +194,11 @@ struct chatvv_engine {
   std::atomic<bool> stopping{false};
 };
 
+// One ASR engine = one loaded whisper.cpp model (+ ggml backend context).
+struct chatvv_asr {
+  chatvv::AsrEngine engine;
+};
+
 void chatvv_sub::run() {
   int64_t after_seq = 0;
   while (!stop.load() && !engine->stopping.load()) {
@@ -265,6 +271,90 @@ char* start_turn(chatvv_engine* engine, const char* text,
 
 }  // namespace
 
+namespace {
+
+chatvv::AsrEngineConfig parse_asr_config(const char* config_json,
+                                        std::string& error) {
+  chatvv::AsrEngineConfig config;
+  if (!config_json || !*config_json) return config;
+  try {
+    const json input = json::parse(config_json);
+    if (!input.is_object()) {
+      error = "config_json must be a JSON object";
+      return config;
+    }
+    const auto use_gpu = input.find("use_gpu");
+    if (use_gpu != input.end()) {
+      if (!use_gpu->is_boolean()) {
+        error = "use_gpu must be a boolean";
+        return config;
+      }
+      config.use_gpu = use_gpu->get<bool>();
+    }
+    const auto flash_attn = input.find("flash_attn");
+    if (flash_attn != input.end()) {
+      if (!flash_attn->is_boolean()) {
+        error = "flash_attn must be a boolean";
+        return config;
+      }
+      config.flash_attn = flash_attn->get<bool>();
+    }
+    const auto threads = input.find("threads");
+    if (threads != input.end()) {
+      if (!threads->is_number_integer()) {
+        error = "threads must be an integer";
+        return config;
+      }
+      config.threads = threads->get<int32_t>();
+    }
+  } catch (const std::exception& e) {
+    error = e.what();
+  }
+  return config;
+}
+
+bool parse_asr_options(const char* options_json, chatvv::AsrOptions& options,
+                       std::string& error) {
+  if (!options_json || !*options_json) return true;
+  try {
+    const json input = json::parse(options_json);
+    if (!input.is_object()) {
+      error = "options_json must be a JSON object";
+      return false;
+    }
+    const auto language = input.find("language");
+    if (language != input.end()) {
+      if (!language->is_string()) {
+        error = "language must be a string";
+        return false;
+      }
+      options.language = language->get<std::string>();
+    }
+    const auto threads = input.find("threads");
+    if (threads != input.end()) {
+      if (!threads->is_number_integer()) {
+        error = "threads must be an integer";
+        return false;
+      }
+      options.threads = threads->get<int32_t>();
+    }
+    const auto translate = input.find("translate");
+    if (translate != input.end()) {
+      if (!translate->is_boolean()) {
+        error = "translate must be a boolean";
+        return false;
+      }
+      options.translate = translate->get<bool>();
+    }
+    return true;
+  } catch (const std::exception& e) {
+    error = e.what();
+    return false;
+  }
+}
+
+}  // namespace
+
 extern "C" {
 
 CHATVV_API int32_t chatvv_tts_synthesize(const char* text, const char* voice,
@@ -274,7 +364,7 @@ CHATVV_API int32_t chatvv_tts_synthesize(const char* text, const char* voice,
     set_error(error_json, "invalid_argument", "text/output_path is required");
     return 1;
   }
-  const auto result = chatvv::EdgeTtsSynthesize(
+  const auto result = chatvv::Synthesize(
       text, (voice && *voice) ? voice : "zh-CN-XiaoxiaoNeural", output_path);
   if (!result.ok) {
     set_error(error_json, "tts_failed", result.error);
@@ -536,6 +626,138 @@ int32_t chatvv_clear_context(chatvv_engine* engine, char** error_json) {
   } catch (const std::exception& e) {
     set_error(error_json, "clear_context_failed", e.what());
     return 0;
+  }
+}
+
+/* ------------------------------------------------------------------------- */
+/* ASR (whisper.cpp)                                                          */
+/* ------------------------------------------------------------------------- */
+
+chatvv_asr* chatvv_asr_create(const char* model_path, const char* config_json,
+                              char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!model_path || !*model_path) {
+    set_error(error_json, "invalid_argument", "model_path is required");
+    return nullptr;
+  }
+  try {
+    std::string parse_error;
+    chatvv::AsrEngineConfig config = parse_asr_config(config_json, parse_error);
+    if (!parse_error.empty()) {
+      set_error(error_json, "invalid_config", parse_error);
+      return nullptr;
+    }
+    config.model_path = model_path;
+
+    auto asr = std::make_unique<chatvv_asr>();
+    std::string load_error;
+    if (!asr->engine.load(config, &load_error)) {
+      set_error(error_json, "model_load_failed", load_error);
+      return nullptr;
+    }
+    return asr.release();
+  } catch (const std::exception& e) {
+    set_error(error_json, "asr_create_failed", e.what());
+    return nullptr;
+  } catch (...) {
+    set_error(error_json, "asr_create_failed", "unknown error");
+    return nullptr;
+  }
+}
+
+void chatvv_asr_destroy(chatvv_asr* asr) { delete asr; }
+
+char* chatvv_asr_transcribe_file(chatvv_asr* asr, const char* wav_path,
+                                 const char* options_json, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!asr) {
+    set_error(error_json, "invalid_argument", "asr is null");
+    return nullptr;
+  }
+  if (!wav_path || !*wav_path) {
+    set_error(error_json, "invalid_argument", "wav_path is required");
+    return nullptr;
+  }
+  try {
+    std::string parse_error;
+    chatvv::AsrOptions options;
+    if (!parse_asr_options(options_json, options, parse_error)) {
+      set_error(error_json, "invalid_options", parse_error);
+      return nullptr;
+    }
+    auto result = asr->engine.transcribe_file(wav_path, options);
+    if (!result.ok) {
+      set_error(error_json, result.code.empty() ? "transcribe_failed" : result.code,
+                result.error);
+      return nullptr;
+    }
+    return dup_string(chatvv::AsrEngine::to_json(result));
+  } catch (const std::exception& e) {
+    set_error(error_json, "transcribe_failed", e.what());
+    return nullptr;
+  } catch (...) {
+    set_error(error_json, "transcribe_failed", "unknown error");
+    return nullptr;
+  }
+}
+
+char* chatvv_asr_transcribe_pcm(chatvv_asr* asr, const float* samples,
+                                int32_t sample_count, int32_t sample_rate,
+                                const char* options_json, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  if (!asr) {
+    set_error(error_json, "invalid_argument", "asr is null");
+    return nullptr;
+  }
+  if (sample_count < 0) {
+    set_error(error_json, "invalid_argument", "sample_count must be >= 0");
+    return nullptr;
+  }
+  if (!samples && sample_count > 0) {
+    set_error(error_json, "invalid_argument", "samples is null");
+    return nullptr;
+  }
+  if (sample_rate <= 0) {
+    set_error(error_json, "invalid_argument", "sample_rate must be positive");
+    return nullptr;
+  }
+  try {
+    std::string parse_error;
+    chatvv::AsrOptions options;
+    if (!parse_asr_options(options_json, options, parse_error)) {
+      set_error(error_json, "invalid_options", parse_error);
+      return nullptr;
+    }
+    auto result = asr->engine.transcribe_pcm(
+        samples, static_cast<size_t>(sample_count), sample_rate, options);
+    if (!result.ok) {
+      set_error(error_json, result.code.empty() ? "transcribe_failed" : result.code,
+                result.error);
+      return nullptr;
+    }
+    return dup_string(chatvv::AsrEngine::to_json(result));
+  } catch (const std::exception& e) {
+    set_error(error_json, "transcribe_failed", e.what());
+    return nullptr;
+  } catch (...) {
+    set_error(error_json, "transcribe_failed", "unknown error");
+    return nullptr;
+  }
+}
+
+char* chatvv_asr_capabilities(chatvv_asr* asr, char** error_json) {
+  if (error_json) *error_json = nullptr;
+  try {
+    if (!asr) {
+      return dup_string(chatvv::AsrEngine::static_capabilities_json());
+    }
+    return dup_string(asr->engine.capabilities_json());
+  } catch (const std::exception& e) {
+    set_error(error_json, "capabilities_failed", e.what());
+    return nullptr;
+  } catch (...) {
+    set_error(error_json, "capabilities_failed", "unknown error");
+    return nullptr;
   }
 }
 
