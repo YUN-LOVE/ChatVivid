@@ -687,7 +687,7 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
     try {
         pipeline->shader_module = device->device.createShaderModule(shader_module_create_info);
     } catch (const vk::SystemError& e) {
-        std::cerr << "ggml_vulkan: shader module creation failed for " << pipeline->name << ": " << e.what() << std::endl;
+        GGML_LOG_ERROR("ggml_vulkan: shader module creation failed for %s: %s\n", pipeline->name.c_str(), e.what());
         throw;
     }
 
@@ -701,7 +701,7 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
     try {
         pipeline->layout = device->device.createPipelineLayout(pipeline_layout_create_info);
     } catch (const vk::SystemError& e) {
-        std::cerr << "ggml_vulkan: pipeline layout creation failed for " << pipeline->name << ": " << e.what() << std::endl;
+        GGML_LOG_ERROR("ggml_vulkan: pipeline layout creation failed for %s: %s\n", pipeline->name.c_str(), e.what());
         throw;
     }
 
@@ -740,8 +740,14 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
         pipeline_shader_create_info.setPNext(&pipeline_shader_stage_required_subgroup_size_create_info);
     }
 
+    // Adreno's Android driver returns VK_ERROR_UNKNOWN from createComputePipeline
+    // when VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR is set, even though the
+    // pipeline-executable-properties extension is advertised. Statistics are
+    // only debug output, so never request them by default.
+    const bool want_pipeline_stats =
+        getenv("GGML_VK_PIPELINE_STATS") != nullptr;
     vk::ComputePipelineCreateInfo compute_pipeline_create_info(
-        device->pipeline_executable_properties_support ?
+        (device->pipeline_executable_properties_support && want_pipeline_stats) ?
             vk::PipelineCreateFlagBits::eCaptureStatisticsKHR :
             vk::PipelineCreateFlags{},
         pipeline_shader_create_info,
@@ -749,7 +755,10 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
 
     vk::PipelineRobustnessCreateInfoEXT rci;
 
-    if (device->pipeline_robustness && disable_robustness) {
+    // VK_EXT_pipeline_robustness is another driver-dependent path that can make
+    // Adreno refuse build the compute pipeline; it is only an optimisation.
+    if (device->pipeline_robustness && disable_robustness &&
+        getenv("GGML_VK_DISABLE_PIPELINE_ROBUSTNESS") != nullptr) {
         rci.storageBuffers = vk::PipelineRobustnessBufferBehaviorEXT::eDisabled;
         rci.uniformBuffers = vk::PipelineRobustnessBufferBehaviorEXT::eDisabled;
         compute_pipeline_create_info.setPNext(&rci);
@@ -771,7 +780,7 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
     try {
         pipeline->pipeline = device->device.createComputePipeline(VK_NULL_HANDLE, compute_pipeline_create_info).value;
     } catch (const vk::SystemError& e) {
-        std::cerr << "ggml_vulkan: compute pipeline creation failed for " << pipeline->name << ": " << e.what() << std::endl;
+        GGML_LOG_ERROR("ggml_vulkan: compute pipeline creation failed for %s: %s\n", pipeline->name.c_str(), e.what());
         throw;
     }
 

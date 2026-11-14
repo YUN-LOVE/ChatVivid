@@ -588,23 +588,15 @@ class _ChatScreenState extends State<ChatScreen>
         return;
       }
       final asr = _asrApi ??= AsrApi();
-      AsrTranscript? transcript;
-      try {
-        transcript = await asr.transcribeFileOnce(
-          modelPath: model,
-          wavPath: wavPath,
-          language: 'zh',
-          useGpu: true,
-        );
-      } catch (error) {
-        debugPrint('GPU whisper failed, retrying on CPU: $error');
-        transcript = await asr.transcribeFileOnce(
-          modelPath: model,
-          wavPath: wavPath,
-          language: 'zh',
-          useGpu: false,
-        );
-      }
+      // llama.cpp/whisper.cpp are locked to Vulkan in this project: no silent
+      // CPU fallback (CPU inference blocks the UI once several models are
+      // loaded). Surface a clear error instead.
+      final transcript = await asr.transcribeFileOnce(
+        modelPath: model,
+        wavPath: wavPath,
+        language: 'zh',
+        useGpu: true,
+      );
       final text = transcript.text.trim();
       if (text.isEmpty) {
         _showMessage('没听清，再说一次？');
