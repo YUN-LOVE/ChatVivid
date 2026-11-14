@@ -170,6 +170,10 @@ class _ChatScreenState extends State<ChatScreen>
         _chat = chat;
         _loading = false;
       });
+      if (!chat.busy && chat.messages.isNotEmpty) {
+        final last = chat.messages.last;
+        if (!last.isUser) _lastSpokenId = last.id;
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_scroll.hasClients) return;
         _scroll.jumpTo(_scroll.position.maxScrollExtent);
@@ -185,23 +189,28 @@ class _ChatScreenState extends State<ChatScreen>
 
   void _onChatChanged() {
     final chat = _chat;
-    if (chat == null || chat.messages.isEmpty || !_scroll.hasClients) return;
+    if (chat == null || chat.messages.isEmpty) return;
     final last = chat.messages.last;
     final changed = last.id != _lastId || last.content.length != _lastLength;
     _lastId = last.id;
     _lastLength = last.content.length;
-    if (!changed) return;
 
-    if (widget.settings.ttsAutoSpeak &&
+    // Auto-speak is evaluated on every notification, not only on content
+    // changes: the last token delta and the busy=false transition usually
+    // arrive together, so gating on `changed` meant the reply was never read
+    // aloud when the final chunk did not add characters.
+    final autoSpeakDue = widget.settings.ttsAutoSpeak &&
         !chat.busy &&
         !last.isUser &&
         last.content.trim().isNotEmpty &&
         last.id != _lastSpokenId &&
-        !_tts.speaking.value) {
+        !_tts.active;
+    if (autoSpeakDue) {
       _lastSpokenId = last.id;
       unawaited(_tts.speak(last.content));
     }
 
+    if (!changed || !_scroll.hasClients) return;
     final distance =
         _scroll.position.maxScrollExtent - _scroll.position.pixels;
     if (distance < 240 || last.isUser) {
@@ -577,26 +586,33 @@ class _ChatScreenState extends State<ChatScreen>
                 ),
               ),
             ),
-          if (!_historyOpen)
-            Positioned(
-              left: 0,
-              right: 0,
-              top: 0,
-              child: SafeArea(
-                bottom: false,
-                child: _StageTopBar(
-                  chat: chat,
-                  onSettings: _openSettings,
-                  onDragUpdate: _onHistoryDragUpdate,
-                  onDragEnd: _onHistoryDragEnd,
-                  onEyeTap: () => _showMessage('YOLO 视觉识别即将接入'),
-                  autoSpeak: widget.settings.ttsAutoSpeak,
-                  onToggleAutoSpeak: _toggleAutoSpeak,
-                  editing: _editMode,
-                  onToggleEdit: () => _setEditMode(!_editMode),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: 0,
+            child: IgnorePointer(
+              ignoring: _historyOpen,
+              child: AnimatedOpacity(
+                opacity: _historyOpen ? 0 : 1,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: SafeArea(
+                  bottom: false,
+                  child: _StageTopBar(
+                    chat: chat,
+                    onSettings: _openSettings,
+                    onDragUpdate: _onHistoryDragUpdate,
+                    onDragEnd: _onHistoryDragEnd,
+                    onEyeTap: () => _showMessage('YOLO 视觉识别即将接入'),
+                    autoSpeak: widget.settings.ttsAutoSpeak,
+                    onToggleAutoSpeak: _toggleAutoSpeak,
+                    editing: _editMode,
+                    onToggleEdit: () => _setEditMode(!_editMode),
+                  ),
                 ),
               ),
             ),
+          ),
           Positioned.fill(
             child: IgnorePointer(
               ignoring: !_historyOpen,
@@ -610,14 +626,19 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ),
           ),
-          if (!_historyOpen)
-            Positioned(
-              left: 12,
-              right: 12,
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              child: SafeArea(
-                top: false,
-                child: Column(
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            child: IgnorePointer(
+              ignoring: _historyOpen,
+              child: AnimatedOpacity(
+                opacity: _historyOpen ? 0 : 1,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (_editMode) ...[
@@ -662,10 +683,12 @@ class _ChatScreenState extends State<ChatScreen>
                         onLongPressSend: () => _setLive(true),
                       ),
                     ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
+          ),
         ],
         ),
       ),
@@ -781,16 +804,15 @@ class _StageTopBar extends StatelessWidget {
       onVerticalDragEnd: (_) => onDragEnd(),
       child: ClipRRect(
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 12 * GlassPanel.intensity.clamp(0.2, 2.0),
-            sigmaY: 12 * GlassPanel.intensity.clamp(0.2, 2.0),
-          ),
-          child: Container(
+        child: Container(
             height: 66,
             padding: EdgeInsets.fromLTRB(8, 6, 8, 8),
             decoration: BoxDecoration(
-              color: AppColors.glass.withValues(alpha: 0.78),
+              // Solid translucent surface: no BackdropFilter over the live2d
+              // platform view (that was the main source of UI jank).
+              color: AppColors.glass.withValues(
+                alpha: (0.82 + 0.05 * GlassPanel.intensity).clamp(0.0, 0.94),
+              ),
               border: Border(
                 bottom: BorderSide(color: Colors.white.withValues(alpha: 0.10)),
               ),
@@ -868,7 +890,6 @@ class _StageTopBar extends StatelessWidget {
               ),
             ),
           ),
-        ),
       ),
     );
   }

@@ -95,6 +95,7 @@ class AppSettings {
     required this.ttsPitchHz,
     required this.ttsVolume,
     required this.ttsAutoSpeak,
+    required this.ttsLipSyncOffsetMs,
     required this.developerMode,
     required this.typewriterSpeed,
     required this.characterScale,
@@ -130,6 +131,7 @@ class AppSettings {
       ttsPitchHz: 0,
       ttsVolume: 1.0,
       ttsAutoSpeak: false,
+      ttsLipSyncOffsetMs: 180,
       developerMode: false,
       typewriterSpeed: 1.0,
       characterScale: 1.0,
@@ -208,6 +210,8 @@ class AppSettings {
       ttsVolume:
           (json['tts_volume'] as num?)?.toDouble() ?? defaults.ttsVolume,
       ttsAutoSpeak: (json['tts_auto_speak'] as bool?) ?? false,
+      ttsLipSyncOffsetMs: (json['tts_lip_sync_offset_ms'] as num?)?.toInt() ??
+          defaults.ttsLipSyncOffsetMs,
       developerMode: (json['developer_mode'] as bool?) ?? false,
       typewriterSpeed: (json['typewriter_speed'] as num?)?.toDouble() ??
           defaults.typewriterSpeed,
@@ -247,6 +251,11 @@ class AppSettings {
   final int ttsPitchHz;
   final double ttsVolume;
   final bool ttsAutoSpeak;
+
+  /// How long the mouth animation waits after audio starts (ms). Lets the user
+  /// align the lip-sync with their device's audio output latency; synthesis
+  /// time itself no longer animates the mouth.
+  final int ttsLipSyncOffsetMs;
   final bool developerMode;
   final double typewriterSpeed;
   final double characterScale;
@@ -282,6 +291,7 @@ class AppSettings {
         'tts_pitch_hz': ttsPitchHz,
         'tts_volume': ttsVolume,
         'tts_auto_speak': ttsAutoSpeak,
+        'tts_lip_sync_offset_ms': ttsLipSyncOffsetMs,
         'developer_mode': developerMode,
         'typewriter_speed': typewriterSpeed,
         'character_scale': characterScale,
@@ -316,6 +326,7 @@ class AppSettings {
     int? ttsPitchHz,
     double? ttsVolume,
     bool? ttsAutoSpeak,
+    int? ttsLipSyncOffsetMs,
     bool? developerMode,
     double? typewriterSpeed,
     double? characterScale,
@@ -349,6 +360,7 @@ class AppSettings {
       ttsPitchHz: ttsPitchHz ?? this.ttsPitchHz,
       ttsVolume: ttsVolume ?? this.ttsVolume,
       ttsAutoSpeak: ttsAutoSpeak ?? this.ttsAutoSpeak,
+      ttsLipSyncOffsetMs: ttsLipSyncOffsetMs ?? this.ttsLipSyncOffsetMs,
       developerMode: developerMode ?? this.developerMode,
       typewriterSpeed: typewriterSpeed ?? this.typewriterSpeed,
       characterScale: characterScale ?? this.characterScale,

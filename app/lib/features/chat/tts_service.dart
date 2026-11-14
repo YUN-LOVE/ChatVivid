@@ -52,6 +52,14 @@ class TtsService {
   static const MethodChannel _audio = MethodChannel('chatvv/audio');
   final FlutterTts _system = FlutterTts();
   final ValueNotifier<bool> speaking = ValueNotifier(false);
+
+  /// True while the Edge request is in flight / the TTS engine is preparing
+  /// audio. The mouth must NOT animate during this phase; [speaking] only
+  /// becomes true once playback actually starts.
+  final ValueNotifier<bool> synthesizing = ValueNotifier(false);
+
+  bool get active => speaking.value || synthesizing.value;
+
   AppSettings _settings = AppSettings.defaults();
   bool _ready = false;
   bool _systemReady = false;
@@ -65,6 +73,7 @@ class TtsService {
     _ready = true;
     _audio.setMethodCallHandler((call) async {
       if (call.method == 'completed' || call.method == 'error') {
+        _cancelSpeakingStart();
         _playbackWatchdog?.cancel();
         _playbackWatchdog = null;
         speaking.value = false;
@@ -87,20 +96,21 @@ class TtsService {
     final clean = _plain(text);
     if (clean.isEmpty) return;
     await stop();
-    speaking.value = true;
+    synthesizing.value = true;
+    var handled = false;
 
     final settings = _settings;
     if (settings.ttsEngine == TtsEngine.system) {
-      if (await _speakSystem(clean, settings)) return;
+      handled = await _speakSystem(clean, settings);
       // System engine unavailable: fall back to Edge so the reply is still
       // spoken instead of going silent.
     }
-    if (await _speakEdge(clean, settings)) return;
-    if (settings.ttsEngine == TtsEngine.edge &&
-        await _speakSystem(clean, settings)) {
-      return;
+    if (!handled) handled = await _speakEdge(clean, settings);
+    if (!handled && settings.ttsEngine == TtsEngine.edge) {
+      handled = await _speakSystem(clean, settings);
     }
-    speaking.value = false;
+    synthesizing.value = false;
+    if (!handled) speaking.value = false;
   }
 
   Future<bool> _speakEdge(String clean, AppSettings settings) async {
@@ -119,7 +129,7 @@ class TtsService {
         () => _edgeSynthesize(clean, voice, options, path),
       );
       if (error == null && File(path).existsSync()) {
-        if (await _playFile(path)) return true;
+        if (await _startPlayback(path)) return true;
       }
       debugPrint('Edge TTS failed: $error');
     } catch (error) {
@@ -139,6 +149,7 @@ class TtsService {
       );
       await _system.setVolume(settings.ttsVolume.clamp(0.0, 1.0));
       await _system.stop();
+      _startSpeakingAfter(_settings.ttsLipSyncOffsetMs);
       await _system.speak(clean);
       return true;
     } catch (error) {
@@ -148,8 +159,10 @@ class TtsService {
   }
 
   Future<void> stop() async {
+    _cancelSpeakingStart();
     _playbackWatchdog?.cancel();
     _playbackWatchdog = null;
+    synthesizing.value = false;
     try {
       await _audio.invokeMethod('stop');
     } catch (_) {}
@@ -178,6 +191,36 @@ class TtsService {
       speaking.value = false;
       _audio.invokeMethod('stop').catchError((_) => null);
     });
+  }
+
+  Timer? _speakingStartTimer;
+
+  void _cancelSpeakingStart() {
+    _speakingStartTimer?.cancel();
+    _speakingStartTimer = null;
+  }
+
+  /// Starts the mouth animation relative to the actual audio start. Positive
+  /// [offsetMs] delays it (compensating output latency), so synthesis time no
+  /// longer shows as "mouth moving before any sound".
+  void _startSpeakingAfter(int offsetMs) {
+    _cancelSpeakingStart();
+    if (offsetMs <= 0) {
+      speaking.value = true;
+      return;
+    }
+    _speakingStartTimer = Timer(Duration(milliseconds: offsetMs), () {
+      if (!synthesizing.value) speaking.value = true;
+    });
+  }
+
+  Future<bool> _startPlayback(String path) async {
+    _cancelSpeakingStart();
+    final offset = _settings.ttsLipSyncOffsetMs.clamp(0, 1500);
+    final played = await _playFile(path);
+    if (!played) return false;
+    _startSpeakingAfter(offset);
+    return true;
   }
 
   Future<bool> _playFile(String path) async {

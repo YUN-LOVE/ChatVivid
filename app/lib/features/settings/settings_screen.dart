@@ -1357,6 +1357,26 @@ class _SettingsDetailState extends State<SettingsDetail> {
                 _updateSettings(settings.copyWith(ttsAutoSpeak: value)),
           ),
         ),
+        SizedBox(height: 10),
+        _ttsSlider(
+          label: '口型对齐延迟',
+          value: settings.ttsLipSyncOffsetMs.toDouble(),
+          min: 0,
+          max: 1200,
+          divisions: 24,
+          format: (value) => '${value.round()} ms',
+          onChanged: (value) => _updateSettings(
+            settings.copyWith(ttsLipSyncOffsetMs: value.round()),
+          ),
+        ),
+        Text(
+          '声音开始后延迟多久再动嘴；用来补偿本机音频输出/蓝牙延迟。',
+          style: TextStyle(
+            color: AppColors.muted.withValues(alpha: 0.6),
+            fontSize: 10,
+            height: 1.4,
+          ),
+        ),
         SizedBox(height: 14),
         OutlinedButton.icon(
           onPressed: _testTts,

@@ -1,21 +1,21 @@
-import 'dart:ui';
+import 'dart:math' as math;
+import 'dart:ui' show PointMode;
 
 import 'package:flutter/material.dart';
 
 import 'app_theme.dart';
 
-/// A frosted surface. Keep this to app bars, composers and sheets; do not wrap
-/// every list item in a blur.
+/// A lightweight frosted-look surface.
 ///
-/// Two tints are available:
-/// * [GlassTint.dark] — the original dark deep-sea glass.
-/// * [GlassTint.light] — white frosted glass (composer + output card). This is a
-///   single backdrop blur layer (no stacked blur / grain) to keep it cheap on
-///   Android where the character platform view animates behind it.
+/// Deliberately **does not use `BackdropFilter`**: on Android the chat screen
+/// keeps a live2d platform view (a GL texture) behind the composer and the
+/// output card, and re-blurring the backdrop every frame made the whole UI
+/// janky (main thread + RenderThread pegged). The frosted look is reproduced
+/// with layered translucent gradients, a soft border highlight and a static
+/// grain texture painted once — visually similar, but essentially free.
 ///
-/// [intensity] is a global 0.2–2.0 multiplier driven by the 设置 → 外观 →
-/// 毛玻璃强度 slider. It scales the blur sigma (and lets the user disable the
-/// material almost entirely).
+/// [intensity] (0.2–2.0, 设置 → 外观 → 毛玻璃强度) scales the tint opacity and
+/// grain so the user can still tune the material.
 enum GlassTint { dark, light }
 
 class GlassPanel extends StatelessWidget {
@@ -32,6 +32,9 @@ class GlassPanel extends StatelessWidget {
 
   final Widget child;
   final double radius;
+
+  /// Kept for API compatibility with the old blur-based panel; it now scales
+  /// the soft inner shadow only.
   final double blur;
   final EdgeInsetsGeometry padding;
   final Color? color;
@@ -41,10 +44,12 @@ class GlassPanel extends StatelessWidget {
   /// Global frost multiplier, set by the app from `AppSettings.glassStrength`.
   static double intensity = 1.0;
 
+  static double get _clamped => intensity.clamp(0.2, 2.0);
+
   @override
   Widget build(BuildContext context) {
+    final i = _clamped;
     final borderRadius = BorderRadius.circular(radius);
-    final effectiveBlur = (blur * intensity.clamp(0.2, 2.0)).clamp(1.0, 48.0);
     final light = tint == GlassTint.light;
     final base = color ??
         (light ? const Color(0xFFFFFFFF) : AppColors.glass);
@@ -54,43 +59,42 @@ class GlassPanel extends StatelessWidget {
         borderRadius: borderRadius,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: light ? 0.20 : 0.24),
-            blurRadius: light ? 20 : 24,
-            offset: Offset(0, light ? 8 : 10),
+            color: Colors.black.withValues(alpha: light ? 0.18 : 0.22),
+            blurRadius: (blur * i).clamp(8.0, 40.0),
+            offset: Offset(0, light ? 6 : 9),
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: borderRadius,
         child: Stack(
-          fit: StackFit.passthrough,
           children: [
             Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(
-                  sigmaX: effectiveBlur,
-                  sigmaY: effectiveBlur,
-                ),
-                child: ColoredBox(
-                  color: light
-                      ? base.withValues(alpha: 0.14 + 0.10 * intensity.clamp(0, 1))
-                      : base.withValues(alpha: 0.78),
+              child: ColoredBox(
+                color: light
+                    ? base.withValues(alpha: (0.22 + 0.16 * i).clamp(0.0, 0.62))
+                    : base.withValues(alpha: 0.86),
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  painter: _FrostGrainPainter(
+                    light: light,
+                    intensity: i,
+                  ),
                 ),
               ),
             ),
             Container(
               padding: padding,
               decoration: BoxDecoration(
-                color: light
-                    ? Colors.white.withValues(alpha: 0.08 + 0.06 * intensity.clamp(0, 1))
-                    : Colors.transparent,
                 borderRadius: borderRadius,
                 border: border
                     ? Border.all(
                         color: light
-                            ? Colors.white.withValues(alpha: 0.34)
+                            ? Colors.white.withValues(alpha: 0.30 + 0.12 * i)
                             : Colors.white.withValues(alpha: 0.10),
-                        width: light ? 1.0 : 1.0,
                       )
                     : null,
                 gradient: LinearGradient(
@@ -98,10 +102,10 @@ class GlassPanel extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: light
                       ? [
-                          Colors.white.withValues(alpha: 0.26),
-                          Colors.white.withValues(alpha: 0.08),
-                          Colors.white.withValues(alpha: 0.04),
-                          Colors.white.withValues(alpha: 0.14),
+                          Colors.white.withValues(alpha: 0.22 + 0.10 * i),
+                          Colors.white.withValues(alpha: 0.05),
+                          Colors.white.withValues(alpha: 0.03),
+                          Colors.white.withValues(alpha: 0.10),
                         ]
                       : [
                           Colors.white.withValues(alpha: 0.055),
@@ -119,4 +123,67 @@ class GlassPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Deterministic frost grain, painted once per panel build (no backdrop
+/// read-back, no blur layer).
+class _FrostGrainPainter extends CustomPainter {
+  _FrostGrainPainter({required this.light, required this.intensity});
+
+  final bool light;
+  final double intensity;
+
+  static final List<Offset> _points = _buildPoints();
+  static final List<Offset> _streaks = _buildStreaks();
+
+  static List<Offset> _buildPoints() {
+    final random = math.Random(20261114);
+    return List<Offset>.generate(
+      260,
+      (_) => Offset(random.nextDouble(), random.nextDouble()),
+      growable: false,
+    );
+  }
+
+  static List<Offset> _buildStreaks() {
+    final random = math.Random(7);
+    return List<Offset>.generate(
+      18,
+      (_) => Offset(random.nextDouble(), random.nextDouble() * 0.98),
+      growable: false,
+    );
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final grain = light ? 0.05 : 0.03;
+    final dotPaint = Paint()
+      ..color = (light ? Colors.white : Colors.white)
+          .withValues(alpha: grain * intensity.clamp(0.0, 2.0))
+      ..strokeWidth = 0.7
+      ..strokeCap = StrokeCap.round;
+    for (final point in _points) {
+      canvas.drawPoints(
+        PointMode.points,
+        [Offset(point.dx * size.width, point.dy * size.height)],
+        dotPaint,
+      );
+    }
+
+    final streakPaint = Paint()
+      ..color = Colors.white.withValues(
+        alpha: (light ? 0.04 : 0.02) * intensity.clamp(0.0, 2.0),
+      )
+      ..strokeWidth = 0.6;
+    for (final streak in _streaks) {
+      final x = streak.dx * size.width;
+      final y = streak.dy * size.height;
+      final length = 5.0 + (streak.dx * 18.0);
+      canvas.drawLine(Offset(x, y), Offset(x + length, y), streakPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _FrostGrainPainter oldDelegate) =>
+      oldDelegate.intensity != intensity || oldDelegate.light != light;
 }
