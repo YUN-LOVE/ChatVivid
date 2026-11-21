@@ -58,7 +58,7 @@ class SettingsCategory {
 final _categories = [
   SettingsCategory(
     title: '连接与后端',
-    description: 'Full / Only client、模型与 API Key',
+    description: 'native / client、模型与 API Key',
     icon: Icons.hub_rounded,
   ),
   SettingsCategory(
@@ -67,7 +67,7 @@ final _categories = [
     icon: Icons.auto_awesome_rounded,
   ),
   SettingsCategory(
-    title: '技能',
+    title: 'SKILLS',
     description: '可启用的提示词工作流',
     icon: Icons.extension_rounded,
   ),
@@ -77,8 +77,8 @@ final _categories = [
     icon: Icons.hub_outlined,
   ),
   SettingsCategory(
-    title: '记忆归档',
-    description: '长期记忆、旧对话归档',
+    title: '记忆',
+    description: '长期记忆、上下文清除',
     icon: Icons.memory_rounded,
   ),
   SettingsCategory(
@@ -313,8 +313,8 @@ class _SummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final label = settings.mode == BackendMode.full
-        ? (settings.apiKey.isEmpty ? 'Full · mock' : 'Full · native')
-        : 'Only client';
+        ? (settings.apiKey.isEmpty ? 'mock' : 'native')
+        : 'client';
     return GlassPanel(
       radius: 24,
       padding: EdgeInsets.all(16),
@@ -327,7 +327,7 @@ class _SummaryCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '大肥鱼',
+                  'ChatVivid',
                   style: TextStyle(
                     color: AppColors.text,
                     fontSize: 15,
@@ -573,7 +573,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
     final tts = _ttsTest ??= TtsService();
     tts.applySettings(_settings);
     await tts.init();
-    await tts.speak('你好，我是大肥鱼。这是当前语音设置的试听。');
+    await tts.speak('你好，我是小鱼。这是当前语音设置的试听。');
   }
 
   @override
@@ -653,7 +653,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
           segments: [
             ButtonSegment(
               value: BackendMode.full,
-              label: Text('Full'),
+              label: Text('Native'),
               icon: Icon(Icons.memory_rounded),
             ),
             ButtonSegment(
@@ -713,8 +713,8 @@ class _SettingsDetailState extends State<SettingsDetail> {
         SizedBox(height: 12),
         Text(
           full
-              ? 'Full 使用 libchatvv_ffi.so；不需要 127.0.0.1 或 adb reverse。'
-              : 'Only client 使用 HTTPS/SSE；服务器需可访问。',
+              ? 'Native 使用 libchatvv_ffi.so；不需要 127.0.0.1 或 adb reverse。'
+              : 'Client 使用 HTTPS/SSE；服务器需可访问。',
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.6),
             fontSize: 10.5,
@@ -1099,7 +1099,7 @@ class _SettingsDetailState extends State<SettingsDetail> {
         SizedBox(height: 10),
         _SettingCard(
           icon: Icons.image_rounded,
-          title: '立绘 · 蓝色女仆',
+          title: '立绘 · 盒马',
           subtitle: '替换服装立绘',
           trailing: _settings.characterMode == CharacterMode.altImage
               ? Icon(Icons.check_rounded, color: AppColors.success)

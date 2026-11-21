@@ -238,7 +238,7 @@ class _WelcomePage extends StatelessWidget {
         ),
         SizedBox(height: 18),
         Text(
-          '把记忆\n留在自己手里',
+          '记忆驱动算力',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.text,
@@ -250,7 +250,7 @@ class _WelcomePage extends StatelessWidget {
         ),
         SizedBox(height: 12),
         Text(
-          '单对话、长期记忆，默认只在本机。',
+          '一个数字生命？',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.85),
@@ -295,9 +295,9 @@ class _ModePage extends StatelessWidget {
         _ModeCard(
           selected: mode == BackendMode.full,
           icon: Icons.memory_rounded,
-          title: 'Full · 内嵌 C++',
+          title: 'native',
           subtitle: '推荐',
-          body: 'C++ core 在 App 内，无端口、无回环。',
+          body: '核心编译成lib打包进app，但是多设备同步有困难',
           onTap: () => onChanged(BackendMode.full),
         ),
         SizedBox(height: 12),
@@ -458,7 +458,7 @@ class _ConnectionPage extends StatelessWidget {
           _Field(
             controller: apiKey,
             label: 'API Key',
-            hint: 'sk-…（留空先用 mock）',
+            hint: 'sk-…（留空即为 mock模式）',
             obscure: true,
           ),
           SizedBox(height: 12),
@@ -555,7 +555,7 @@ class _ReadyPage extends StatelessWidget {
         ),
         SizedBox(height: 18),
         Text(
-          '记忆体已就绪',
+          'RAG已就绪',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: AppColors.text,

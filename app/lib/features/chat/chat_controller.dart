@@ -105,7 +105,7 @@ class ChatController extends ChangeNotifier {
         online = false;
         error = exception.toString();
         if (reply.content.isEmpty) {
-          reply.content = '……连接不上后端。\n确认 chatvvd 已启动；Android 真机先 adb reverse tcp:8080 tcp:8080。';
+          reply.content = '……连接不上后端。\n确认 chatvvd 已启动';
         }
         reply.streaming = false;
         busy = false;
