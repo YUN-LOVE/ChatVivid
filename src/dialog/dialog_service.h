@@ -1,6 +1,9 @@
 #pragma once
 
+#include <nlohmann/json.hpp>
+
 #include <atomic>
+#include <map>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -9,6 +12,7 @@
 #include <vector>
 
 #include "context/context_builder.h"
+#include "mcp/mcp_client.h"
 
 namespace chatvv {
 
@@ -43,12 +47,25 @@ class DialogService {
            std::string user_text,
            std::shared_ptr<std::atomic<bool>> cancel);
 
+  void ensure_mcp_tools();
+
   const Config& cfg_;
   Db& db_;
   InjectionStore& slots_;
   ResponseHub& hub_;
   Provider& provider_;
   EmbeddingEngine* embedding_ = nullptr;
+
+  struct McpBinding {
+    std::string exposed_name;
+    std::string original_name;
+    McpClient* client = nullptr;
+  };
+
+  std::once_flag mcp_once_;
+  nlohmann::json mcp_tools_ = nlohmann::json::array();
+  std::map<std::string, McpBinding> mcp_bindings_;
+  std::vector<std::unique_ptr<McpClient>> mcp_clients_;
 
   std::mutex mu_;
   std::unordered_map<std::string, std::shared_ptr<std::atomic<bool>>> cancels_;

@@ -1405,8 +1405,8 @@ class _SettingsDetailState extends State<SettingsDetail> {
         ),
         SizedBox(height: 6),
         Text(
-          '首次语音输入会下载 ggml-base-q5_1.bin（约 57MB）。'
-          '也可以把已有 ggml 模型路径填在这里。',
+          'App 已内置 whisper base（ggml-base-q5_1，约 57MB），语音输入开箱可用。'
+          '想换模型可以在上面填路径，或打开镜像站下载。',
           style: TextStyle(
             color: AppColors.muted.withValues(alpha: 0.6),
             fontSize: 10,

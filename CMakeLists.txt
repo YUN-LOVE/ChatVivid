@@ -107,7 +107,8 @@ add_library(chatvv_core STATIC
   src/dialog/response_hub.cpp
   src/dialog/dialog_service.cpp
   src/tts/synthesize.cpp
-  src/asr/asr.cpp)
+  src/asr/asr.cpp
+  src/mcp/mcp_client.cpp)
 if(ANDROID)
   # __android_log_print() used by the native logging bridge.
   target_link_libraries(chatvv_core PUBLIC log)

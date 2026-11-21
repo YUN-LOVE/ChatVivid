@@ -1,8 +1,16 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 namespace chatvv {
+
+struct McpServerConfig {
+  std::string name;
+  std::string url;
+  std::string token;
+  bool enabled = true;
+};
 
 struct Config {
   struct Server {
@@ -43,6 +51,8 @@ struct Config {
     std::string system_file;
     std::string system_text;
   } prompt;
+
+  std::vector<McpServerConfig> mcp_servers;
 
   static Config load(const std::string& path);
   static std::string default_system_prompt();

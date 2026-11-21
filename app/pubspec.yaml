@@ -36,6 +36,7 @@ flutter:
   assets:
     - assets/cacert.pem
     - assets/models/bge-small-zh-v1.5-f16.gguf
+    - assets/models/whisper/ggml-base-q5_1.bin
     - assets/mascot/
     - assets/rive/
     - assets/live2d/whale-girl/

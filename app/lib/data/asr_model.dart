@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'app_paths.dart';
 
@@ -13,6 +14,11 @@ import 'app_paths.dart';
 /// in 设置 → 语音与 TTS.
 class WhisperModelStore {
   static const String fileName = 'ggml-base-q5_1.bin';
+
+  /// Whisper base model shipped inside the app (quantized q5_1, ~57 MB), so
+  /// voice input works out of the box without a download.
+  static const String bundledAsset =
+      'assets/models/whisper/ggml-base-q5_1.bin';
 
   static const String _huggingFaceBase = 'https://huggingface.co';
   static const String _repoPath = 'ggerganov/whisper.cpp/resolve/main';
@@ -62,6 +68,19 @@ class WhisperModelStore {
     final file = File(candidate);
     if (await file.exists() && await file.length() > 10 * 1024 * 1024) {
       return file.path;
+    }
+    // Prefer the model bundled in the APK; copy it into the app support dir on
+    // first use. Downloading is only needed when the asset is absent (e.g. a
+    // custom/older build) or when a different model was requested.
+    if (overridePath.trim().isEmpty) {
+      try {
+        await file.parent.create(recursive: true);
+        final data = await rootBundle.load(bundledAsset);
+        await file.writeAsBytes(data.buffer.asUint8List(), flush: true);
+        if (await file.length() > 10 * 1024 * 1024) return file.path;
+      } catch (error) {
+        debugPrint('bundled whisper model unavailable: $error');
+      }
     }
     if (!downloadIfMissing) return null;
 

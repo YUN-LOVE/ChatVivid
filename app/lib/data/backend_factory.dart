@@ -85,6 +85,16 @@ Future<ChatBackend> createChatBackend(AppSettings settings) async {
       'system_prompt': combinedSystem,
       'embedding_model': modelFile.path,
       'embedding_threads': 2,
+      'mcp_servers': [
+        for (final server in settings.mcpServers)
+          if (server.enabled && server.url.trim().isNotEmpty)
+            {
+              'name': server.name,
+              'url': server.url,
+              'token': server.token,
+              'enabled': true,
+            },
+      ],
     },
   );
 }

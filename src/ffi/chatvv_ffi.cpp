@@ -119,6 +119,21 @@ bool parse_config(const json& input, chatvv::Config& cfg, std::string& error) {
   int_field("embedding_threads", cfg.embedding.threads);
   int_field("timeout_ms", cfg.llm.timeout_ms);
 
+  const auto mcp = input.find("mcp_servers");
+  if (mcp != input.end() && mcp->is_array()) {
+    for (const auto& item : *mcp) {
+      if (!item.is_object()) continue;
+      chatvv::McpServerConfig server;
+      server.name = item.value("name", std::string());
+      server.url = item.value("url", std::string());
+      server.token = item.value("token", std::string());
+      server.enabled = item.value("enabled", true);
+      if (server.enabled && !server.url.empty()) {
+        cfg.mcp_servers.push_back(std::move(server));
+      }
+    }
+  }
+
   if (cfg.storage.data_dir.empty()) {
     error = "data_dir is required";
     return false;

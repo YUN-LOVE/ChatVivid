@@ -1,5 +1,7 @@
 #include "dialog/dialog_service.h"
 
+#include <cctype>
+#include <set>
 #include <stdexcept>
 
 #include "app/config.h"
@@ -58,6 +60,44 @@ DialogService::DialogService(const Config& cfg, Db& db, InjectionStore& slots,
 
 DialogService::~DialogService() { shutdown(); }
 
+void DialogService::ensure_mcp_tools() {
+  std::call_once(mcp_once_, [this] {
+    if (cfg_.mcp_servers.empty()) return;
+    std::set<std::string> names;
+    for (const auto& server : cfg_.mcp_servers) {
+      auto client = std::make_unique<McpClient>(server);
+      std::vector<McpTool> tools;
+      std::string error;
+      if (!client->list_tools(&tools, &error)) {
+        log_warn("mcp.tools_failed",
+                 {{"server", server.name}, {"error", error}});
+        continue;
+      }
+      McpClient* raw = client.get();
+      for (const auto& tool : tools) {
+        std::string exposed = tool.name;
+        if (!names.insert(exposed).second) {
+          std::string prefix = server.name;
+          for (auto& c : prefix) {
+            if (!std::isalnum(static_cast<unsigned char>(c))) c = '_';
+          }
+          exposed = prefix + "_" + tool.name;
+          names.insert(exposed);
+        }
+        mcp_tools_.push_back({{"type", "function"},
+                              {"name", exposed},
+                              {"description", tool.description},
+                              {"parameters", tool.input_schema}});
+        mcp_bindings_[exposed] = McpBinding{exposed, tool.name, raw};
+      }
+      log_info("mcp.tools_loaded",
+               {{"server", server.name},
+                {"count", static_cast<int64_t>(tools.size())}});
+      mcp_clients_.push_back(std::move(client));
+    }
+  });
+}
+
 DialogService::StartResult DialogService::start(
     const std::string& text, const std::vector<Injection>& extra,
     const std::string& instructions_override) {
@@ -86,11 +126,13 @@ DialogService::StartResult DialogService::start(
           // input dispatch for seconds (Android ANR). Build it here instead:
           // the caller only needs the response id to start streaming.
           try {
+            ensure_mcp_tools();
             BuiltContext ctx =
                 build_context(db_, slots_, cfg_, text, extra, embedding_);
             if (!instructions_override.empty()) {
               ctx.instructions = instructions_override;
             }
+            ctx.tools = mcp_tools_;
             std::string rendered;
             if (!ctx.input.empty()) {
               const auto& last = ctx.input.back();
@@ -182,7 +224,77 @@ void DialogService::run(std::string id, BuiltContext ctx, std::string model,
     emit(type, data);
   };
 
-  const LlmResult result = provider_.complete(req, sink);
+  // Run the model, executing MCP tool calls and feeding their results back
+  // until the model produces a normal answer (bounded to avoid an infinite
+  // loop if a server keeps returning calls).
+  LlmResult result;
+  nlohmann::json conversation_input = ctx.input;
+  constexpr int kMaxToolRounds = 6;
+  for (int round = 0; round < kMaxToolRounds; ++round) {
+    req.input = conversation_input;
+    result = provider_.complete(req, sink);
+    if (!result.ok || cancel->load()) break;
+    if (!result.output.is_array()) break;
+
+    nlohmann::json calls = nlohmann::json::array();
+    for (const auto& item : result.output) {
+      if (item.is_object() &&
+          item.value("type", std::string()) == "function_call") {
+        calls.push_back(item);
+      }
+    }
+    if (calls.empty()) break;
+
+    emit("response.tool_calls",
+         {{"type", "response.tool_calls"}, {"calls", calls}});
+
+    // Keep the assistant tool-call items in the conversation, then append one
+    // function_call_output item per call.
+    for (const auto& item : result.output) conversation_input.push_back(item);
+    for (const auto& call : calls) {
+      const std::string call_id = call.value("call_id", call.value("id", ""));
+      const std::string name = call.value("name", std::string());
+      nlohmann::json arguments = nlohmann::json::object();
+      try {
+        const auto raw = call.value("arguments", std::string("{}"));
+        if (!raw.empty()) arguments = nlohmann::json::parse(raw);
+      } catch (...) {
+      }
+      emit("response.tool_call",
+           {{"type", "response.tool_call"},
+            {"call_id", call_id},
+            {"name", name},
+            {"arguments", arguments}});
+      std::string output;
+      std::string error;
+      nlohmann::json raw = nlohmann::json::object();
+      const auto binding = mcp_bindings_.find(name);
+      if (binding == mcp_bindings_.end() || binding->second.client == nullptr) {
+        error = "unknown tool: " + name;
+      } else if (!binding->second.client->call_tool(
+                     binding->second.original_name, arguments, &output, &raw,
+                     &error)) {
+        error = error.empty() ? "tool call failed" : error;
+      }
+      if (error.empty() && output.empty()) output = "error: empty tool result";
+      if (!error.empty()) output = "error: " + error;
+      emit("response.tool_result",
+           {{"type", "response.tool_result"},
+            {"call_id", call_id},
+            {"name", name},
+            {"output", output},
+            {"raw", raw},
+            {"error", error}});
+      conversation_input.push_back(
+          {{"type", "function_call_output"},
+           {"call_id", call_id},
+           {"output", output}});
+    }
+    if (round == kMaxToolRounds - 1) {
+      result.ok = false;
+      result.error = "too many tool call rounds";
+    }
+  }
   const bool cancelled = cancel->load();
 
   if (cancelled) {
