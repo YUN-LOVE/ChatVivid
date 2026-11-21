@@ -308,6 +308,18 @@ jobs:
           yes | "$SDKMGR" --licenses >/dev/null || true
           "$SDKMGR" "platforms;android-36" "build-tools;36.0.0" \
             "ndk;27.2.12479018" "cmake;3.22.1"
+      - name: Pin Android NDK + CMake (runner image drift)
+        if: matrix.platform == 'android'
+        shell: bash
+        run: |
+          SDK="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "ANDROID_NDK_HOME=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$SDK/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          # GitHub's Android/CMake images moved to CMake 4.5 + NDK 27.3, which
+          # breaks vcpkg's Android cross Threads check. Pin both to the versions
+          # this project is known to build with.
+          python3 -m pip install --quiet "cmake==3.31.6"
+          echo "$(python3 -c 'import sysconfig;print(sysconfig.get_path("scripts"))')" >> "$GITHUB_PATH"
       - name: Build Android FFI + read-aloud
         if: matrix.platform == 'android'
         shell: bash
